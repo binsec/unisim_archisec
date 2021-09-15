@@ -1,0 +1,105 @@
+(rule
+ (target .unisim-tree)
+ (deps (source_tree unisim))
+ (action
+  (write-file %{target} "")))
+
+(subdir
+ unisim/util
+ (include_subdirs unqualified)
+ (library
+  (package unisim_archisec)
+  (name util)
+  (foreign_stubs
+   (language cxx)
+   (names (:standard))
+   (flags :standard -I ../..)
+   (extra_deps ../../.unisim-tree))
+  (c_library_flags :standard -lstdc++)))
+
+(subdir
+ unisim/component/cxx/processor/arm
+ (foreign_library
+  (archive_name arm)
+  (language cxx)
+  (names (:standard))
+  (flags :standard -I ../../../../.. -I .)
+  (extra_deps
+   ../../../../../.unisim-tree
+   top_arm32.hh top_arm32.tcc
+   top_thumb.hh top_thumb.tcc)))
+
+(library
+ (public_name unisim_archisec.arm32dba)
+ (name arm32dba)
+ (modules arm32dba)
+ (foreign_archives unisim/component/cxx/processor/arm/arm)
+ (foreign_stubs
+  (language cxx)
+  (names arm32dba)
+  (flags :standard))
+ (c_library_flags :standard -lstdc++)
+ (libraries util))
+
+(subdir
+ unisim/component/cxx/processor/arm/isa/arm64
+ (foreign_library
+  (archive_name arm64)
+  (language cxx)
+  (names (:standard))
+  (flags :standard -I ../../../../../../.. -I .)
+  (extra_deps
+   ../../../../../../../.unisim-tree
+   aarch64dec.hh aarch64dec.tcc)))
+
+(library
+ (public_name unisim_archisec.aarch64dba)
+ (name aarch64dba)
+ (modules aarch64dba)
+ (foreign_archives
+  unisim/component/cxx/processor/arm/isa/arm64/arm64)
+ (foreign_stubs
+  (language cxx)
+  (names aarch64dba)
+  (flags :standard))
+ (c_library_flags :standard -lstdc++)
+ (libraries util))
+
+(subdir
+ unisim/component/cxx/processor/intel
+ (include_subdirs unqualified)
+ (foreign_library
+  (archive_name intel)
+  (language cxx)
+  (names (:standard))
+  (flags :standard -I ../../../../..)
+  (extra_deps ../../../../../.unisim-tree)))
+
+(subdir
+ unisim/component/cxx/processor/amd64
+ (foreign_library
+ (archive_name amd64)
+ (language cxx)
+ (names (:standard))
+ (flags :standard -I . -I ../../../../..)
+ (extra_deps ../../../../../.unisim-tree)))
+
+(library
+ (public_name unisim_archisec.amd64dba)
+ (name amd64dba)
+ (modules amd64dba)
+ (foreign_archives
+  unisim/component/cxx/processor/amd64/amd64
+  unisim/component/cxx/processor/intel/intel)
+ (foreign_stubs
+  (language cxx)
+  (names amd64dba)
+  (flags :standard))
+ (c_library_flags :standard -lstdc++)
+ (libraries util))
+
+(test
+ (name unittest)
+ (modes native)
+ (modules unittest)
+ (libraries arm32dba aarch64dba amd64dba))
