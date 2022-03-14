@@ -3,8 +3,7 @@ INSTALLATION
 
 Requirements:
   - GCC/G++
-  - OCaml (>= 4.05)
-  - dune (>= 2.8)
+  - dune (>= 3.0)
 
 Building instructions:
 ```console

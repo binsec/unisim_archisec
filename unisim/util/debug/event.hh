@@ -53,31 +53,32 @@ public:
 		EV_WATCHPOINT,
 		EV_FETCH_INSN,
 		EV_COMMIT_INSN,
-		EV_TRAP
+		EV_TRAP,
+		EV_SOURCE_CODE_BREAKPOINT
 	} Type;
 	
-	Event(Type _type) : type(_type), id(next_id++), prc_num(-1), front_end_num(-1), ref_count(0) { ref_count = new unsigned int(); *ref_count = 0; }
-	virtual ~Event() { delete ref_count; }
+	Event(Type _type) : type(_type), event_id(next_event_id++), prc_num(-1), front_end_num(-1), ref_count(0) {}
+	virtual ~Event() {}
 	Type GetType() const { return type; }
-	unsigned int GetId() const { return id; }
+	unsigned int GetEventId() const { return event_id; }
 	int GetProcessorNumber() const { return prc_num; }
 	int GetFrontEndNumber() const { return front_end_num; }
 	void SetProcessorNumber(int _prc_num) { if((prc_num >= 0) || (_prc_num < 0)) return; prc_num = _prc_num; }
 	void SetFrontEndNumber(int _front_end_num) { if((front_end_num >= 0) || (_front_end_num < 0)) return; front_end_num = _front_end_num; }
-	void Catch() const { (*ref_count)++; }
-	void Release() const { if((*ref_count) && --(*ref_count) == 0) delete this; }
+	void Catch() const { ref_count++; }
+	void Release() const { if(ref_count && (--ref_count == 0)) delete this; }
 private:
 	Type type;
-	unsigned int id;
+	unsigned int event_id;
 	int prc_num;
 	int front_end_num;
-	unsigned int *ref_count;
+	mutable unsigned int ref_count;
 	
-	static unsigned int next_id;
+	static unsigned int next_event_id;
 };
 
 template <typename ADDRESS>
-unsigned int Event<ADDRESS>::next_id;
+unsigned int Event<ADDRESS>::next_event_id;
 
 } // end of namespace debug
 } // end of namespace util

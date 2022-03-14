@@ -38,6 +38,7 @@
 #include <unisim/service/interfaces/interface.hh>
 #include <inttypes.h>
 #include <string.h>
+#include <iostream>
 
 namespace unisim {
 namespace service {
@@ -92,6 +93,7 @@ struct Register : public ServiceInterface
 	inline void GetValue(uint64_t& val) const { GetTypedValue(val); }
 	inline void SetValue(const uint64_t& val) { SetTypedValue(val); }
 	
+	inline void Print(std::ostream& os) const;
 private:
 	template <typename T> void GetTypedValue(T& val) const;
 	template <typename T> void SetTypedValue(const T& val);
@@ -171,6 +173,47 @@ void Register::SetTypedValue(const T& val)
 			}
 			break;
 	}
+}
+
+inline void Register::Print(std::ostream& os) const
+{
+	switch(GetSize())
+	{
+		case 1:
+			{
+				uint8_t val8;
+				this->GetValue(&val8);
+				os << +val8;
+			}
+			break;
+		case 2:
+			{
+				uint16_t val16;
+				this->GetValue(&val16);
+				os << val16;
+			}
+			break;
+		case 4:
+			{
+				uint32_t val32;
+				this->GetValue(&val32);
+				os << val32;
+			}
+			break;
+		case 8:
+			{
+				uint64_t val64;
+				this->GetValue(&val64);
+				os << val64;
+			}
+			break;
+	}
+}
+
+inline std::ostream& operator << (std::ostream& os, const Register& reg)
+{
+	reg.Print(os);
+	return os;
 }
 
 } // end of namespace interfaces

@@ -997,8 +997,6 @@ Object::Object(const char *_name, Object *_parent, const char *_description)
 	, object_base_name(std::string(_name))
 	, description(_description ? std::string(_description) : std::string(""))
 	, parent(_parent)
-	, srv_imports()
-	, srv_exports()
 	, leaf_objects()
 	, killed(false)
 {
@@ -1030,54 +1028,6 @@ std::string Object::URI() const
 Object *Object::GetParent() const
 {
 	return parent;
-}
-
-const std::list<ServiceExportBase *>& Object::GetServiceExports() const
-{
-	return srv_exports;
-}
-
-void Object::Add(ServiceExportBase& srv_export)
-{
-	srv_exports.push_back(&srv_export);
-}
-
-void Object::Remove(ServiceExportBase& srv_export)
-{
-	std::list<ServiceExportBase *>::iterator export_iter;
-
-	for(export_iter = srv_exports.begin(); export_iter != srv_exports.end(); export_iter++)
-	{
-		if(*export_iter == &srv_export)
-		{
-			srv_exports.erase(export_iter);
-			return;
-		}
-	}
-}
-
-const std::list<ServiceImportBase *>& Object::GetServiceImports() const
-{
-	return srv_imports;
-}
-
-void Object::Add(ServiceImportBase& srv_import)
-{
-	srv_imports.push_back(&srv_import);
-}
-
-void Object::Remove(ServiceImportBase& srv_import)
-{
-	std::list<ServiceImportBase *>::iterator import_iter;
-
-	for(import_iter = srv_imports.begin(); import_iter != srv_imports.end(); import_iter++)
-	{
-		if(*import_iter == &srv_import)
-		{
-			srv_imports.erase(import_iter);
-			return;
-		}
-	}
 }
 
 void Object::Add(Object& object)
@@ -1157,35 +1107,7 @@ const std::list<Object *>& Object::GetLeafs() const
 	return leaf_objects;
 }
 
-void Object::Disconnect()
-{
-	std::list<ServiceImportBase *>::iterator import_iter;
-
-	for(import_iter = srv_imports.begin(); import_iter != srv_imports.end(); import_iter++)
-	{
-#ifdef DEBUG_KERNEL
-		std::cerr << (*import_iter)->GetName() << "->DisconnectService()" << std::endl;
-#endif
-		(*import_iter)->DisconnectService();
-	}
-
-	std::list<ServiceExportBase *>::iterator export_iter;
-
-	for(export_iter = srv_exports.begin(); export_iter != srv_exports.end(); export_iter++)
-	{
-#ifdef DEBUG_KERNEL
-		std::cerr << (*export_iter)->GetName() << "->DisconnectClient()" << std::endl;
-#endif
-		(*export_iter)->DisconnectClient();
-	}
-}
-
 bool Object::BeginSetup()
-{
-	return true;
-}
-
-bool Object::Setup(ServiceExportBase *srv_export)
 {
 	return true;
 }
@@ -1267,61 +1189,106 @@ void Object::SetDescription(const char *_description)
 	description = _description;
 }
 
+void Object::AddServiceAgent( ServiceAgent const* srv_agent )
+{
+	if (not srv_agents.insert( srv_agent ).second)
+	{
+		throw std::runtime_error("Multiple service agent registering");
+	}
+}
+
+void Object::DoServiceSetup()
+{
+	for (ServiceAgent const* agent : srv_agents)
+		agent->Setup(this);
+}
+
+
 //=============================================================================
-//=                           ServiceImportBase                               =
+//=                            Service<SERVICE_IF>                            =
 //=============================================================================
 
-ServiceImportBase::ServiceImportBase(const char *_name, Object *_owner) :
-	name(std::string(_owner->GetName()) + std::string(".") + std::string(_name)),
-	owner(_owner)
+ServiceBase::ServiceBase(const char *name, Object *parent, const char *description)
+	: Object(name, parent, description)
+	, setup_state( NoSetup )
+	, is_connected(false)
+{}
+
+/// Check if service setup is needed while ensuring that no concurrent setup is ongoing
+bool ServiceBase::NeedServiceSetup() const
 {
-	_owner->Add(*this);
+	switch (SetupState(setup_state))
+	{
+	case NoSetup:       return true;
+	case SetupComplete: return false;
+	default: break;
+	}
+
+	std::cerr << "ERROR! Cyclic Service Setup in Object \"" << this->GetName() << "\n";
+	exit(1);
+	return false;
+}
+
+//=============================================================================
+//=                              ServicePortBase                              =
+//=============================================================================
+
+ServicePortBase::ServicePortBase(const char *_name, Object *_owner)
+	: name(std::string(_owner->GetName()) + std::string(".") + std::string(_name))
+	, owner(_owner)
+	, bwd_ports()
+	, fwd_port(0)
+{
 	Simulator::Instance()->Register(this);
 }
 
-ServiceImportBase::~ServiceImportBase()
+ServicePortBase::~ServicePortBase()
 {
-	if(owner) owner->Remove(*this);
 	Simulator::Instance()->Unregister(this);
 }
 
-const char *ServiceImportBase::GetName() const
+const char *ServicePortBase::GetName() const
 {
 	return name.c_str();
 }
 
-//=============================================================================
-//=                           ServiceExportBase                               =
-//=============================================================================
-
-ServiceExportBase::ServiceExportBase(const char *_name, Object *_owner) :
-	name(std::string(_owner->GetName()) + std::string(".") + std::string(_name)),
-	owner(_owner),
-	setup_dependencies()
+void ServicePortBase::Dump(std::ostream& os) const
 {
-	_owner->Add(*this);
-	Simulator::Instance()->Register(this);
+	if(fwd_port)
+	{
+		os << GetName() << " -> " << fwd_port->GetName() << std::endl;
+	}
+
+	for(std::list<ServicePortBase*>::const_iterator port_iter = bwd_ports.begin(); port_iter != bwd_ports.end(); port_iter++)
+	{
+		os << "# " << (*port_iter)->GetName() << " -> " << GetName() << std::endl;
+	}
 }
 
-ServiceExportBase::~ServiceExportBase()
+void ServicePortBase::Connect(ServicePortBase* fwd)
 {
-	if(owner) owner->Remove(*this);
-	Simulator::Instance()->Unregister(this);
+	if (fwd_port)
+	{
+		std::cerr << "WARNING! Can't connect " << GetName() << " to "
+		          << fwd->GetName() << " because it is already connected to "
+		          << fwd_port->GetName() << std::endl;
+		return;
+	}
+#ifdef DEBUG_KERNEL
+	std::cerr << GetName() << " -> " << srv_export.GetName() << std::endl;
+#endif
+	fwd_port = fwd;
+        fwd->bwd_ports.push_back(this);
 }
 
-const char *ServiceExportBase::GetName() const
+void
+ServicePortBase::SpreadBwd( ServicePortBase::Visitor& visitor )
 {
-	return name.c_str();
-}
-
-void ServiceExportBase::SetupDependsOn(ServiceImportBase& srv_import)
-{
-	setup_dependencies.push_back(&srv_import);
-}
-
-std::list<ServiceImportBase *>& ServiceExportBase::GetSetupDependencies()
-{
-	return setup_dependencies;
+	for (auto const& bwd_port : bwd_ports)
+	{
+		bwd_port->SpreadBwd(visitor);
+	}
+	visitor.Process(*this);
 }
 
 //=============================================================================
@@ -1444,8 +1411,7 @@ Simulator::Simulator(int argc, char **argv, void (*LoadBuiltInConfig)(Simulator 
 	, config_file_formats()
 	, command_line_options()
 	, objects()
-	, imports()
-	, exports()
+	, srv_ports()
 	, variables()
 	, cmd_args()
 	, param_cmd_args(0)
@@ -2032,26 +1998,15 @@ void Simulator::Initialize(VariableBase *variable)
 	}
 }
 
-void Simulator::Register(ServiceImportBase *srv_import)
+void Simulator::Register(ServicePortBase *srv_port)
 {
-	if(imports.find(srv_import->GetName()) != imports.end())
+	if(srv_ports.find(srv_port->GetName()) != srv_ports.end())
 	{
-		std::cerr << "ERROR! Import \"" << srv_import->GetName() << "\" already exists" << std::endl;
+		std::cerr << "ERROR! " << (srv_port->IsExport() ? "Export" : "Import") << " \"" << srv_port->GetName() << "\" already exists" << std::endl;
 		exit(1);
 	}
 
-	imports[srv_import->GetName()] = srv_import;
-}
-
-void Simulator::Register(ServiceExportBase *srv_export)
-{
-	if(exports.find(srv_export->GetName()) != exports.end())
-	{
-		std::cerr << "ERROR! Export \"" << srv_export->GetName() << "\" already exists" << std::endl;
-		exit(1);
-	}
-
-	exports[srv_export->GetName()] = srv_export;
+	srv_ports[srv_port->GetName()] = srv_port;
 }
 
 void Simulator::Register(ConfigFileHelper *config_file_helper)
@@ -2084,18 +2039,10 @@ void Simulator::Unregister(VariableBase *variable)
 	if(variable_iter != variables.end()) variables.erase(variable_iter);
 }
 
-void Simulator::Unregister(ServiceImportBase *srv_import)
+void Simulator::Unregister(ServicePortBase *srv_port)
 {
-	std::map<std::string, ServiceImportBase *>::iterator import_iter;
-	import_iter = imports.find(srv_import->GetName());
-	if(import_iter != imports.end()) imports.erase(import_iter);
-}
-
-void Simulator::Unregister(ServiceExportBase *srv_export)
-{
-	std::map<std::string, ServiceExportBase *>::iterator export_iter;
-	export_iter = exports.find(srv_export->GetName());
-	if(export_iter != exports.end()) exports.erase(export_iter);
+	std::map<std::string, ServicePortBase*>::iterator port_iter = srv_ports.find(srv_port->GetName());
+	if(port_iter != srv_ports.end()) srv_ports.erase(port_iter);
 }
 
 void Simulator::Dump(std::ostream& os)
@@ -2119,14 +2066,16 @@ void Simulator::Dump(std::ostream& os)
 	}
 	os << std::endl;
 
+	std::map<std::string, ServicePortBase *>::iterator port_iter;
+
 	os << "IMPORTS:" << std::endl;
 
-	std::map<std::string, ServiceImportBase *>::iterator import_iter;
-
-	for(import_iter = imports.begin(); import_iter != imports.end(); import_iter++)
+	for(port_iter = srv_ports.begin(); port_iter != srv_ports.end(); port_iter++)
 	{
-		Object *service = (*import_iter).second->GetService();
-		os << (*import_iter).second->GetName();
+		ServicePortBase& srv_port = *port_iter->second;
+		if (srv_port.IsExport()) continue;
+		Object *service = srv_port.GetService();
+		os << srv_port.GetName();
 		if(service) os << " (to " << service->GetName() << ")";
 		os << std::endl;
 	}
@@ -2134,25 +2083,22 @@ void Simulator::Dump(std::ostream& os)
 
 	std::cerr << "EXPORTS:" << std::endl;
 
-	std::map<std::string, ServiceExportBase *>::iterator export_iter;
-
-	for(export_iter = exports.begin(); export_iter != exports.end(); export_iter++)
+	for(port_iter = srv_ports.begin(); port_iter != srv_ports.end(); port_iter++)
 	{
-		Object *client = (*export_iter).second->GetClient();
-		os << (*export_iter).second->GetName();
-		if(client) os << " (from " << client->GetName() << ")";
-		os << std::endl;
+		ServicePortBase& srv_port = *port_iter->second;
+		if (not srv_port.IsExport()) continue;
+		os << srv_port.GetName();
+                os << " (from ";
+		// TODO: Give client names
+                // srv_port.DumpClientNames( os );
+                os <<  ")" << std::endl;
 	}
 	os << std::endl;
 
 	std::cerr << "CONNECTIONS:" << std::endl;
-	for(import_iter = imports.begin(); import_iter != imports.end(); import_iter++)
+	for(port_iter = srv_ports.begin(); port_iter != srv_ports.end(); port_iter++)
 	{
-		(*import_iter).second->Dump(os);
-	}
-	for(export_iter = exports.begin(); export_iter != exports.end(); export_iter++)
-	{
-		(*export_iter).second->Dump(os);
+		port_iter->second->Dump(os);
 	}
 }
 
@@ -2396,77 +2342,24 @@ Simulator::SetupStatus Simulator::Setup()
 
 	if(sig_int_cond) return ST_OK_DONT_START;
 	
-	std::map<std::string, ServiceExportBase *>::iterator export_iter;
+	std::map<std::string, ServicePortBase *>::iterator port_iter;
 	if(enable_warning)
 	{
-		for(export_iter = exports.begin(); export_iter != exports.end(); export_iter++)
+		for(port_iter = srv_ports.begin(); port_iter != srv_ports.end(); port_iter++)
 		{
-			ServiceExportBase *srv_export = (*export_iter).second;
-			if(!srv_export->GetClient())
+			ServicePortBase& srv_export = *port_iter->second;
+			if (srv_export.IsExport() and not srv_export.IsConnected())
 			{
-				std::cerr << "WARNING! " << srv_export->GetName() << " is unused" << std::endl;
+				std::cerr << "WARNING! " << srv_export.GetName() << " is unused" << std::endl;
 			}
 		}
 	}
 
-	if(sig_int_cond) return ST_OK_DONT_START;
-	
-	// Build a dependency graph of exports
-	DiGraph<ServiceExportBase *> dependency_graph;
-
-	for(export_iter = exports.begin(); export_iter != exports.end(); ++export_iter)
-	{
-		ServiceExportBase *srv_export = (*export_iter).second;
-		dependency_graph(new Vertex<ServiceExportBase *>(srv_export, srv_export->GetName()));
-	}
-
-	for(export_iter = exports.begin(); export_iter != exports.end(); ++export_iter)
-	{
-		ServiceExportBase *srv_export = (*export_iter).second;
-		Vertex<ServiceExportBase *> *u = dependency_graph[srv_export];
-		
-		std::list<ServiceImportBase *>& setup_dependencies = srv_export->GetSetupDependencies();
-		std::list<ServiceImportBase *>::iterator import_iter;
-
-		for(import_iter = setup_dependencies.begin(); import_iter != setup_dependencies.end(); import_iter++)
-		{
-			ServiceExportBase *peer_export = (*import_iter)->GetServiceExport();
-			if(peer_export)
-			{
-#ifdef DEBUG_KERNEL
-				std::cerr << "Export dependency: " << srv_export->GetName() << " -> " << peer_export->GetName() << std::endl;
-#endif
-				Vertex<ServiceExportBase *> *v = dependency_graph[peer_export];
-				assert(v);
-				(*u)(v); // make edge u -> v
-			}
-		}
-	}
-
-	if(sig_int_cond) return ST_OK_DONT_START;
-	
-#ifdef DEBUG_KERNEL
-	std::ofstream file("deps.dot");
-	dependency_graph.WriteGraphviz(file);
-#endif
-
-	typedef std::vector<Vertex<ServiceExportBase *> *> ReversedSetupOrder;
-	ReversedSetupOrder reversed_setup_order;
-	reversed_setup_order.reserve(dependency_graph.Size());
-	if(!dependency_graph.TopologicalSort(std::back_inserter(reversed_setup_order)))
-	{
-		std::ofstream file("deps.dot");
-		dependency_graph.WriteGraphviz(file);
-		
-		std::cerr << "Simulator: ERROR! cyclic setup dependency graph. Dependency graph dumped as Graphivz format to deps.dot. Run 'twopi -Tpdf deps.dot -o deps.pdf' and see deps.pdf for details." << std::endl;
-		return ST_ERROR;
-	}
-	
 	if(sig_int_cond) return ST_OK_DONT_START;
 	
 	SetupStatus status = ST_OK_TO_START;
 	
-	// Call all methods "BeginSetup()"
+	// Call all objects "BeginSetup()"
 	std::map<std::string, Object *>::iterator object_iter;
 	for(object_iter = objects.begin(); object_iter != objects.end(); object_iter++)
 	{
@@ -2483,6 +2376,13 @@ Simulator::SetupStatus Simulator::Setup()
 		
 		if(sig_int_cond) break;
 	}
+
+	// Call all services "DoServiceSetup()"
+	for(object_iter = objects.begin(); object_iter != objects.end(); object_iter++)
+	{
+		Object& object = *object_iter->second;
+		object.DoServiceSetup();
+        }
 	
 	if(sig_int_cond)
 	{
@@ -2497,44 +2397,7 @@ Simulator::SetupStatus Simulator::Setup()
 	
 	if(status != ST_ERROR)
 	{
-		// Call methods "Setup(export)" in a topological order
-		ReversedSetupOrder::reverse_iterator vertex_iter;
-		for(vertex_iter = reversed_setup_order.rbegin(); vertex_iter != reversed_setup_order.rend(); ++vertex_iter)
-		{
-			ServiceExportBase *srv_export = (*vertex_iter)->GetValue();
-			Object *object = srv_export->GetService();
-
-			if(object)
-			{
-#ifdef DEBUG_KERNEL
-				std::cerr << "Simulator:" << object->GetName() << "::Setup(" << srv_export->GetName() << ")" << std::endl;
-#endif
-				if(!object->Setup(srv_export))
-				{
-					std::cerr << "Simulator: " << srv_export->GetName() << " setup failed" << std::endl;
-					status = ST_ERROR;
-					break;
-				}
-			}
-			
-			if(sig_int_cond) break;
-		}
-	}
-
-	if(sig_int_cond)
-	{
-		switch(status)
-		{
-			case ST_OK_TO_START  : 
-			case ST_OK_DONT_START:
-			case ST_WARNING      : return ST_OK_DONT_START; 
-			case ST_ERROR        : return ST_ERROR;
-		}
-	}
-	
-	if(status != ST_ERROR)
-	{
-		// Call all methods "EndSetup()"
+		// Call all objects "EndSetup()"
 		for(object_iter = objects.begin(); object_iter != objects.end(); object_iter++)
 		{
 			Object *object = (*object_iter).second;

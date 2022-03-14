@@ -49,9 +49,6 @@ namespace debug {
 template <typename ADDRESS> class Watchpoint;
 
 template <typename ADDRESS>
-std::ostream& operator << (std::ostream& os, const Watchpoint<ADDRESS>& wp);
-
-template <typename ADDRESS>
 class Watchpoint : public Event<ADDRESS>
 {
 public:
@@ -63,9 +60,11 @@ public:
 		, addr(_addr)
 		, size(_size)
 		, overlook(_overlook)
+		, id(-1)
 	{
 	}
 
+	inline int GetId() const { return id; }
 	inline typename unisim::util::debug::MemoryAccessType GetMemoryAccessType() const { return mat; }
 	inline typename unisim::util::debug::MemoryType GetMemoryType() const { return mt; }
 	inline ADDRESS GetAddress() const { return addr; }
@@ -88,24 +87,26 @@ public:
 		
 		return ovl_lo <= ovl_hi;
 	}
-	inline bool Equals(unisim::util::debug::MemoryAccessType _mat, unisim::util::debug::MemoryType _mt, ADDRESS _addr, uint32_t _size)
+	inline bool Equals(unisim::util::debug::MemoryAccessType _mat, unisim::util::debug::MemoryType _mt, ADDRESS _addr, uint32_t _size, bool _overlook)
 	{
-		return (mat == _mat) && (mt == _mt) && (addr = _addr) && (size = _size);
+		return (mat == _mat) && (mt == _mt) && (addr = _addr) && (size = _size) && (overlook == _overlook);
 	}
 	
-	friend std::ostream& operator << <ADDRESS>(std::ostream& os, const Watchpoint<ADDRESS>& wp);
+	inline void SetId(int _id) { id = _id; }
+	
 private:
 	typename unisim::util::debug::MemoryAccessType mat;
 	typename unisim::util::debug::MemoryType mt;
 	ADDRESS addr;
 	uint32_t size;
 	bool overlook;
+	int id;
 };
 
 template <typename ADDRESS>
 inline std::ostream& operator << (std::ostream& os, const Watchpoint<ADDRESS>& wp)
 {
-	switch(wp.mt)
+	switch(wp.GetMemoryType())
 	{
 		case unisim::util::debug::MT_DATA:
 			os << "data";
@@ -115,19 +116,19 @@ inline std::ostream& operator << (std::ostream& os, const Watchpoint<ADDRESS>& w
 			break;
 	}
 	os << " ";
-	if((wp.mat & (unisim::util::debug::MAT_WRITE | unisim::util::debug::MAT_READ)) == (unisim::util::debug::MAT_WRITE | unisim::util::debug::MAT_READ))
+	if((wp.GetMemoryAccessType() & (unisim::util::debug::MAT_WRITE | unisim::util::debug::MAT_READ)) == (unisim::util::debug::MAT_WRITE | unisim::util::debug::MAT_READ))
 	{
 		os << "read/write";
 	}
-	else if(wp.mat & unisim::util::debug::MAT_WRITE)
+	else if(wp.GetMemoryAccessType() & unisim::util::debug::MAT_WRITE)
 	{
 		os << "write";
 	}
-	else if(wp.mat & unisim::util::debug::MAT_READ)
+	else if(wp.GetMemoryAccessType() & unisim::util::debug::MAT_READ)
 	{
 		os << "read";
 	}
-	os << " at 0x" << std::hex << wp.addr << std::dec << " (" << wp.size << " bytes) watchpoint for processor #" << wp.GetProcessorNumber() << " and front-end #" << wp.GetFrontEndNumber() << " (" << (wp.overlook ? "with" : "without") << " overlook)";
+	os << " at 0x" << std::hex << wp.GetAddress() << std::dec << " (" << wp.GetSize() << " bytes) watchpoint #" << wp.GetId() << " for processor #" << wp.GetProcessorNumber() << " and front-end #" << wp.GetFrontEndNumber() << " (" << (wp.Overlooks() ? "with" : "without") << " overlook)";
 	
 	return os;
 }

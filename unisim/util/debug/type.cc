@@ -36,6 +36,7 @@
 #include <iostream>
 #include <sstream>
 #include <queue>
+#include <cassert>
 
 namespace unisim {
 namespace util {
@@ -43,16 +44,37 @@ namespace debug {
 
 Type::Type()
 	: type_class(T_UNKNOWN)
+	, decl_location(0)
+	, ref_count(0)
 {
+}
+
+Type::Type(const DeclLocation *_decl_location)
+	: type_class(T_UNKNOWN)
+	, decl_location(_decl_location)
+	, ref_count(0)
+{
+	if(decl_location) decl_location->Catch();
 }
 
 Type::Type(TYPE_CLASS _type_class)
 	: type_class(_type_class)
+	, decl_location(0)
+	, ref_count(0)
 {
+}
+
+Type::Type(TYPE_CLASS _type_class, const DeclLocation *_decl_location)
+	: type_class(_type_class)
+	, decl_location(_decl_location)
+	, ref_count(0)
+{
+	if(decl_location) decl_location->Catch();
 }
 
 Type::~Type()
 {
+	if(decl_location) decl_location->Release();
 }
 
 TYPE_CLASS Type::GetClass() const
@@ -60,60 +82,110 @@ TYPE_CLASS Type::GetClass() const
 	return type_class;
 }
 
+bool Type::IsComposite() const
+{
+	return (type_class == unisim::util::debug::T_STRUCT) ||
+	       (type_class == unisim::util::debug::T_UNION) ||
+	       (type_class == unisim::util::debug::T_CLASS) ||
+	       (type_class == unisim::util::debug::T_INTERFACE);
+}
+
+bool Type::IsBase() const
+{
+	return (type_class == unisim::util::debug::T_INTEGER) ||
+	       (type_class == unisim::util::debug::T_CHAR) ||
+	       (type_class == unisim::util::debug::T_FLOAT) ||
+	       (type_class == unisim::util::debug::T_BOOL);
+}
+
+bool Type::IsNamed() const
+{
+	return IsBase() ||
+	       IsComposite() ||
+	       (type_class == T_TYPEDEF) ||
+	       (type_class == T_ENUM);
+}
+
+const DeclLocation *Type::GetDeclLocation() const
+{
+	return decl_location;
+}
+
 void Type::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
 {
 	visitor->Visit(path.c_str(), this, TINIT_TOK_LITERAL);
 }
 
-std::string Type::BuildCDecl(const char *data_object_name) const
+std::string Type::BuildCDecl(char const **identifier, bool collapsed) const
 {
-	return std::string("unknown_type ") + (data_object_name ? data_object_name : "");
+	return std::string("void");
+}
+
+void Type::Catch() const
+{
+	++ref_count;
+}
+
+void Type::Release() const
+{
+	if(ref_count)
+	{
+		if(--ref_count == 0)
+		{
+			delete this;
+		}
+	}
 }
 
 std::ostream& operator << (std::ostream& os, const Type& type)
 {
-	switch(type.type_class)
-	{
-		case T_UNKNOWN:
-			return os << "unknown_type";
-		case T_CHAR:
-			return os << *((const CharType *) &type);
-		case T_INTEGER:
-			return os << *((const IntegerType *) &type);
-		case T_FLOAT:
-			return os << *((const FloatingPointType *) &type);
-		case T_BOOL:
-			return os << *((const BooleanType *) &type);
-		case T_STRUCT:
-			return os << *((const StructureType *) &type);
-		case T_UNION:
-			return os << *((const StructureType *) &type);
-		case T_CLASS:
-			return os << *((const StructureType *) &type);
-		case T_INTERFACE:
-			return os << *((const StructureType *) &type);
-		case T_ARRAY:
-			return os << *((const ArrayType *) &type);
-		case T_POINTER:
-			return os << *((const PointerType *) &type);
-		case T_TYPEDEF:
-			return os << *((const Typedef *) &type);
-		case T_FUNCTION:
-			return os << *((const FunctionType *) &type);
-		case T_CONST:
-			return os << *((const ConstType *) &type);
-		case T_ENUM:
-			return os << *((const EnumType *) &type);
-		case T_VOID:
-			return os << *((const UnspecifiedType *) &type);
-		case T_VOLATILE:
-			return os << *((const VolatileType *) &type);
-	}
-	return os;
+	return os << type.BuildCDecl();
 }
 
-BaseType::BaseType(TYPE_CLASS _type_class, unsigned int _bit_size)
+NamedType::NamedType(TYPE_CLASS _type_class, const char *_name)
 	: Type(_type_class)
+	, name(_name ? _name : "")
+	, has_name(_name != 0)
+{
+}
+
+NamedType::NamedType(TYPE_CLASS _type_class, const char *_name, const DeclLocation *_decl_location)
+	: Type(_type_class, _decl_location)
+	, name(_name ? _name : "")
+	, has_name(_name != 0)
+{
+}
+
+const std::string& NamedType::GetName() const
+{
+	return name;
+}
+
+bool NamedType::HasName() const
+{
+	return has_name;
+}
+
+BaseType::BaseType(const char *_name, unsigned int _bit_size)
+	: NamedType(T_UNKNOWN, _name)
+	, bit_size(_bit_size)
+{
+}
+
+BaseType::BaseType(const char *_name, unsigned int _bit_size, const DeclLocation *_decl_location)
+	: NamedType(T_UNKNOWN, _name, _decl_location)
+	, bit_size(_bit_size)
+{
+}
+
+BaseType::BaseType(TYPE_CLASS _type_class, const char *_name, unsigned int _bit_size)
+	: NamedType(_type_class, _name)
+	, bit_size(_bit_size)
+{
+}
+
+BaseType::BaseType(TYPE_CLASS _type_class, const char *_name, unsigned int _bit_size, const DeclLocation *_decl_location)
+	: NamedType(_type_class, _name, _decl_location)
 	, bit_size(_bit_size)
 {
 }
@@ -127,8 +199,14 @@ unsigned int BaseType::GetBitSize() const
 	return bit_size;
 }
 
-IntegerType::IntegerType(unsigned int _bit_size, bool _is_signed)
-	: BaseType(T_INTEGER, _bit_size)
+IntegerType::IntegerType(const char *_name, unsigned int _bit_size, bool _is_signed)
+	: BaseType(T_INTEGER, _name, _bit_size)
+	, is_signed(_is_signed)
+{
+}
+
+IntegerType::IntegerType(const char *_name, unsigned int _bit_size, bool _is_signed, const DeclLocation *_decl_location)
+	: BaseType(T_INTEGER, _name, _bit_size, _decl_location)
 	, is_signed(_is_signed)
 {
 }
@@ -142,26 +220,31 @@ bool IntegerType::IsSigned() const
 	return is_signed;
 }
 
-std::string IntegerType::BuildCDecl(const char *data_object_name) const
+std::string IntegerType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
-	sstr << (is_signed ? "s" : "u") << "int";
-	uint64_t bit_size = GetBitSize();
-	if(bit_size) sstr << bit_size;
-	if(data_object_name) sstr << " " << data_object_name;
+	const std::string& name = GetName();
+	if(name.empty())
+	{
+		sstr << (is_signed ? "s" : "u") << "int";
+		uint64_t bit_size = GetBitSize();
+		if(bit_size) sstr << bit_size;
+	}
+	else
+	{
+		sstr << name;
+	}
 	return sstr.str();
 }
 
-std::ostream& operator << (std::ostream& os, const IntegerType& integer_type)
+CharType::CharType(const char *_name, unsigned int _bit_size, bool _is_signed)
+	: BaseType(T_CHAR, _name, _bit_size)
+	, is_signed(_is_signed)
 {
-	os << (integer_type.is_signed ? "s" : "u") << "int";
-	uint64_t bit_size = integer_type.GetBitSize();
-	if(bit_size) os << bit_size;
-	return os;
 }
 
-CharType::CharType(unsigned int _bit_size, bool _is_signed)
-	: BaseType(T_CHAR, _bit_size)
+CharType::CharType(const char *_name, unsigned int _bit_size, bool _is_signed, const DeclLocation *_decl_location)
+	: BaseType(T_CHAR, _name, _bit_size, _decl_location)
 	, is_signed(_is_signed)
 {
 }
@@ -175,27 +258,31 @@ bool CharType::IsSigned() const
 	return is_signed;
 }
 
-std::string CharType::BuildCDecl(const char *data_object_name) const
+std::string CharType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
-	sstr << (is_signed ? "s" : "u") << "char";
-	uint64_t bit_size = GetBitSize();
-	
-	if(bit_size) sstr << bit_size;
-	if(data_object_name) sstr << " " << data_object_name;
+	const std::string& name = GetName();
+	if(name.empty())
+	{
+		sstr << (is_signed ? "s" : "u") << "char";
+		uint64_t bit_size = GetBitSize();
+		
+		if(bit_size) sstr << bit_size;
+	}
+	else
+	{
+		sstr << name;
+	}
 	return sstr.str();
 }
 
-std::ostream& operator << (std::ostream& os, const CharType& char_type)
+FloatingPointType::FloatingPointType(const char *_name, unsigned int bit_size)
+	: BaseType(T_FLOAT, _name, bit_size)
 {
-	os << (char_type.is_signed ? "s" : "u") << "char";
-	uint64_t bit_size = char_type.GetBitSize();
-	if(bit_size) os << bit_size;
-	return os;
 }
 
-FloatingPointType::FloatingPointType(unsigned int bit_size)
-	: BaseType(T_FLOAT, bit_size)
+FloatingPointType::FloatingPointType(const char *_name, unsigned int bit_size, const DeclLocation *_decl_location)
+	: BaseType(T_FLOAT, _name, bit_size, _decl_location)
 {
 }
 
@@ -203,27 +290,31 @@ FloatingPointType::~FloatingPointType()
 {
 }
 
-std::string FloatingPointType::BuildCDecl(const char *data_object_name) const
+std::string FloatingPointType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
-	sstr << "float";
-	uint64_t bit_size = GetBitSize();
-	if(bit_size) sstr << bit_size;
-	if(data_object_name) sstr << " " << data_object_name;
+	const std::string& name = GetName();
+	if(name.empty())
+	{
+		sstr << "float";
+		uint64_t bit_size = GetBitSize();
+		if(bit_size) sstr << bit_size;
+	}
+	else
+	{
+		sstr << name;
+	}
 	
 	return sstr.str();
 }
 
-std::ostream& operator << (std::ostream& os, const FloatingPointType& floating_point_type)
+BooleanType::BooleanType(const char *_name, unsigned int _bit_size)
+	: BaseType(T_BOOL, _name, _bit_size)
 {
-	os << "float";
-	uint64_t bit_size = floating_point_type.GetBitSize();
-	if(bit_size) os << bit_size;
-	return os;
 }
 
-BooleanType::BooleanType(unsigned int _bit_size)
-	: BaseType(T_BOOL, _bit_size)
+BooleanType::BooleanType(const char *_name, unsigned int _bit_size, const DeclLocation *_decl_location)
+	: BaseType(T_BOOL, _name, _bit_size, _decl_location)
 {
 }
 
@@ -231,39 +322,51 @@ BooleanType::~BooleanType()
 {
 }
 
-std::string BooleanType::BuildCDecl(const char *data_object_name) const
+std::string BooleanType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
-	sstr << "bool";
-	uint64_t bit_size = GetBitSize();
-	if(bit_size) sstr << bit_size;
-	if(data_object_name) sstr << " " << data_object_name;
+	const std::string& name = GetName();
+	if(name.empty())
+	{
+		sstr << "bool";
+		uint64_t bit_size = GetBitSize();
+		if(bit_size) sstr << bit_size;
+	}
+	else
+	{
+		sstr << name;
+	}
 	return sstr.str();
 }
 
-std::ostream& operator << (std::ostream& os, const BooleanType& boolean_type)
-{
-	os << "bool";
-	uint64_t bit_size = boolean_type.GetBitSize();
-	if(bit_size) os << bit_size;
-	return os;
-}
-
 Member::Member(const char *_name, const Type *_type, uint64_t _bit_size)
-	: name(_name)
+	: name(_name ? _name : "")
+	, has_name(_name != 0)
 	, type(_type)
 	, bit_size(_bit_size)
 {
+	if(type)
+	{
+		type->Catch();
+	}
 }
 
 Member::~Member()
 {
-	delete type;
+	if(type)
+	{
+		type->Release();
+	}
 }
 
 const char *Member::GetName() const
 {
 	return name.c_str();
+}
+
+bool Member::HasName() const
+{
+	return has_name;
 }
 
 const Type *Member::GetType() const
@@ -279,29 +382,48 @@ uint64_t Member::GetBitSize() const
 void Member::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
 {
 	visitor->Visit(this);
-	std::string member_path = path + '.' + name;
+	std::string member_path = path;
+	if(has_name)
+	{
+		member_path += '.';
+		member_path += name;
+	}
 	type->DFS(member_path, visitor, follow_pointer);
 }
 
-std::ostream& operator << (std::ostream& os, const Member& member)
+std::string Member::BuildCDecl() const
 {
-	os << *member.type;
-	if(member.type->GetClass() != T_POINTER) os << " ";
-	os << member.name;
-	if(member.bit_size)
+	std::stringstream sstr;
+	char const *member_name = name.c_str();
+	std::string s(type->BuildCDecl(&member_name, true));
+	sstr << s;
+	if(member_name)
 	{
-		os << ":" << member.bit_size;
+		if(!s.empty() && (s.back() != ' ') && (s.back() != '*')) sstr << " ";
+		sstr << member_name;
 	}
-	return os;
+	if(bit_size)
+	{
+		sstr << ":" << bit_size;
+	}
+	return sstr.str();
 }
 
-StructureType::StructureType(TYPE_CLASS _type_class, const char *_name)
-	: Type(_type_class)
-	, name(_name ? _name : "__anonymous__")
+CompositeType::CompositeType(TYPE_CLASS _type_class, const char *_name, bool _incomplete)
+	: NamedType(_type_class, _name)
+	, incomplete(_incomplete)
+	, members()
 {
 }
 
-StructureType::~StructureType()
+CompositeType::CompositeType(TYPE_CLASS _type_class, const char *_name, bool _incomplete, const DeclLocation *_decl_location)
+	: NamedType(_type_class, _name, _decl_location)
+	, incomplete(_incomplete)
+	, members()
+{
+}
+
+CompositeType::~CompositeType()
 {
 	unsigned int member_count = members.size();
 	unsigned int i;
@@ -311,24 +433,29 @@ StructureType::~StructureType()
 	}
 }
 
-void StructureType::Add(const Member *_member)
+void CompositeType::Add(const Member *_member)
 {
 	members.push_back(_member);
 }
 
-unsigned int StructureType::GetMemberCount() const
+bool CompositeType::IsIncomplete() const
+{
+	return incomplete;
+}
+
+unsigned int CompositeType::GetMemberCount() const
 {
 	return members.size();
 }
 
-const Member *StructureType::GetMember(unsigned int _idx) const
+const Member *CompositeType::GetMember(unsigned int _idx) const
 {
 	unsigned int member_count = members.size();
 	
 	return (_idx < member_count) ? members[_idx] : 0;
 }
 
-void StructureType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
+void CompositeType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
 {
 	visitor->Visit(path.c_str(), this, TINIT_TOK_BEGIN_OF_STRUCT);
 	unsigned int member_count = members.size();
@@ -345,7 +472,7 @@ void StructureType::DFS(const std::string& path, const TypeVisitor *visitor, boo
 	visitor->Visit(path.c_str(), this, TINIT_TOK_END_OF_STRUCT);
 }
 
-std::string StructureType::BuildCDecl(const char *data_object_name) const
+std::string CompositeType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
 	
@@ -364,63 +491,81 @@ std::string StructureType::BuildCDecl(const char *data_object_name) const
 			sstr << "interface";
 			break;
 		default:
-			return std::string();
+			assert(false);
 	}
-	sstr << " " << name;
-	if(data_object_name) sstr << " " << data_object_name;
+	if(HasName())
+	{
+		sstr << " " << GetName();
+	}
+	if((!collapsed || !HasName()) && !IsIncomplete())
+	{
+		sstr << " { ";
+		unsigned int member_count = members.size();
+		if(member_count)
+		{
+			unsigned int i;
+			for(i = 0; i < member_count; i++)
+			{
+				Member const *member = members[i];
+				Type const *member_type = member->GetType();
+				if(member_type->GetClass() == T_ARRAY)
+				{
+					ArrayType const *array_type = dynamic_cast<ArrayType const *>(member_type);
+					if((array_type->GetCount() == 0) && ((GetClass() != T_STRUCT) || (i != (member_count - 1))))
+					{
+						 continue;
+					}
+				}
+				sstr << member->BuildCDecl() << "; ";
+			}
+		}
+		sstr << "}";
+	}
 	return sstr.str();
 }
 
-std::ostream& operator << (std::ostream& os, const StructureType& structure_type)
-{
-	switch(structure_type.GetClass())
-	{
-		case T_STRUCT:
-			os << "struct";
-			break;
-		case T_UNION:
-			os << "union";
-			break;
-		case T_CLASS:
-			os << "class";
-			break;
-		case T_INTERFACE:
-			os << "interface";
-			break;
-		default:
-			return os;
-	}
-	os << " " << structure_type.name;
-	unsigned int member_count = structure_type.members.size();
-	if(member_count)
-	{
-		os << " { ";
-		unsigned int i;
-		for(i = 0; i < member_count; i++)
-		{
-			os << *structure_type.members[i] << "; ";
-		}
-		os << "}";
-	}
-	return os;
-}
-
-ArrayType::ArrayType(const Type *_type_of_element, int64_t _lower_bound, int64_t _upper_bound)
+ArrayType::ArrayType(const Type *_type_of_element, unsigned int _order, int64_t _lower_bound, int64_t _upper_bound)
 	: Type(T_ARRAY)
 	, type_of_element(_type_of_element)
+	, order(_order)
 	, lower_bound(_lower_bound)
 	, upper_bound(_upper_bound)
 {
+	if(type_of_element)
+	{
+		type_of_element->Catch();
+	}
+}
+
+ArrayType::ArrayType(const Type *_type_of_element, unsigned int _order, int64_t _lower_bound, int64_t _upper_bound, const DeclLocation *_decl_location)
+	: Type(T_ARRAY, _decl_location)
+	, type_of_element(_type_of_element)
+	, order(_order)
+	, lower_bound(_lower_bound)
+	, upper_bound(_upper_bound)
+{
+	if(type_of_element)
+	{
+		type_of_element->Catch();
+	}
 }
 
 ArrayType::~ArrayType()
 {
-	delete type_of_element;
+	if(type_of_element)
+	{
+		type_of_element->Release();
+	}
 }
 
 const Type *ArrayType::GetTypeOfElement() const
 {
 	return type_of_element;
+}
+
+unsigned int ArrayType::GetOrder() const
+{
+	return order;
 }
 
 int64_t ArrayType::GetLowerBound() const
@@ -431,6 +576,11 @@ int64_t ArrayType::GetLowerBound() const
 int64_t ArrayType::GetUpperBound() const
 {
 	return upper_bound;
+}
+
+int64_t ArrayType::GetCount() const
+{
+	return upper_bound - lower_bound + 1;
 }
 
 void ArrayType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
@@ -450,29 +600,19 @@ void ArrayType::DFS(const std::string& path, const TypeVisitor *visitor, bool fo
 	visitor->Visit(path.c_str(), this, TINIT_TOK_END_OF_ARRAY);
 }
 
-std::string ArrayType::BuildCDecl(const char *data_object_name) const
+std::string ArrayType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
-	
-	std::queue<const ArrayType *> fifo;
-	
+	if(identifier && (*identifier))
+	{
+		sstr << (*identifier);
+		*identifier = 0;
+	}
 	const ArrayType *a = 0;
 	const Type *t = this; 
 	do
 	{
 		a = (const ArrayType *) t;
-		fifo.push(a);
-	}
-	while((t = a->type_of_element)->GetClass() == T_ARRAY);
-	
-	sstr << t->BuildCDecl();
-	if(data_object_name) sstr << " " << data_object_name;
-
-	while(!fifo.empty())
-	{
-		a = fifo.front();
-		fifo.pop();
-		
 		if(a->lower_bound <= a->upper_bound)
 		{
 			if(a->lower_bound)
@@ -485,61 +625,107 @@ std::string ArrayType::BuildCDecl(const char *data_object_name) const
 			sstr << "[]";
 		}
 	}
-	
-	return sstr.str();
-}
-
-std::ostream& operator << (std::ostream& os, const ArrayType& array_type)
-{
-	std::queue<const ArrayType *> fifo;
-	
-	const ArrayType *a = 0;
-	const Type *t = &array_type; 
-	do
-	{
-		a = (const ArrayType *) t;
-		fifo.push(a);
-	}
 	while((t = a->type_of_element)->GetClass() == T_ARRAY);
+	std::string s(sstr.str());
+	char const *s_cstr = s.c_str();
 	
-	os << *t;
-
-	while(!fifo.empty())
+	std::stringstream sstr2;
+	sstr2 << t->BuildCDecl(&s_cstr, true);
+	if(s_cstr)
 	{
-		a = fifo.front();
-		fifo.pop();
-		
-		if(a->lower_bound <= a->upper_bound)
-		{
-			if(a->lower_bound)
-				os << '[' << a->lower_bound << ".." << a->upper_bound << ']';
-			else
-				os << '[' << (a->upper_bound + 1) << ']';
-		}
-		else
-		{
-			os << "[]";
-		}
+		sstr2 << " " << s;
 	}
 	
-	return os;
+	return sstr2.str();
 }
 
 PointerType::PointerType(const Type *_type_of_dereferenced_object)
 	: Type(T_POINTER)
 	, type_of_dereferenced_object(_type_of_dereferenced_object)
 {
-	
+	if(type_of_dereferenced_object)
+	{
+		type_of_dereferenced_object->Catch();
+	}
+}
+
+PointerType::PointerType(const Type *_type_of_dereferenced_object, const DeclLocation *_decl_location)
+	: Type(T_POINTER, _decl_location)
+	, type_of_dereferenced_object(_type_of_dereferenced_object)
+{
+	if(type_of_dereferenced_object)
+	{
+		type_of_dereferenced_object->Catch();
+	}
 }
 
 PointerType::~PointerType()
 {
-	delete type_of_dereferenced_object;
+	if(type_of_dereferenced_object)
+	{
+		type_of_dereferenced_object->Release();
+	}
 }
 
 const Type *PointerType::GetTypeOfDereferencedObject() const
 {
 	return type_of_dereferenced_object;
+}
+
+bool PointerType::IsNullTerminatedStringPointer() const
+{
+	if(type_of_dereferenced_object->GetClass() == T_CHAR)
+	{
+		// char *
+		return true;
+	}
+	else
+	{
+		if(type_of_dereferenced_object->GetClass() == T_CONST)
+		{
+			const ConstType *const_type = static_cast<const ConstType *>(type_of_dereferenced_object);
+			if(const_type->GetType()->GetClass() == T_VOLATILE)
+			{
+				const VolatileType *volatile_type = static_cast<const VolatileType *>(const_type->GetType());
+				if(volatile_type->GetType()->GetClass() == T_CHAR)
+				{
+					// char volatile const *
+					return true;
+				}
+			}
+			else
+			{
+				if(const_type->GetType()->GetClass() == T_CHAR)
+				{
+					// char const *
+					return true;
+				}
+			}
+		}
+		else if(type_of_dereferenced_object->GetClass() == T_VOLATILE)
+		{
+			const VolatileType *volatile_type = static_cast<const VolatileType *>(type_of_dereferenced_object);
+			if(volatile_type->GetType()->GetClass() == T_CONST)
+			{
+				const ConstType *const_type = static_cast<const ConstType *>(volatile_type->GetType());
+				if(const_type->GetClass() == T_CHAR)
+				{
+					// char const volatile *
+					return true;
+				}
+			}
+			else
+			{
+				if(volatile_type->GetType()->GetClass() == T_CHAR)
+				{
+					// char volatile *
+					return true;
+				}
+			}
+		}
+	}
+	
+	return false;
 }
 
 void PointerType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
@@ -555,39 +741,80 @@ void PointerType::DFS(const std::string& path, const TypeVisitor *visitor, bool 
 	}
 }
 
-std::string PointerType::BuildCDecl(const char *data_object_name) const
+std::string PointerType::BuildCDecl(char const **identifier, bool collapsed) const
 {
+	const Type *nested_type = type_of_dereferenced_object;
+	do
+	{
+		if(nested_type->GetClass() == T_FUNCTION) break;
+		if(nested_type->GetClass() == T_ARRAY) break;
+		if(nested_type->GetClass() == T_CONST)
+		{
+			nested_type = static_cast<const ConstType *>(nested_type)->GetType();
+		}
+		if(nested_type->GetClass() == T_VOLATILE)
+		{
+			nested_type = static_cast<const VolatileType *>(nested_type)->GetType();
+		}
+		else
+		{
+			break;
+		}
+	}
+	while(1);
+	
 	std::stringstream sstr;
-	if((type_of_dereferenced_object->GetClass() == T_FUNCTION) || (type_of_dereferenced_object->GetClass() == T_ARRAY))
+	if((nested_type->GetClass() == T_FUNCTION) || (nested_type->GetClass() == T_ARRAY))
 	{
 		std::string s("(*");
-		if(data_object_name) s += data_object_name;
+		if(identifier && (*identifier))
+		{
+			s += (*identifier);
+		}
 		s += ')';
-		sstr << type_of_dereferenced_object->BuildCDecl(s.c_str());
+		char const *s_cstr = s.c_str();
+		sstr << type_of_dereferenced_object->BuildCDecl(&s_cstr);
+		if(identifier && (*identifier) && !s_cstr)
+		{
+			*identifier = 0;
+		}
 	}
 	else
 	{
-		sstr << type_of_dereferenced_object->BuildCDecl() << " *";
-		if(data_object_name) sstr << data_object_name;
+		std::string s(type_of_dereferenced_object->BuildCDecl(0, true));
+		sstr << s;
+		if(!s.empty() && (s.back() != '*') && (s.back() != ' ')) sstr << " ";
+		sstr << "*";
 	}
 	return sstr.str();
 }
 
-std::ostream& operator << (std::ostream& os, const PointerType& pointer_type)
+Typedef::Typedef(const Type *_type, const char *_name)
+	: NamedType(T_TYPEDEF, _name)
+	, type(_type)
 {
-	return os << *pointer_type.type_of_dereferenced_object << " *";
+	if(type)
+	{
+		type->Catch();
+	}
 }
 
-Typedef::Typedef(const Type *_type, const char *_name)
-	: Type(T_TYPEDEF)
+Typedef::Typedef(const Type *_type, const char *_name, const DeclLocation *_decl_location)
+	: NamedType(T_TYPEDEF, _name, _decl_location)
 	, type(_type)
-	, name(_name ? _name : "__anonymous__")
 {
+	if(type)
+	{
+		type->Catch();
+	}
 }
 
 Typedef::~Typedef()
 {
-	delete type;
+	if(type)
+	{
+		type->Release();
+	}
 }
 
 const Type *Typedef::GetType() const
@@ -595,17 +822,24 @@ const Type *Typedef::GetType() const
 	return type;
 }
 
-const char *Typedef::GetName() const
+std::string Typedef::BuildCDecl(char const **identifier, bool collapsed) const
 {
-	return name.c_str();
-}
-
-std::string Typedef::BuildCDecl(const char *data_object_name) const
-{
-	std::stringstream sstr;
-	sstr << name;
-	if(data_object_name) sstr << " " << data_object_name;
-	return sstr.str();
+	if(collapsed)
+	{
+		return std::string(GetName());
+	}
+	else
+	{
+		std::stringstream sstr;
+		sstr << "typedef ";
+		char const *typedef_name = GetName().c_str();
+		sstr << type->BuildCDecl(&typedef_name, true);
+		if(typedef_name)
+		{
+			sstr << " " << typedef_name;
+		}
+		return sstr.str();
+	}
 }
 
 void Typedef::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
@@ -613,20 +847,22 @@ void Typedef::DFS(const std::string& path, const TypeVisitor *visitor, bool foll
 	type->DFS(path, visitor, follow_pointer);
 }
 
-std::ostream& operator << (std::ostream& os, const Typedef& _typedef)
-{
-	return os << _typedef.name;
-}
-
 FormalParameter::FormalParameter(const char *_name, const Type *_type)
 	: name(_name)
 	, type(_type)
 {
+	if(type)
+	{
+		type->Catch();
+	}
 }
 
 FormalParameter::~FormalParameter()
 {
-	delete type;
+	if(type)
+	{
+		type->Release();
+	}
 }
 
 const char *FormalParameter::GetName() const
@@ -639,18 +875,26 @@ const Type *FormalParameter::GetType() const
 	return type;
 }
 
-std::ostream& operator << (std::ostream& os, const FormalParameter& formal_param)
-{
-	os << *formal_param.type;
-	if(formal_param.type->GetClass() != T_POINTER) os << " ";
-	os << formal_param.name;
-	return os;
-}
-
 FunctionType::FunctionType(const Type *_return_type)
 	: Type(T_FUNCTION)
 	, return_type(_return_type)
+	, formal_params()
 {
+	if(return_type)
+	{
+		return_type->Catch();
+	}
+}
+
+FunctionType::FunctionType(const Type *_return_type, const DeclLocation *_decl_location)
+	: Type(T_FUNCTION, _decl_location)
+	, return_type(_return_type)
+	, formal_params()
+{
+	if(return_type)
+	{
+		return_type->Catch();
+	}
 }
 
 FunctionType::~FunctionType()
@@ -661,7 +905,10 @@ FunctionType::~FunctionType()
 	{
 		delete formal_params[i];
 	}
-	if(return_type) delete return_type;
+	if(return_type)
+	{
+		return_type->Release();
+	}
 }
 
 void FunctionType::Add(const FormalParameter *formal_param)
@@ -669,20 +916,25 @@ void FunctionType::Add(const FormalParameter *formal_param)
 	formal_params.push_back(formal_param);
 }
 
-std::string FunctionType::BuildCDecl(const char *data_object_name) const
+std::string FunctionType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
 	
 	if(return_type)
 	{
-		sstr << return_type->BuildCDecl();
+		std::string s(return_type->BuildCDecl(0, true));
+		sstr << s;
+		if(!s.empty() && (s.back() != ' ') && (s.back() != '*')) sstr << " ";
 	}
 	else
 	{
-		sstr << "void";
+		sstr << "void ";
 	}
-	sstr << " ";
-	if(data_object_name) sstr << data_object_name;
+	if(identifier && (*identifier))
+	{
+		sstr << (*identifier);
+		*identifier = 0;
+	}
 	sstr << "(";
 	unsigned int formal_param_count = formal_params.size();
 	if(formal_param_count)
@@ -690,7 +942,7 @@ std::string FunctionType::BuildCDecl(const char *data_object_name) const
 		unsigned int i;
 		for(i = 0; i < formal_param_count; i++)
 		{
-			sstr << formal_params[i]->GetType()->BuildCDecl();
+			sstr << formal_params[i]->GetType()->BuildCDecl(0, true);
 			if(i != (formal_param_count - 1)) sstr << ", ";
 		}
 	}
@@ -698,40 +950,37 @@ std::string FunctionType::BuildCDecl(const char *data_object_name) const
 	return sstr.str();
 }
 
-std::ostream& operator << (std::ostream& os, const FunctionType& func_type)
-{
-	if(func_type.return_type)
-	{
-		os << *func_type.return_type;
-	}
-	else
-	{
-		os << "void";
-	}
-	os << " (";
-	unsigned int formal_param_count = func_type.formal_params.size();
-	if(formal_param_count)
-	{
-		unsigned int i;
-		for(i = 0; i < formal_param_count; i++)
-		{
-			os << *func_type.formal_params[i];
-			if(i != (formal_param_count - 1)) os << ", ";
-		}
-	}
-	os << ")";
-	return os;
-}
-
 ConstType::ConstType(const Type *_type)
 	: Type(T_CONST)
 	, type(_type)
 {
+	if(type)
+	{
+		type->Catch();
+	}
+}
+
+ConstType::ConstType(const Type *_type, const DeclLocation *_decl_location)
+	: Type(T_CONST, _decl_location)
+	, type(_type)
+{
+	if(type)
+	{
+		type->Catch();
+	}
 }
 
 ConstType::~ConstType()
 {
-	delete type;
+	if(type)
+	{
+		type->Release();
+	}
+}
+
+const Type *ConstType::GetType() const
+{
+	return type;
 }
 
 void ConstType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
@@ -739,22 +988,47 @@ void ConstType::DFS(const std::string& path, const TypeVisitor *visitor, bool fo
 	type->DFS(path, visitor, follow_pointer);
 }
 
-std::string ConstType::BuildCDecl(const char *data_object_name) const
+std::string ConstType::BuildCDecl(char const **identifier, bool collapsed) const
 {
-	std::stringstream sstr;
+	if(type->GetClass() != T_ARRAY)
+	{
+		std::stringstream sstr;
 	
-	sstr << type->BuildCDecl() << " const";
-	if(data_object_name) sstr << " " << data_object_name;
-	return sstr.str();
+		if(identifier && (*identifier))
+		{
+			std::string s("const");
+			s += ' ';
+			s += (*identifier);
+			char const *s_cstr = s.c_str();
+			sstr << type->BuildCDecl(&s_cstr, collapsed);
+			if(!s_cstr)
+			{
+				*identifier = 0;
+			}
+		}
+		else
+		{
+			sstr << type->BuildCDecl(0, collapsed);
+			sstr << " const";
+		}
+		return sstr.str();
+	}
+
+	// Discarding const for arrays
+	return type->BuildCDecl(identifier, collapsed);
 }
 
-std::ostream& operator << (std::ostream& os, const ConstType& const_type)
-{
-	return os << *const_type.type << " const";
-}
-
-Enumerator::Enumerator(const char *_name)
+Enumerator::Enumerator(const char *_name, int64_t _value)
 	: name(_name)
+	, sign(_value < 0)
+	, value(sign ? (-_value) : _value)
+{
+}
+
+Enumerator::Enumerator(const char *_name, uint64_t _value)
+	: name(_name)
+	, sign(false)
+	, value(_value)
 {
 }
 
@@ -764,12 +1038,27 @@ Enumerator::~Enumerator()
 
 std::ostream& operator << (std::ostream& os, const Enumerator& enumerator)
 {
-	return os << enumerator.name;
+	os << enumerator.name << " = ";
+	if(enumerator.sign)
+	{
+		os << (int64_t)(-enumerator.value);
+	}
+	else
+	{
+		os << enumerator.value;
+	}
+	return os;
 }
 
 EnumType::EnumType(const char *_name)
-	: Type(T_ENUM)
-	, name(_name ? _name : "__anonymous__")
+	: NamedType(T_ENUM, _name)
+	, enumerators()
+{
+}
+
+EnumType::EnumType(const char *_name, const DeclLocation *_decl_location)
+	: NamedType(T_ENUM, _name, _decl_location)
+	, enumerators()
 {
 }
 
@@ -788,10 +1077,29 @@ void EnumType::Add(const Enumerator *enumerator)
 	enumerators.push_back(enumerator);
 }
 
-std::ostream& operator << (std::ostream& os, const EnumType& enum_type)
+std::string EnumType::BuildCDecl(char const **identifier, bool collapsed) const
 {
-	os << "enum " << enum_type.name;
-	return os;
+	std::stringstream sstr;
+	
+	sstr << "enum";
+	if(HasName())
+	{
+		sstr << " " << GetName();
+	}
+	unsigned int enumerator_count = enumerators.size();
+	if(enumerator_count && (!collapsed || !HasName()))
+	{
+		sstr << " { ";
+		unsigned int i;
+		for(i = 0; i < enumerator_count; i++)
+		{
+			if(i != 0) sstr << ", ";
+			const Enumerator *enumerator = enumerators[i];
+			sstr << (*enumerator);
+		}
+		sstr << " }";
+	}
+	return sstr.str();
 }
 
 UnspecifiedType::UnspecifiedType()
@@ -799,24 +1107,51 @@ UnspecifiedType::UnspecifiedType()
 {
 }
 
+UnspecifiedType::UnspecifiedType(const DeclLocation *_decl_location)
+	: Type(T_VOID, _decl_location)
+{
+}
+
 UnspecifiedType::~UnspecifiedType()
 {
 }
 
-std::ostream& operator << (std::ostream& os, const UnspecifiedType& unspecified_type)
+std::string UnspecifiedType::BuildCDecl(char const **identifier, bool collapsed) const
 {
-	return os << "void";
+	return std::string("void");
 }
 
 VolatileType::VolatileType(const Type *_type)
-	: Type(T_CONST)
+	: Type(T_VOLATILE)
 	, type(_type)
 {
+	if(type)
+	{
+		type->Catch();
+	}
+}
+
+VolatileType::VolatileType(const Type *_type, const DeclLocation *_decl_location)
+	: Type(T_VOLATILE, _decl_location)
+	, type(_type)
+{
+	if(type)
+	{
+		type->Catch();
+	}
 }
 
 VolatileType::~VolatileType()
 {
-	delete type;
+	if(type)
+	{
+		type->Release();
+	}
+}
+
+const Type *VolatileType::GetType() const
+{
+	return type;
 }
 
 void VolatileType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
@@ -824,9 +1159,34 @@ void VolatileType::DFS(const std::string& path, const TypeVisitor *visitor, bool
 	type->DFS(path, visitor, follow_pointer);
 }
 
-std::ostream& operator << (std::ostream& os, const VolatileType& volatile_type)
+std::string VolatileType::BuildCDecl(char const **identifier, bool collapsed) const
 {
-	return os << "volatile " << *volatile_type.type;
+	if(type->GetClass() != T_ARRAY)
+	{
+		std::stringstream sstr;
+	
+		if(identifier && (*identifier))
+		{
+			std::string s("volatile");
+			s += ' ';
+			s += (*identifier);
+			char const *s_cstr = s.c_str();
+			sstr << type->BuildCDecl(&s_cstr, collapsed);
+			if(!s_cstr)
+			{
+				*identifier = 0;
+			}
+		}
+		else
+		{
+			sstr << type->BuildCDecl(0, collapsed);
+			sstr << " volatile";
+		}
+		return sstr.str();
+	}
+	
+	// Discarding volatile for arrays
+	return type->BuildCDecl(identifier, collapsed);
 }
 
 } // end of namespace debug

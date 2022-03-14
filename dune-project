@@ -1,8 +1,8 @@
-(lang dune 2.8)
+(lang dune 3.0)
 (generate_opam_files true)
 
 (name unisim_archisec)
-(version "0.0.0")
+(version "0.0.1")
 (maintainers "BINSEC <binsec@saxifrage.saclay.cea.fr>")
 (authors
   "Yves Lhuillier"

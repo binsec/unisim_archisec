@@ -32,8 +32,9 @@
 (*  POSSIBILITY OF SUCH DAMAGE.                                               *)
 (******************************************************************************)
 
-external decode : thumb:bool -> bigendian:bool -> itstate:int ->
-  addr:int32 -> int32 -> string = "arm32dba_decode"
+external decode :
+  thumb:bool -> bigendian:bool -> itstate:int -> addr:int32 -> int32 -> string
+  = "arm32dba_decode"
 
-let decode ~thumb ?(bigendian=false) ?(itstate=0) ~addr code =
+let decode ~thumb ?(bigendian = false) ?(itstate = 0) ~addr code =
   decode ~thumb ~bigendian ~itstate ~addr code

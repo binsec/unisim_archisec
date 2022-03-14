@@ -51,4 +51,4 @@ let () =
   print_newline ();
   print_string "Aarch64dba.decode ~addr:0x4000L 0x18000020l";
   print_newline ();
-  print_string @@ Aarch64dba.decode ~addr:0x4000L 0x18000020l;
+  print_string @@ Aarch64dba.decode ~addr:0x4000L 0x18000020l

@@ -53,8 +53,7 @@ public:
 	virtual ADDRESS GetBitSize() const = 0;
 	virtual const Type *GetType() const = 0;
 	virtual unisim::util::endian::endian_type GetEndian() const = 0;
-	virtual void Seek(ADDRESS pc) = 0;
-	virtual bool GetPC() const = 0;
+	virtual ADDRESS GetPC() const = 0;
 	virtual bool Exists() const = 0;
 	virtual bool IsOptimizedOut() const = 0;
 	virtual bool GetAddress(ADDRESS& addr) const = 0;

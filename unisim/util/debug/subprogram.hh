@@ -35,10 +35,9 @@
 #ifndef __UNISIM_UTIL_DEBUG_SUBPROGRAM_HH__
 #define __UNISIM_UTIL_DEBUG_SUBPROGRAM_HH__
 
-#include <unisim/util/endian/endian.hh>
+#include <unisim/util/debug/type.hh>
+#include <unisim/util/debug/decl_location.hh>
 #include <string>
-#include <vector>
-#include <iosfwd>
 
 namespace unisim {
 namespace util {
@@ -48,11 +47,24 @@ template <class ADDRESS>
 class SubProgram
 {
 public:
-	virtual ~SubProgram() {}
+	SubProgram();
+	virtual ~SubProgram();
 	virtual const char *GetName() const = 0;
+	virtual bool IsExternal() const = 0;
+	virtual bool IsDeclaration() const = 0;
+	virtual bool IsInline() const = 0;
+	virtual bool IsInlined() const = 0;
 	virtual const Type *GetReturnType() const = 0;
 	virtual unsigned int GetArity() const = 0;
 	virtual const FormalParameter *GetFormalParameter(unsigned int idx) const = 0;
+	virtual const DeclLocation *GetDeclLocation() const = 0;
+	const std::string& BuildCDecl() const;
+	void Catch() const;
+	void Release() const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
+private:
+	mutable unsigned int ref_count;
+	mutable std::string *cdecl;
 };
 
 } // end of namespace debug

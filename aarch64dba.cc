@@ -32,14 +32,12 @@
 /*  POSSIBILITY OF SUCH DAMAGE.                                               */
 /******************************************************************************/
 
+#include <aarch64/decoder.hh>
+
 #include <vector>
 #include <iostream>
 #include <sstream>
 #include <cstdint>
-
-namespace aarch64 {
-  int decode(uint64_t, uint32_t, std::ostream&);
-}
 
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
@@ -47,6 +45,9 @@ namespace aarch64 {
 
 extern "C" value aarch64dba_decode(value vaddr, value vopcode) {
   std::stringstream s;
-  aarch64::decode(Int64_val(vaddr), Int32_val(vopcode), s);
+  aarch64::Decoder decoder;
+
+  decoder.process(s, Int64_val(vaddr), Int32_val(vopcode));
+
   return caml_copy_string(s.str().c_str());
 }

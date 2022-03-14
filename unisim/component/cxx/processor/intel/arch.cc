@@ -68,6 +68,13 @@ namespace intel {
     std::memset( static_cast<void*>( &m_fregs[0] ), 0, sizeof (m_fregs) );
     std::memset( static_cast<void*>( &m_gdt_bases[0] ), 0, sizeof (m_gdt_bases) );
   }
+
+  Arch::~Arch()
+  {
+    for (unsigned reg = 0; reg < 8; ++reg)
+      umms[reg].Clear(&vmm_storage[reg][0]);
+  }
+
   
   template <typename DECODER>
   struct ICache : public DECODER

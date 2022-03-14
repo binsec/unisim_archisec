@@ -292,7 +292,7 @@ namespace arm {
     BOOL const scr_fw( false ); // prevents Non-secure masking of FIQs that are taken to Monitor mode
     BOOL const have_virt_ext( false ); // HaveVirtExt()
 
-    BOOL privileged = core.CPSR().Get(M) != U32(core.USER_MODE);
+    BOOL privileged = core.CPSR().Get(M) != U32(PSR::USER_MODE);
     
     if (A.Get( psr_mask ) and not core.Test
         (privileged and (is_secure or  scr_aw or have_virt_ext)))

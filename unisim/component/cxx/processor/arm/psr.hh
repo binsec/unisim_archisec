@@ -129,6 +129,17 @@ namespace arm {
       RegisterField<10,6>().Set( m_value, state >> 2 );
       RegisterField<25,2>().Set( m_value, state & 3 );
     }
+
+    /* masks for the different running modes */
+    static uint32_t const USER_MODE = 0b10000;
+    static uint32_t const FIQ_MODE = 0b10001;
+    static uint32_t const IRQ_MODE = 0b10010;
+    static uint32_t const SUPERVISOR_MODE = 0b10011;
+    static uint32_t const MONITOR_MODE = 0b10110;
+    static uint32_t const ABORT_MODE = 0b10111;
+    static uint32_t const HYPERVISOR_MODE = 0b11010;
+    static uint32_t const UNDEFINED_MODE = 0b11011;
+    static uint32_t const SYSTEM_MODE = 0b11111;
   };
 
 } // end of namespace arm

@@ -36,8 +36,9 @@
 #ifndef __UNISIM_UTIL_DEBUG_WATCHPOINT_REGISTRY_HH__
 #define __UNISIM_UTIL_DEBUG_WATCHPOINT_REGISTRY_HH__
 
-#include "unisim/util/debug/memory_access_type.hh"
-#include "unisim/util/debug/watchpoint.hh"
+#include <unisim/util/debug/memory_access_type.hh>
+#include <unisim/util/debug/watchpoint.hh>
+#include <unisim/service/interfaces/debug_event.hh>
 
 #include <list>
 #include <map>
@@ -79,7 +80,7 @@ public:
 
 	void Reset();
 	void Clear(unsigned int front_end_num);
-	bool SetWatchpoint(unisim::util::debug::MemoryAccessType mat, unisim::util::debug::MemoryType mt, ADDRESS addr, uint32_t size, bool overlook = true, unsigned int prc_num = 0, unsigned int front_end_num = 0);
+	Watchpoint<ADDRESS> *SetWatchpoint(unisim::util::debug::MemoryAccessType mat, unisim::util::debug::MemoryType mt, ADDRESS addr, uint32_t size, bool overlook = true, unsigned int prc_num = 0, unsigned int front_end_num = 0);
 	bool RemoveWatchpoint(unisim::util::debug::MemoryAccessType mat, unisim::util::debug::MemoryType mt, ADDRESS addr, uint32_t size, unsigned int prc_num = 0, unsigned int front_end_num = 0);
 	bool SetWatchpoint(Watchpoint<ADDRESS> *wp);
 	bool RemoveWatchpoint(Watchpoint<ADDRESS> *wp);
@@ -92,9 +93,9 @@ public:
 	/* struct Visitor { void Visit(Watchpoint<ADDRESS> *) {} }; */
 	template <class VISITOR> bool FindWatchpoints(unisim::util::debug::MemoryAccessType mat, unisim::util::debug::MemoryType mt, ADDRESS addr, uint32_t size, unsigned int prc_num, unsigned int front_end_num, VISITOR& visitor) const;
 	
-	void EnumerateWatchpoints(unsigned int prc_num, unsigned int front_end_num, std::list<Event<ADDRESS> *>& lst) const;
-	void EnumerateWatchpoints(unsigned int front_end_num, std::list<Event<ADDRESS> *>& lst) const;
-	void EnumerateWatchpoints(std::list<Event<ADDRESS> *>& lst) const;
+	void ScanWatchpoints(unsigned int prc_num, unsigned int front_end_num, unisim::service::interfaces::DebugEventScanner<ADDRESS>& scanner) const;
+	void ScanWatchpoints(unsigned int front_end_num, unisim::service::interfaces::DebugEventScanner<ADDRESS>& scanner) const;
+	void ScanWatchpoints(unisim::service::interfaces::DebugEventScanner<ADDRESS>& scanner) const;
 
 private:
 	std::multimap<ADDRESS, Watchpoint<ADDRESS> *> watchpoints[NUM_PROCESSORS][MAX_FRONT_ENDS];

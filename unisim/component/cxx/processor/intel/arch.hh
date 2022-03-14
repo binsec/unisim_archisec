@@ -108,6 +108,7 @@ namespace intel {
     
     // CONSTRUCTORS/DESTRUCTORS
     Arch();
+    ~Arch();
   
     // PROCESSOR META STATE
     bool                        m_running;      ///< Processors on/off

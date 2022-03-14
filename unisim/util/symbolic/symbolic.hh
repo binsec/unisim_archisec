@@ -111,6 +111,7 @@ namespace symbolic {
   {
     virtual ~ExprNode() {}
     ExprNode() : refs(0) {}
+    ExprNode(ExprNode const&) : refs(0) {}
     mutable uintptr_t refs;
     void Retain() const { ++refs; }
     void Release() const { if (--refs == 0) delete this; }
@@ -132,7 +133,7 @@ namespace symbolic {
       {
         Xor, And, Or,
         Ror, Rol, Lsl, Asr, Lsr,
-        Add, Sub, Div, Mod, Mul, Min, Max,
+        Add, Sub, Div, Divu, Mod, Modu, Mul, Min, Max,
         Teq, Tne, Tge, Tgt, Tle, Tlt, Tgeu, Tgtu, Tleu, Tltu,
         BSwp, BSR, BSF, POPCNT, Not, Neg,
         FCmp, FSQB, FFZ, FNeg, FSqrt, FAbs, FDen, FMod, FPow, FTrunc, FFloor,
@@ -150,7 +151,9 @@ namespace symbolic {
         case    Add: return "Add";
         case    Sub: return "Sub";
         case    Div: return "Div";
+        case   Divu: return "Divu";
         case    Mod: return "Mod";
+        case   Modu: return "Modu";
         case    Mul: return "Mul";
         case    Min: return "Min";
         case    Max: return "Max";
@@ -406,7 +409,7 @@ namespace symbolic {
         case Op::Xor:  case Op::And: case Op::Or:
         case Op::Lsl:  case Op::Lsr: case Op::Asr:  case Op::Ror:   case Op::Rol:
         case Op::Add:  case Op::Sub: case Op::Min:  case Op::Max:
-        case Op::Mul:  case Op::Div: case Op::Mod:
+        case Op::Mul:  case Op::Div: case Op::Mod: case Op::Divu: case Op::Modu:
 
           return GetSub(0)->GetType();
 
@@ -473,8 +476,10 @@ namespace symbolic {
         case Op::Add:    return new this_type( value + GetValue( args[1] ) );
         case Op::Sub:    return new this_type( value - GetValue( args[1] ) );
         case Op::Mul:    return new this_type( EvalMul( value, GetValue( args[1] ) ) );
-        case Op::Div:    return new this_type( value / GetValue( args[1] ) );
-        case Op::Mod:    return new this_type( EvalMod( value, GetValue( args[1] ) ) );
+        case Op::Div:
+        case Op::Divu:   return new this_type( value / GetValue( args[1] ) );
+        case Op::Mod:
+        case Op::Modu:   return new this_type( EvalMod( value, GetValue( args[1] ) ) );
 
         case Op::Teq:    return new ConstNode   <bool>   ( value == GetValue( args[1] ) );
         case Op::Tne:    return new ConstNode   <bool>   ( value != GetValue( args[1] ) );
@@ -646,8 +651,8 @@ namespace symbolic {
     this_type& operator += ( this_type const& other ) { expr = make_operation( "Add", expr, other.expr ); return *this; }
     this_type& operator -= ( this_type const& other ) { expr = make_operation( "Sub", expr, other.expr ); return *this; }
     this_type& operator *= ( this_type const& other ) { expr = make_operation( "Mul", expr, other.expr ); return *this; }
-    this_type& operator /= ( this_type const& other ) { expr = make_operation( "Div", expr, other.expr ); return *this; }
-    this_type& operator %= ( this_type const& other ) { expr = make_operation( "Mod", expr, other.expr ); return *this; }
+    this_type& operator /= ( this_type const& other ) { expr = make_operation( is_signed ? "Div" : "Divu", expr, other.expr ); return *this; }
+    this_type& operator %= ( this_type const& other ) { expr = make_operation( is_signed ? "Mod" : "Modu", expr, other.expr ); return *this; }
     this_type& operator ^= ( this_type const& other ) { expr = make_operation( "Xor", expr, other.expr ); return *this; }
     this_type& operator &= ( this_type const& other ) { expr = make_operation( "And", expr, other.expr ); return *this; }
     this_type& operator |= ( this_type const& other ) { expr =  make_operation( "Or", expr, other.expr ); return *this; }
@@ -655,8 +660,8 @@ namespace symbolic {
     this_type operator + ( this_type const& other ) const { return this_type( make_operation( "Add", expr, other.expr ) ); }
     this_type operator - ( this_type const& other ) const { return this_type( make_operation( "Sub", expr, other.expr ) ); }
     this_type operator * ( this_type const& other ) const { return this_type( make_operation( "Mul", expr, other.expr ) ); }
-    this_type operator / ( this_type const& other ) const { return this_type( make_operation( "Div", expr, other.expr ) ); }
-    this_type operator % ( this_type const& other ) const { return this_type( make_operation( "Mod", expr, other.expr ) ); }
+    this_type operator / ( this_type const& other ) const { return this_type( make_operation( is_signed ? "Div" : "Divu", expr, other.expr ) ); }
+    this_type operator % ( this_type const& other ) const { return this_type( make_operation( is_signed ? "Mod" : "Modu", expr, other.expr ) ); }
     this_type operator ^ ( this_type const& other ) const { return this_type( make_operation( "Xor", expr, other.expr ) ); }
     this_type operator & ( this_type const& other ) const { return this_type( make_operation( "And", expr, other.expr ) ); }
     this_type operator | ( this_type const& other ) const { return this_type( Expr(  make_operation( "Or", expr, other.expr ) ) ); }

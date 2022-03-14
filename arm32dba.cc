@@ -32,20 +32,12 @@
 /*  POSSIBILITY OF SUCH DAMAGE.                                               */
 /******************************************************************************/
 
+#include <aarch32/decoder.hh>
+
 #include <vector>
 #include <iostream>
 #include <sstream>
 #include <cstdint>
-
-namespace armsec {
-  struct Processor {
-    struct StatusRegister {
-      enum InstructionSet { Arm, Thumb, Jazelle, ThumbEE };
-    };
-  };
-  int decode(enum Processor::StatusRegister::InstructionSet, bool, uint32_t,
-	     unsigned, uint32_t, uint32_t, std::ostream&);
-}
 
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
@@ -54,11 +46,14 @@ namespace armsec {
 extern "C" value arm32dba_decode(value vmode, value vendian,
 				 value vitstate, value vaddr, value vopcode) {
   std::stringstream s;
-  enum armsec::Processor::StatusRegister::InstructionSet iset =
-    Long_val(vmode) ?
-    armsec::Processor::StatusRegister::Thumb :
-    armsec::Processor::StatusRegister::Arm;
-  armsec::decode(iset, Long_val(vendian), 0b10000, Long_val(vitstate),
-		 Int32_val(vaddr), Int32_val(vopcode), s);
+  armsec::Decoder decoder;
+
+  decoder.iset = Long_val(vmode) ? decoder.Thumb : decoder.Arm;
+  decoder.bigendian = Long_val(vendian);
+  decoder.mode = unisim::component::cxx::processor::arm::PSR::USER_MODE;
+  decoder.itstate = Long_val(vitstate);
+
+  decoder.process( s, Int32_val(vaddr), Int32_val(vopcode) );
+
   return caml_copy_string(s.str().c_str());
 }

@@ -231,7 +231,10 @@ namespace binsec {
               case Op::Add:     sink << " + "; break;
               case Op::Sub:     sink << " - "; break;
               case Op::Mul:     sink << " * "; break;
-              case Op::Mod:     sink << " modu "; break;
+              case Op::Mod:     sink << " mods "; break;
+              case Op::Modu:     sink << " modu "; break;
+              case Op::Div:     sink << " /s "; break;
+              case Op::Divu:     sink << " /u "; break;
 
               case Op::Xor:     sink << " xor "; break;
               case Op::Or:      sink << " or "; break;
@@ -695,7 +698,7 @@ namespace binsec {
           TmpVar( std::string const& _ref, unsigned rsz )
             : ref(_ref), dsz(rsz)
           {}
-          virtual TmpVar* Mutate() const { return new TmpVar(*this); }
+          virtual TmpVar* Mutate() const override { return new TmpVar(*this); }
           virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const { sink << ref; return dsz; }
           virtual ScalarType::id_t GetType() const { return ScalarType::IntegerType(false, dsz); }
           virtual int cmp( ExprNode const& rhs ) const override { return ref.compare( dynamic_cast<TmpVar const&>( rhs ).ref ); }

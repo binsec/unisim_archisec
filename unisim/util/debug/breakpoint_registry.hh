@@ -37,6 +37,7 @@
 #define __UNISIM_UTIL_DEBUG_BREAKPOINT_REGISTRY_HH__
 
 #include <unisim/util/debug/breakpoint.hh>
+#include <unisim/service/interfaces/debug_event.hh>
 #include <list>
 #include <map>
 
@@ -77,7 +78,7 @@ public:
 
 	void Reset();
 	void Clear(unsigned int front_end_num);
-	bool SetBreakpoint(ADDRESS addr, unsigned int prc_num = 0, unsigned int front_end_num = 0);
+	Breakpoint<ADDRESS> *SetBreakpoint(ADDRESS addr, unsigned int prc_num = 0, unsigned int front_end_num = 0);
 	bool RemoveBreakpoint(ADDRESS addr, unsigned int prc_num = 0, unsigned int front_end_num = 0);
 	bool SetBreakpoint(Breakpoint<ADDRESS> *brkp);
 	bool RemoveBreakpoint(Breakpoint<ADDRESS> *brkp);
@@ -86,9 +87,9 @@ public:
 	bool HasBreakpoints(ADDRESS addr, unsigned int prc_num, unsigned int front_end_num) const;
 	bool HasBreakpoints(unsigned int prc_num) const;
 	bool HasBreakpoints() const;
-	void EnumerateBreakpoints(unsigned int prc_num, unsigned int front_end_num, std::list<Event<ADDRESS> *>& lst) const;
-	void EnumerateBreakpoints(unsigned int front_end_num, std::list<Event<ADDRESS> *>& lst) const;
-	void EnumerateBreakpoints(std::list<Event<ADDRESS> *>& lst) const;
+	void ScanBreakpoints(unsigned int prc_num, unsigned int front_end_num, unisim::service::interfaces::DebugEventScanner<ADDRESS>& scanner) const;
+	void ScanBreakpoints(unsigned int front_end_num, unisim::service::interfaces::DebugEventScanner<ADDRESS>& scanner) const;
+	void ScanBreakpoints(unisim::service::interfaces::DebugEventScanner<ADDRESS>& scanner) const;
 
 	/* struct Visitor { void Visit(Breakpoint<ADDRESS> *) {} }; */
 	template <class VISITOR> bool FindBreakpoints(ADDRESS addr, unsigned int prc_num, unsigned int front_end_num, VISITOR& visitor);

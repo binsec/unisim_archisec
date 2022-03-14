@@ -175,7 +175,7 @@ InputStreamBuffer::int_type InputStreamBuffer::underflow()
 
 std::streamsize InputStreamBuffer::xsgetn(char* s, std::streamsize n)
 {
-	std::streamsize m = ((pos + n) > length) ? (length - pos) : n;
+	std::streamsize m = ((pos + std::streamoff(n)) > (std::ios::beg + std::streamoff(length))) ? (std::ios::beg + std::streamoff(length) - pos) : n;
 	if(m > 0)
 	{
 		memcpy(s, buffer + pos, m);
@@ -976,7 +976,7 @@ bool Form_URL_Encoded_Decoder::Decode(const std::string& s, std::ostream& err_lo
   std::size_t eos_pos = len ? (len - 1) : 0;
   std::string name;
   std::string value;
-  char non_alpha_numeric;
+  char non_alpha_numeric = ' ';
   
   // syntax: name'='value('&'name'='value)*
   //         '+' is replaced by space
@@ -1247,7 +1247,7 @@ bool URL_AbsolutePathDecoder::Decode(const std::string& url, std::string& abs_pa
 	std::size_t pos = 0;
 	std::size_t len = url.length();
 	std::size_t eos_pos = len ? (len - 1) : 0;
-	char non_alpha_numeric;
+	char non_alpha_numeric = ' ';
 	
 	std::string s;
 	std::vector<std::string> stack;

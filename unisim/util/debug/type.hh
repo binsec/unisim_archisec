@@ -35,10 +35,12 @@
 #ifndef __UNISIM_UTIL_DEBUG_TYPE_HH__
 #define __UNISIM_UTIL_DEBUG_TYPE_HH__
 
+#include <unisim/util/debug/decl_location.hh>
 #include <inttypes.h>
 #include <string>
 #include <vector>
 #include <iosfwd>
+#include <set>
 
 namespace unisim {
 namespace util {
@@ -83,57 +85,74 @@ class CharType;
 class FloatingPointType;
 class BooleanType;
 class Member;
+class CompositeType;
 class StructureType;
-class ArraySubRange;
+class UnionType;
+class ClassType;
+class InterfaceType;
 class ArrayType;
 class PointerType;
 class Typedef;
 class FormalParameter;
 class FunctionType;
 class ConstType;
+class Enumerator;
 class EnumType;
 class UnspecifiedType;
 class VolatileType;
 class TypeVisitor;
 
 std::ostream& operator << (std::ostream& os, const Type& type);
-std::ostream& operator << (std::ostream& os, const IntegerType& integer_type);
-std::ostream& operator << (std::ostream& os, const CharType& char_type);
-std::ostream& operator << (std::ostream& os, const FloatingPointType& floating_point_type);
-std::ostream& operator << (std::ostream& os, const BooleanType& boolean_type);
-std::ostream& operator << (std::ostream& os, const Member& member);
-std::ostream& operator << (std::ostream& os, const StructureType& structure_type);
-std::ostream& operator << (std::ostream& os, const ArraySubRange& array_sub_range);
-std::ostream& operator << (std::ostream& os, const ArrayType& array_type);
-std::ostream& operator << (std::ostream& os, const PointerType& pointer_type);
-std::ostream& operator << (std::ostream& os, const Typedef& _typedef);
-std::ostream& operator << (std::ostream& os, const FormalParameter& formal_param);
-std::ostream& operator << (std::ostream& os, const FunctionType& func_type);
-std::ostream& operator << (std::ostream& os, const ConstType& const_type);
-std::ostream& operator << (std::ostream& os, const EnumType& enum_type);
-std::ostream& operator << (std::ostream& os, const UnspecifiedType& unspecified_type);
-std::ostream& operator << (std::ostream& os, const VolatileType& volatile_type);
+std::ostream& operator << (std::ostream& os, const Enumerator& enumerator);
 
 class Type
 {
 public:
 	Type();
+	Type(const DeclLocation *decl_location);
 	Type(TYPE_CLASS type_class);
+	Type(TYPE_CLASS type_class, const DeclLocation *decl_location);
 	virtual ~Type();
 	
 	TYPE_CLASS GetClass() const;
+	bool IsComposite() const;
+	bool IsBase() const;
+	bool IsNamed() const;
+	const DeclLocation *GetDeclLocation() const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	void Catch() const;
+	void Release() const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
+// protected:
+	template <typename VISITOR> bool Visit(VISITOR& visitor) const;
 private:
 	TYPE_CLASS type_class;
+	const DeclLocation *decl_location;
+	mutable unsigned int ref_count;
 	
 	friend std::ostream& operator << (std::ostream& os, const Type& type);
 };
 
-class BaseType : public Type
+class NamedType : public Type
 {
 public:
-	BaseType(TYPE_CLASS type_class, unsigned int bit_size);
+	NamedType(TYPE_CLASS type_class, const char *name);
+	NamedType(TYPE_CLASS type_class, const char *name, const DeclLocation *decl_location);
+	const std::string& GetName() const;
+	bool HasName() const;
+private:
+	std::string name;
+	bool has_name;
+};
+
+class BaseType : public NamedType
+{
+public:
+	BaseType(const char *name, unsigned int bit_size);
+	BaseType(const char *name, unsigned int bit_size, const DeclLocation *decl_location);
+	BaseType(TYPE_CLASS type_class, const char *name, unsigned int bit_size);
+	BaseType(TYPE_CLASS type_class, const char *name, unsigned int bit_size, const DeclLocation *decl_location);
 	virtual ~BaseType();
 	unsigned int GetBitSize() const;
 private:
@@ -143,47 +162,45 @@ private:
 class IntegerType : public BaseType
 {
 public:
-	IntegerType(unsigned int bit_size, bool is_signed);
+	IntegerType(const char *name, unsigned int bit_size, bool is_signed);
+	IntegerType(const char *name, unsigned int bit_size, bool is_signed, const DeclLocation *decl_location);
 	virtual ~IntegerType();
 	bool IsSigned() const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 private:
 	bool is_signed;
-	
-	friend std::ostream& operator << (std::ostream& os, const IntegerType& integer_type);
 };
 
 class CharType : public BaseType
 {
 public:
-	CharType(unsigned int bit_size, bool is_signed);
+	CharType(const char *name, unsigned int bit_size, bool is_signed);
+	CharType(const char *name, unsigned int bit_size, bool is_signed, const DeclLocation *decl_location);
 	virtual ~CharType();
 	bool IsSigned() const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 private:
 	bool is_signed;
-	
-	friend std::ostream& operator << (std::ostream& os, const CharType& char_type);
 };
 
 class FloatingPointType : public BaseType
 {
 public:
-	FloatingPointType(unsigned int bit_size);
+	FloatingPointType(const char *name, unsigned int bit_size);
+	FloatingPointType(const char *name, unsigned int bit_size, const DeclLocation *decl_location);
 	virtual ~FloatingPointType();
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 private:
-	friend std::ostream& operator << (std::ostream& os, const FloatingPointType& floating_point_type);
 };
 
 class BooleanType : public BaseType
 {
 public:
-	BooleanType(unsigned int bit_size);
+	BooleanType(const char *name, unsigned int bit_size);
+	BooleanType(const char *name, unsigned int bit_size, const DeclLocation *decl_location);
 	virtual ~BooleanType();
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 private:
-	friend std::ostream& operator << (std::ostream& os, const BooleanType& boolean_type);
 };
 
 class Member
@@ -192,81 +209,114 @@ public:
 	Member(const char *name, const Type *type, uint64_t bit_size);
 	virtual ~Member();
 	const char *GetName() const;
+	bool HasName() const;
 	const Type *GetType() const;
 	uint64_t GetBitSize() const;
+	std::string BuildCDecl() const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	std::string name;
+	bool has_name;
 	const Type *type;
 	uint64_t bit_size;
-	
-	friend std::ostream& operator << (std::ostream& os, const Member& member);
 };
 
-class StructureType : public Type
+class CompositeType : public NamedType
 {
 public:
-	StructureType(TYPE_CLASS type_class, const char *name);
-	virtual ~StructureType();
+	CompositeType(TYPE_CLASS type_class, const char *name, bool incomplete);
+	CompositeType(TYPE_CLASS type_class, const char *name, bool incomplete, const DeclLocation *decl_location);
+	virtual ~CompositeType();
 	
 	void Add(const Member *member);
+	bool IsIncomplete() const;
 	unsigned int GetMemberCount() const;
 	const Member *GetMember(unsigned int idx) const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
-	std::string name;
+	bool incomplete;
 	std::vector<const Member *> members;
-	
-	friend std::ostream& operator << (std::ostream& os, const StructureType& structure_type);
+};
+
+class StructureType : public CompositeType
+{
+public:
+	StructureType(const char *name, bool incomplete) : CompositeType(T_STRUCT, name, incomplete) {}
+	StructureType(const char *name, bool incomplete, const DeclLocation *decl_location) : CompositeType(T_STRUCT, name, incomplete, decl_location) {}
+};
+
+class UnionType : public CompositeType
+{
+public:
+	UnionType(const char *name, bool incomplete) : CompositeType(T_UNION, name, incomplete) {}
+	UnionType(const char *name, bool incomplete, const DeclLocation *decl_location) : CompositeType(T_UNION, name, incomplete, decl_location) {}
+};
+
+class ClassType : public CompositeType
+{
+public:
+	ClassType(const char *name, bool incomplete) : CompositeType(T_CLASS, name, incomplete) {}
+	ClassType(const char *name, bool incomplete, const DeclLocation *decl_location) : CompositeType(T_CLASS, name, incomplete, decl_location) {}
+};
+
+class InterfaceType : public CompositeType
+{
+public:
+	InterfaceType(const char *name, bool incomplete) : CompositeType(T_INTERFACE, name, incomplete) {}
+	InterfaceType(const char *name, bool incomplete, const DeclLocation *decl_location) : CompositeType(T_INTERFACE, name, incomplete, decl_location) {}
 };
 
 class ArrayType : public Type
 {
 public:
-	ArrayType(const Type *type_of_element, int64_t lower_bound, int64_t upper_bound);
+	ArrayType(const Type *type_of_element, unsigned int order, int64_t lower_bound, int64_t upper_bound);
+	ArrayType(const Type *type_of_element, unsigned int order, int64_t lower_bound, int64_t upper_bound, const DeclLocation *decl_location);
 	virtual ~ArrayType();
 	const Type *GetTypeOfElement() const;
+	unsigned int GetOrder() const;
 	int64_t GetLowerBound() const;
 	int64_t GetUpperBound() const;
+	int64_t GetCount() const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	const Type *type_of_element;
+	unsigned int order;
 	int64_t lower_bound;
 	int64_t upper_bound;
-	
-	friend std::ostream& operator << (std::ostream& os, const ArrayType& array_type);
 };
 
 class PointerType : public Type
 {
 public:
 	PointerType(const Type *type_of_dereferenced_object);
+	PointerType(const Type *type_of_dereferenced_object, const DeclLocation *decl_location);
 	virtual ~PointerType();
 	const Type *GetTypeOfDereferencedObject() const;
+	bool IsNullTerminatedStringPointer() const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	const Type *type_of_dereferenced_object;
-	
-	friend std::ostream& operator << (std::ostream& os, const PointerType& pointer_type);
 };
 
-class Typedef : public Type
+class Typedef : public NamedType
 {
 public:
 	Typedef(const Type *type, const char *name);
+	Typedef(const Type *type, const char *name, const DeclLocation *decl_location);
 	virtual ~Typedef();
 	const Type *GetType() const;
-	const char *GetName() const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	const Type *type;
-	std::string name;
-	
-	friend std::ostream& operator << (std::ostream& os, const Typedef& _typedef);
 };
 
 class FormalParameter
@@ -276,82 +326,92 @@ public:
 	virtual ~FormalParameter();
 	const char *GetName() const;
 	const Type *GetType() const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	std::string name;
 	const Type *type;
-	
-	friend std::ostream& operator << (std::ostream& os, const FormalParameter& formal_param);
 };
 
 class FunctionType : public Type
 {
 public:
 	FunctionType(const Type *return_type);
+	FunctionType(const Type *return_type, const DeclLocation *decl_location);
 	virtual ~FunctionType();
 	
 	void Add(const FormalParameter *formal_param);
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
+	
 private:
 	const Type *return_type;
 	std::vector<const FormalParameter *> formal_params;
-	
-	friend std::ostream& operator << (std::ostream& os, const FunctionType& func_type);
 };
 
 class ConstType : public Type
 {
 public:
 	ConstType(const Type *type);
+	ConstType(const Type *type, const DeclLocation *decl_location);
 	virtual ~ConstType();
+	const Type *GetType() const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
-	virtual std::string BuildCDecl(const char *data_object_name = 0) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	const Type *type;
-	friend std::ostream& operator << (std::ostream& os, const ConstType& const_type);
 };
 
 class Enumerator
 {
 public:
-	Enumerator(const char *name);
+	Enumerator(const char *name, int64_t value);
+	Enumerator(const char *name, uint64_t value);
 	virtual ~Enumerator();
 	const char *GetName() const;
 private:
 	std::string name;
+	bool sign;
+	uint64_t value;
+	
 	friend std::ostream& operator << (std::ostream& os, const Enumerator& enumerator);
 };
 
-class EnumType : public Type
+class EnumType : public NamedType
 {
 public:
 	EnumType(const char *name);
+	EnumType(const char *name, const DeclLocation *decl_location);
 	virtual ~EnumType();
 	void Add(const Enumerator *enumerator);
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
-	std::string name;
 	std::vector<const Enumerator *> enumerators;
-	
-	friend std::ostream& operator << (std::ostream& os, const EnumType& enum_type);
 };
 
 class UnspecifiedType : public Type
 {
 public:
 	UnspecifiedType();
+	UnspecifiedType(const DeclLocation *decl_location);
 	virtual ~UnspecifiedType();
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 private:
-	friend std::ostream& operator << (std::ostream& os, const UnspecifiedType& unspecified_type);
 };
 
 class VolatileType : public Type
 {
 public:
 	VolatileType(const Type *type);
+	VolatileType(const Type *type, const DeclLocation *decl_location);
 	virtual ~VolatileType();
+	const Type *GetType() const;
 	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
+	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
+	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	const Type *type;
-	friend std::ostream& operator << (std::ostream& os, const VolatileType& volatile_type);
 };
 
 class TypeVisitor
@@ -362,6 +422,122 @@ public:
 	virtual void Visit(const Member *member) const = 0;
 private:
 };
+
+template <typename VISITOR> void Type::Scan(VISITOR& visitor) const
+{
+	switch(type_class)
+	{
+		case T_UNKNOWN  : break;
+		case T_CHAR     : break;
+		case T_INTEGER  : break;
+		case T_FLOAT    : break;
+		case T_BOOL     : break;
+		case T_STRUCT   : return dynamic_cast<StructureType     const *>(this)->Scan(visitor);
+		case T_UNION    : return dynamic_cast<UnionType         const *>(this)->Scan(visitor);
+		case T_CLASS    : return dynamic_cast<ClassType         const *>(this)->Scan(visitor);
+		case T_INTERFACE: return dynamic_cast<InterfaceType     const *>(this)->Scan(visitor);
+		case T_ARRAY    : return dynamic_cast<ArrayType         const *>(this)->Scan(visitor);
+		case T_POINTER  : return dynamic_cast<PointerType       const *>(this)->Scan(visitor);
+		case T_TYPEDEF  : return dynamic_cast<Typedef           const *>(this)->Scan(visitor);
+		case T_FUNCTION : return dynamic_cast<FunctionType      const *>(this)->Scan(visitor);
+		case T_CONST    : return dynamic_cast<ConstType         const *>(this)->Scan(visitor);
+		case T_ENUM     : break;
+		case T_VOID     : break;
+		case T_VOLATILE : return dynamic_cast<VolatileType      const *>(this)->Scan(visitor);
+	}
+}
+
+template <typename VISITOR> bool Type::Visit(VISITOR& visitor) const
+{
+	switch(type_class)
+	{
+		case T_UNKNOWN  : return false;
+		case T_CHAR     : return visitor.Visit(dynamic_cast<CharType          const *>(this));
+		case T_INTEGER  : return visitor.Visit(dynamic_cast<IntegerType       const *>(this));
+		case T_FLOAT    : return visitor.Visit(dynamic_cast<FloatingPointType const *>(this));
+		case T_BOOL     : return visitor.Visit(dynamic_cast<BooleanType       const *>(this));
+		case T_STRUCT   : return visitor.Visit(dynamic_cast<StructureType     const *>(this));
+		case T_UNION    : return visitor.Visit(dynamic_cast<UnionType         const *>(this));
+		case T_CLASS    : return visitor.Visit(dynamic_cast<ClassType         const *>(this));
+		case T_INTERFACE: return visitor.Visit(dynamic_cast<InterfaceType     const *>(this));
+		case T_ARRAY    : return visitor.Visit(dynamic_cast<ArrayType         const *>(this));
+		case T_POINTER  : return visitor.Visit(dynamic_cast<PointerType       const *>(this));
+		case T_TYPEDEF  : return visitor.Visit(dynamic_cast<Typedef           const *>(this));
+		case T_FUNCTION : return visitor.Visit(dynamic_cast<FunctionType      const *>(this));
+		case T_CONST    : return visitor.Visit(dynamic_cast<ConstType         const *>(this));
+		case T_ENUM     : return visitor.Visit(dynamic_cast<EnumType          const *>(this));
+		case T_VOID     : return visitor.Visit(dynamic_cast<UnspecifiedType   const *>(this));
+		case T_VOLATILE : return visitor.Visit(dynamic_cast<VolatileType      const *>(this));
+	}
+	return false;
+}
+
+template <typename VISITOR> void Member::Scan(VISITOR& visitor) const
+{
+	type->Visit(visitor);
+}
+
+template <typename VISITOR> void CompositeType::Scan(VISITOR& visitor) const
+{
+	unsigned int member_count = members.size();
+	for(unsigned int i = 0; i < member_count; i++)
+	{
+		Member const *member = members[i];
+		if(!visitor.Visit(member)) break;
+	}
+}
+
+template <typename VISITOR> void ArrayType::Scan(VISITOR& visitor) const
+{
+	type_of_element->Visit(visitor);
+}
+
+template <typename VISITOR> void PointerType::Scan(VISITOR& visitor) const
+{
+	type_of_dereferenced_object->Visit(visitor);
+}
+
+template <typename VISITOR> void Typedef::Scan(VISITOR& visitor) const
+{
+	type->Visit(visitor);
+}
+
+template <typename VISITOR> void FormalParameter::Scan(VISITOR& visitor) const
+{
+	type->Visit(visitor);
+}
+
+template <typename VISITOR> void FunctionType::Scan(VISITOR& visitor) const
+{
+	if(!return_type->Visit(visitor)) return;
+	
+	unsigned int formal_param_count = formal_params.size();
+	for(unsigned int i = 0; i < formal_param_count; i++)
+	{
+		FormalParameter const *formal_param = formal_params[i];
+		if(!visitor.Visit(formal_param)) break;
+	}
+}
+
+template <typename VISITOR> void ConstType::Scan(VISITOR& visitor) const
+{
+	type->Visit(visitor);
+}
+
+template <typename VISITOR> void EnumType::Scan(VISITOR& visitor) const
+{
+	unsigned int enumerator_count = enumerators.size();
+	for(unsigned int i = 0; i < enumerator_count; i++)
+	{
+		Enumerator const *enumerator = enumerators[i];
+		if(!visitor.Visit(enumerator)) break;
+	}
+}
+
+template <typename VISITOR> void VolatileType::Scan(VISITOR& visitor) const
+{
+	type->Visit(visitor);
+}
 
 } // end of namespace debug
 } // end of namespace util

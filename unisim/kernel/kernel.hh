@@ -68,10 +68,11 @@ class VariableBase;
 class Simulator;
 template <class SERVICE_IF> class Client;
 template <class SERVICE_IF> class Service;
-class ServiceImportBase;
-class ServiceExportBase;
+class ServicePortBase;
 template <class SERVICE_IF> class ServiceImport;
 template <class SERVICE_IF> class ServiceExport;
+class ServiceAgent;
+class ServiceBase;
 class SignalHandler;
 class ConfigFileHelper;
 
@@ -238,7 +239,7 @@ class Simulator
 public:
 	typedef enum
 	{
-		ST_OK_TO_START,
+		ST_OK_TO_START = 0,
 		ST_OK_DONT_START,
 		ST_WARNING,
 		ST_ERROR
@@ -304,8 +305,7 @@ private:
 	friend class VariableBase;
 	template <class TYPE> friend class Variable;
 	template <class TYPE> friend class VariableArray;
-	friend class ServiceImportBase;
-	friend class ServiceExportBase;
+	friend class ServicePortBase;
 	friend class SignalHandler;
 
 	static Simulator *simulator;
@@ -346,13 +346,11 @@ private:
 	void Help(std::ostream& os) const;
 	
 	void Register(Object *object);
-	void Register(ServiceImportBase *srv_import);
-	void Register(ServiceExportBase *srv_export);
+	void Register(ServicePortBase *srv_port);
 	void Register(VariableBase *variable);
 
 	void Unregister(Object *object);
-	void Unregister(ServiceImportBase *srv_import);
-	void Unregister(ServiceExportBase *srv_export);
+	void Unregister(ServicePortBase *srv_import);
 	void Unregister(VariableBase *variable);
 
 	void Initialize(VariableBase *variable);
@@ -390,8 +388,7 @@ private:
 	std::vector<CommandLineOption> command_line_options;
 
 	std::map<std::string, Object *, unisim::util::nat_sort::nat_ltstr> objects;
-	std::map<std::string, ServiceImportBase *> imports;
-	std::map<std::string, ServiceExportBase *> exports;
+	std::map<std::string, ServicePortBase *> srv_ports;
 	std::map<std::string, VariableBase *, unisim::util::nat_sort::nat_ltstr> variables;
 	std::map<std::string, ConfigFileHelper *> config_file_helpers;
 	
@@ -451,15 +448,17 @@ private:
 class Object
 {
 public:
+	Object(Object const&) = delete;
 	Object(const char *name, Object *parent = 0, const char *description = 0);
 	virtual ~Object();
 
 	virtual void OnDisconnect();
-	virtual bool BeginSetup(); // must not call any import. By contract it is called first.
-	virtual bool Setup(ServiceExportBase *service_export); // must setup an export, can call any import it depends, see ServiceExportBase::SetupDependsOn.
-	                                                       // By contract, BeginSetup has been called before.
-	virtual bool EndSetup(); // can call any import
-	                         // By contract, it is called after Setup(ServiceExportBase&)
+	/** Object initial setup routine. The routine is the first
+	 * called, it must not call any import. */
+	virtual bool BeginSetup();
+	/** Object final setup routine. The routine is called after export
+	 * setup, id can call any import. */
+	virtual bool EndSetup();
 	
 	virtual void SigInt();
 	virtual void Kill();
@@ -469,16 +468,10 @@ public:
 	const char *GetObjectName() const;
 	std::string URI() const;
 
-	void Add(ServiceImportBase& srv_import);
-	void Remove(ServiceImportBase& srv_import);
-	void Add(ServiceExportBase& srv_export);
-	void Remove(ServiceExportBase& srv_export);
 	void Add(Object& object);
 	void Remove(Object& object);
 	void Add(VariableBase& var);
 	void Remove(VariableBase& var);
-	const std::list<ServiceImportBase *>& GetServiceImports() const;
-	const std::list<ServiceExportBase *>& GetServiceExports() const;
 	const std::list<Object *>& GetLeafs() const;
 	void GetVariables(std::list<VariableBase *>& lst, VariableBase::Type type = VariableBase::VAR_VOID) const;
 	Object *GetParent() const;
@@ -490,6 +483,10 @@ public:
 	const char *GetDescription() const;
 	virtual void Stop(int exit_status, bool asynchronous = false);
 	void SetDescription(const char *description);
+	/** Service setup routine. The routine is called after BeginSetup, it
+	 * can call imports (see ServiceImport::RequireSetup) */
+	void AddServiceAgent( ServiceAgent const* srv_agent );
+	void DoServiceSetup();
 	
 private:
 	std::string object_name;
@@ -497,9 +494,8 @@ private:
 	std::string description;
 	Object *parent;
 	std::list<VariableBase *> variables;
-	std::list<ServiceImportBase *> srv_imports;
-	std::list<ServiceExportBase *> srv_exports;
 	std::list<Object *> leaf_objects;
+	std::set<ServiceAgent const*> srv_agents;
 	bool killed;
 };
 
@@ -517,17 +513,50 @@ public:
 //=                            Service<SERVICE_IF>                            =
 //=============================================================================
 
-template <class SERVICE_IF>
-class Service : public SERVICE_IF, virtual public Object
+// ServiceAgent objects that knows about Services actual types (able to call Setup(Service*))
+class ServiceAgent
 {
 public:
-	Service(const char *name, Object *parent = 0, const char *description = 0);
+	virtual ~ServiceAgent() {}
+	virtual void Setup( Object* ) const = 0;
+	virtual ServiceBase* GetBase( Object* ) const = 0;
+	
+	struct SetupError {};
+};
+
+class ServiceBase : virtual public Object
+{
+public:
+	ServiceBase(const char *name, Object *parent, const char *description);
+	bool NeedServiceSetup() const;
+	bool ServiceIsConnected() const { return is_connected; }
+	
+protected:
+	enum SetupState { NoSetup = 0, SetupStarted, SetupComplete  };
+	unsigned setup_state : 2;
+	unsigned is_connected : 1;
 };
 
 template <class SERVICE_IF>
-Service<SERVICE_IF>::Service(const char *_name, Object *_parent, const char *_description) :
-	Object(_name, _parent, _description)
+class Service : public ServiceBase, public SERVICE_IF
 {
+public:
+	Service(const char *name, Object *parent = 0, const char *description = 0);
+	virtual void Setup(SERVICE_IF*) {}
+	void RequireSetup() { if (NeedServiceSetup()) { Setup(this); setup_state = SetupComplete; } }
+};
+
+template <class SERVICE_IF>
+Service<SERVICE_IF>::Service(const char *_name, Object *_parent, const char *_description)
+	: Object(_name, _parent, _description)
+	, ServiceBase(_name, _parent, _description)
+{
+	static struct DerivedServiceAgent : public ServiceAgent
+	{
+		void Setup( Object* object ) const override { dynamic_cast<Service<SERVICE_IF>*>(object)->RequireSetup(); }
+		ServiceBase* GetBase( Object* object ) const  override { return dynamic_cast<Service<SERVICE_IF>*>(object); }
+	} agent;
+	this->Object::AddServiceAgent( &agent );
 }
 
 //=============================================================================
@@ -554,154 +583,101 @@ Client<SERVICE_IF>::~Client()
 }
 
 //=============================================================================
-//=                           ServiceImportBase                               =
+//=                              ServicePortBase                              =
 //=============================================================================
 
-class ServiceImportBase
+class ServicePortBase
 {
 public:
-	ServiceImportBase(const char *name, Object *owner);
-	virtual ~ServiceImportBase();
-	const char *GetName() const;
-	virtual void Disconnect() = 0;
-	virtual void DisconnectService() = 0;
-	virtual void Dump(std::ostream& os) const = 0;
+	ServicePortBase(const char *name, Object *owner);
+	virtual ~ServicePortBase();
+
+	virtual bool IsConnected() const = 0;
 	virtual Object *GetService() const = 0;
-	virtual ServiceExportBase *GetServiceExport() = 0;
+	virtual bool IsExport() const = 0;
+
+	const char *GetName() const;
+	void Dump(std::ostream& os) const;
+
+	struct Visitor { virtual ~Visitor() {} virtual void Process(ServicePortBase& port) = 0; };
+	void SpreadBwd( Visitor& visitor );
+
 protected:
+	void Connect(ServicePortBase* fwd);
+
 	std::string name;
 	Object *owner;
+	std::list<ServicePortBase *> bwd_ports;
+	ServicePortBase *fwd_port;
 };
-
-//=============================================================================
-//=                           ServiceExportBase                               =
-//=============================================================================
-
-class ServiceExportBase
-{
-public:
-	ServiceExportBase(const char *name, Object *owner);
-	virtual ~ServiceExportBase();
-	const char *GetName() const;
-	virtual void Disconnect() = 0;
-	virtual void DisconnectClient() = 0;
-	virtual void Dump(std::ostream& os) const = 0;
-	virtual Object *GetClient() const = 0;
-	virtual Object *GetService() const = 0;
-	void SetupDependsOn(ServiceImportBase& srv_import);
-	virtual std::list<ServiceImportBase *>& GetSetupDependencies();
-
-	friend void operator >> (ServiceExportBase& lhs, ServiceImportBase& rhs);
-	friend void operator << (ServiceImportBase& lhs, ServiceExportBase& rhs);
-protected:
-	std::string name;
-	Object *owner;
-	std::list<ServiceImportBase *> setup_dependencies;
-};
-
-//=============================================================================
-//=                       ServiceImport<SERVICE_IF>                           =
-//=============================================================================
 
 template <class SERVICE_IF>
-class ServiceImport : public ServiceImportBase
+class ServicePort : public ServicePortBase
 {
 public:
-	ServiceImport(const char *name, Client<SERVICE_IF> *client);
-	ServiceImport(const char *name, Object *owner);
-	virtual ~ServiceImport();
+	ServicePort(const char *name, Service<SERVICE_IF> *owner);
+	ServicePort(const char *name, Client<SERVICE_IF> *owner);
+	ServicePort(const char *name, Object *owner);
 
- 	inline operator SERVICE_IF * () const ALWAYS_INLINE;
+	virtual bool IsConnected() const override;
 
-	inline SERVICE_IF *operator -> () const ALWAYS_INLINE;
+	virtual Service<SERVICE_IF> *GetService() const override;
 
-	// (import -> export) ==> export
-	friend ServiceExport<SERVICE_IF>& operator >> <SERVICE_IF>(ServiceImport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
+	operator SERVICE_IF * () const;
 
-	// (export <- import) ==> import
-	friend ServiceImport<SERVICE_IF>& operator << <SERVICE_IF>(ServiceExport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
-	
-	// (import1 -> import2) ==> import2
-	friend ServiceImport<SERVICE_IF>& operator >> <SERVICE_IF>(ServiceImport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
-	
-	// (import1 <- import2) ==> import2
-	friend ServiceImport<SERVICE_IF>& operator << <SERVICE_IF>(ServiceImport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
+	SERVICE_IF *operator -> () const;
 
-	virtual void Disconnect();
+	void Bind(ServicePort<SERVICE_IF>& fwd);
 
-	virtual void DisconnectService();
+	void RequireSetup() const;
 
-	void ResolveClient();
-
-	void Unbind(ServiceExport<SERVICE_IF>& srv_export);
-
-	virtual void Dump(std::ostream& os) const;
-
-	virtual Object *GetService() const;
-
-	virtual ServiceExportBase *GetServiceExport();
-
-private:
+protected:
 	Service<SERVICE_IF> *service;
-	ServiceExport<SERVICE_IF> *srv_export;
-	ServiceImport<SERVICE_IF> *alias_import;
-	std::list<ServiceImport<SERVICE_IF> *> actual_imports;
 	Client<SERVICE_IF> *client;
 
-	Service<SERVICE_IF> *ResolveService(Client<SERVICE_IF> *client);
-	ServiceExport<SERVICE_IF> *ResolveServiceExport();
-	void UnresolveService();
-	void Bind(ServiceExport<SERVICE_IF>& srv_export); // myself -> export
-	void Bind(ServiceImport<SERVICE_IF>& alias_import);  // myself -> import
-	void Unbind(ServiceImport<SERVICE_IF>& alias_import);
 };
 
 template <class SERVICE_IF>
-ServiceImport<SERVICE_IF>::ServiceImport(const char *_name, Client<SERVICE_IF> *_client) :
-	ServiceImportBase(_name, _client),
-	service(0),
-	srv_export(0),
-	alias_import(0),
-	actual_imports(),
-	client(_client)
+ServicePort<SERVICE_IF>::ServicePort(const char *_name, Service<SERVICE_IF> *_owner)
+	: ServicePortBase(_name, _owner)
+	, service(_owner)
+	, client(0)
+{}
+
+template <class SERVICE_IF>
+ServicePort<SERVICE_IF>::ServicePort(const char *_name, Client<SERVICE_IF> *_owner)
+	: ServicePortBase(_name, _owner)
+	, service(0)
+	, client(_owner)
+{}
+
+template <class SERVICE_IF>
+ServicePort<SERVICE_IF>::ServicePort(const char *_name, Object *_owner)
+	: ServicePortBase(_name, _owner)
+	, service(0)
+	, client(0)
+{}
+
+template <class SERVICE_IF>
+bool ServicePort<SERVICE_IF>::IsConnected() const
 {
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".ServiceImport(" << _name << ", client " << _client->GetName() << ")" << std::endl;
-#endif
+	return service and service->ServiceIsConnected();
 }
 
 template <class SERVICE_IF>
-ServiceImport<SERVICE_IF>::ServiceImport(const char *_name, Object *_owner) :
-	ServiceImportBase(_name, _owner),
-	service(0),
-	srv_export(0),
-	alias_import(0),
-	actual_imports(),
-	client(0)
+Service<SERVICE_IF> *ServicePort<SERVICE_IF>::GetService() const
 {
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".ServiceImport(" << _name << ", object " << (_owner ? _owner->GetName() : "?") << ")" << std::endl;
-#endif
+	return service;
 }
 
 template <class SERVICE_IF>
-ServiceImport<SERVICE_IF>::~ServiceImport()
+ServicePort<SERVICE_IF>::operator SERVICE_IF * () const
 {
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".~ServiceImport()" << std::endl;
-#endif
-	//ServiceImport<SERVICE_IF>::DisconnectService();
-	ServiceImport<SERVICE_IF>::Disconnect();
+	return service;
 }
 
 template <class SERVICE_IF>
-inline ServiceImport<SERVICE_IF>::operator SERVICE_IF * () const
-{
-	return (service);
-}
-
-template <class SERVICE_IF>
-inline SERVICE_IF *ServiceImport<SERVICE_IF>::operator -> () const
+SERVICE_IF *ServicePort<SERVICE_IF>::operator -> () const
 {
 #ifdef DEBUG_KERNEL
 	if(!service)
@@ -710,562 +686,62 @@ inline SERVICE_IF *ServiceImport<SERVICE_IF>::operator -> () const
 		owner->Object::Stop(-1);
 	}
 #endif
-	return (service);
+	return service;
 }
 
 template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::Bind(ServiceExport<SERVICE_IF>& srv_export)
+void ServicePort<SERVICE_IF>::RequireSetup() const
 {
-	if(this->alias_import)
-	{
-		std::cerr << "WARNING! Can't connect " << GetName() << " to " << srv_export.GetName() << " because it is already connected to " << this->alias_import->GetName() << std::endl;
+	if (service)
+		service->RequireSetup();
+}
+
+template <class SERVICE_IF>
+void ServicePort<SERVICE_IF>::Bind(ServicePort<SERVICE_IF>& fwd)
+{
+	Connect(&fwd);
+
+	if (not fwd.service)
 		return;
-	}
 
-	if(this->srv_export)
-	{
-		std::cerr << "WARNING! Can't connect " << GetName() << " to " << srv_export.GetName() << " because it is already connected to " << this->srv_export->GetName() << std::endl;
-		return;
-	}
-
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << " -> " << srv_export.GetName() << std::endl;
-#endif
-	this->srv_export = &srv_export;
+	// Now service is known, it needs to be propagated upstream.
+        struct ServiceAssignment : public Visitor
+        {
+          ServiceAssignment(Service<SERVICE_IF> *srv) : service(srv) {} Service<SERVICE_IF> *service;
+          void Process(ServicePortBase& port) override
+          {
+            static_cast<ServicePort<SERVICE_IF>&>(port).service = service;
+          }
+        } visitor( fwd.service );
+        
+        SpreadBwd( visitor );
 }
+
+//=============================================================================
+//=                       ServiceImport<SERVICE_IF>                           =
+//=============================================================================
 
 template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::Bind(ServiceImport<SERVICE_IF>& alias_import)
+class ServiceImport : public ServicePort<SERVICE_IF>
 {
-	if(srv_export)
-	{
-		std::cerr << "WARNING! Can't connect " << GetName() << " to " << alias_import.GetName() << " because it is already connected to " << srv_export->GetName() << std::endl;
-		return;
-	}
-
-	if(this->alias_import)
-	{
-		std::cerr << "WARNING! Can't connect " << GetName() << " to " << alias_import.GetName() << " because it is already connected to " << this->alias_import->GetName() << std::endl;
-		return;
-	}
-
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << " -> " << alias_import.GetName() << std::endl;
-#endif
-	this->alias_import = &alias_import;
-	alias_import.actual_imports.push_back(this);
-}
-
-template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::Unbind(ServiceExport<SERVICE_IF>& srv_export)
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".Unbind(" << srv_export.GetName() << ")" << std::endl;
-#endif
-
-	if(this->srv_export != &srv_export)
-	{
-		std::cerr << "ERROR! Can't disconnect " << GetName() << " from " << srv_export.GetName() << " because connection does not exist" << std::endl;
-		return;
-	}
-
-	UnresolveService();
-
-	this->srv_export = 0;
-}
-
-template <class SERVICE_IF>
-Service<SERVICE_IF> *ServiceImport<SERVICE_IF>::ResolveService(Client<SERVICE_IF> *_client)
-{
-	if(alias_import)
-		return (alias_import->ResolveService(_client));
-	else
-		if(srv_export) return (srv_export->ResolveService(_client));
-
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".ResolveService(" << _client->GetName() << ") failed" << std::endl;
-#endif
-	return (0);
-}
-
-template <class SERVICE_IF>
-ServiceExport<SERVICE_IF> *ServiceImport<SERVICE_IF>::ResolveServiceExport()
-{
-	if(alias_import)
-		return (alias_import->ResolveServiceExport());
-	else
-		if(srv_export) return (srv_export->ResolveServiceExport());
-
-	return (0);
-}
-
-template <class SERVICE_IF>
-ServiceExportBase *ServiceImport<SERVICE_IF>::GetServiceExport()
-{
-	return (ResolveServiceExport());
-}
-
-template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::ResolveClient()
-{
-	if(actual_imports.empty())
-	{
-		if(client && !service)
-		{
-			service = ResolveService(client);
-		}
-	}
-	else
-	{
-		typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-	
-		for(import_iter = actual_imports.begin(); import_iter != actual_imports.end(); import_iter++)
-		{
-			(*import_iter)->ResolveClient();
-		}
-	}
-}
-
-template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::UnresolveService()
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".UnresolveService()" << std::endl;
-#endif
-
-	if(actual_imports.empty())
-	{
-		if(service)
-		{
-			//service->OnDisconnect(); // Gilles: That's dangerous
-#ifdef DEBUG_KERNEL
-			std::cerr << GetName() << ": Unresolving service " << service->GetName() << std::endl;
-#endif
-		}
-	}
-	else
-	{
-		typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-	
-		for(import_iter = actual_imports.begin(); import_iter != actual_imports.end(); import_iter++)
-		{
-			(*import_iter)->UnresolveService();
-		}
-	}
-	service = 0;
-}
-
-template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::Disconnect()
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".Disconnect()" << std::endl;
-#endif
-
-	DisconnectService();
-
-	if(alias_import)
-	{
-		typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-	
-		for(import_iter = alias_import->actual_imports.begin(); import_iter != alias_import->actual_imports.end(); import_iter++)
-		{
-			if(*import_iter == this)
-			{
-				alias_import->actual_imports.erase(import_iter);
-				break;
-			}
-		}
-		alias_import = 0;
-	}
-
-	if(!actual_imports.empty())
-	{
-		typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-	
-		for(import_iter = actual_imports.begin(); import_iter != actual_imports.end(); import_iter++)
-		{
-			if((*import_iter)->alias_import == this)
-			{
-				(*import_iter)->alias_import = 0;
-			}
-		}
-		actual_imports.clear();
-	}
-
-	if(srv_export)
-	{
-		srv_export->Unbind(*this);
-		srv_export = 0;
-	}
-}
-
-template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::DisconnectService()
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".DisconnectService()" << std::endl;
-#endif
-
-	if(alias_import)
-	{
-		alias_import->DisconnectService();
-	}
-
-	if(srv_export)
-	{
-		UnresolveService();
-		srv_export->Unbind(*this);
-		srv_export = 0;
-	}
-}
-
-template <class SERVICE_IF>
-void ServiceImport<SERVICE_IF>::Dump(std::ostream& os) const
-{
-	if(alias_import)
-	{
-		os << GetName() << " -> " << alias_import->GetName() << std::endl;
-	}
-
-	typename std::list<ServiceImport<SERVICE_IF> *>::const_iterator import_iter;
-
-	for(import_iter = actual_imports.begin(); import_iter != actual_imports.end(); import_iter++)
-	{
-		os << "# " << (*import_iter)->GetName() << " -> " << GetName() << std::endl;
-	}
-
-	if(srv_export)
-	{
-		os << GetName() << " -> " << srv_export->GetName() << std::endl;
-	}
-}
-
-template <class SERVICE_IF>
-Object *ServiceImport<SERVICE_IF>::GetService() const
-{
-	return (service);
-}
+public:
+	ServiceImport(const char *name, Client<SERVICE_IF> *client) : ServicePort<SERVICE_IF>(name, client) {}
+	ServiceImport(const char *name, Object *owner) : ServicePort<SERVICE_IF>(name, owner) {}
+	virtual bool IsExport() const override { return false; }
+};
 
 //=============================================================================
 //=                          ServiceExport<SERVICE_IF>                        =
 //=============================================================================
 
 template <class SERVICE_IF>
-class ServiceExport : public ServiceExportBase
+class ServiceExport : public ServicePort<SERVICE_IF>
 {
 public:
-	ServiceExport(const char *name, Service<SERVICE_IF> *service);
-	ServiceExport(const char *name, Object *owner);
-	virtual ~ServiceExport();
-
-	inline bool IsConnected() const ALWAYS_INLINE;
-
-	// (import -> export) ==> export
-	friend ServiceExport<SERVICE_IF>& operator >> <SERVICE_IF>(ServiceImport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
-	
-	// (export <- import) ==> import
-	friend ServiceImport<SERVICE_IF>& operator << <SERVICE_IF>(ServiceExport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
-	
-	// (export1 -> export2) ==> export2
-	friend ServiceExport<SERVICE_IF>& operator >> <SERVICE_IF>(ServiceExport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
-	
-	// (export1 <- export2) ==> export2
-	friend ServiceExport<SERVICE_IF>& operator << <SERVICE_IF>(ServiceExport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
-
-	virtual void Disconnect();
-	virtual void DisconnectClient();
-
-	void Unbind(ServiceImport<SERVICE_IF>& srv_import);
-
-	Service<SERVICE_IF> *ResolveService(Client<SERVICE_IF> *client);
-	ServiceExport<SERVICE_IF> *ResolveServiceExport();
-
-	virtual void Dump(std::ostream& os) const;
-
-	virtual Object *GetClient() const;
-	virtual Object *GetService() const;
-	
-	virtual std::list<ServiceImportBase *>& GetSetupDependencies();
-
-private:
-	std::list<ServiceExport<SERVICE_IF> *> alias_exports;
-	ServiceExport<SERVICE_IF> *actual_export;
-	Service<SERVICE_IF> *service;
-	std::list<ServiceImport<SERVICE_IF> *> srv_imports;
-	Client<SERVICE_IF> *client;
-
-	void UnresolveClient();
-	void Bind(ServiceImport<SERVICE_IF>& srv_import);
-	void Bind(ServiceExport<SERVICE_IF>& alias_export);
-	void ResolveClient();
+	ServiceExport(const char *name, Service<SERVICE_IF> *service) : ServicePort<SERVICE_IF>(name, service) {}
+	ServiceExport(const char *name, Object *owner) : ServicePort<SERVICE_IF>(name, owner) {}
+	virtual bool IsExport() const override { return true; }
 };
-
-template <class SERVICE_IF>
-ServiceExport<SERVICE_IF>::ServiceExport(const char *_name, Service<SERVICE_IF> *_service) :
-	ServiceExportBase(_name, _service),
-	alias_exports(),
-	actual_export(0),
-	service(_service),
-	srv_imports(),
-	client(0)
-{
-}
-
-template <class SERVICE_IF>
-ServiceExport<SERVICE_IF>::ServiceExport(const char *_name, Object *_owner) :
-	ServiceExportBase(_name, _owner),
-	alias_exports(),
-	actual_export(0),
-	service(0),
-	srv_imports(),
-	client(0)
-{
-}
-
-template <class SERVICE_IF>
-ServiceExport<SERVICE_IF>::~ServiceExport()
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".~ServiceExport()" << std::endl;
-#endif
-	//ServiceExport<SERVICE_IF>::DisconnectClient();
-	ServiceExport<SERVICE_IF>::Disconnect();
-}
-
-template <class SERVICE_IF>
-inline bool ServiceExport<SERVICE_IF>::IsConnected() const
-{
-	return (client != 0);
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::Bind(ServiceImport<SERVICE_IF>& srv_import)
-{
-	typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-
-	for(import_iter = srv_imports.begin(); import_iter != srv_imports.end(); import_iter++)
-	{
-		if(*import_iter == &srv_import)
-		{
-			std::cerr << "WARNING! Can't connect again " << GetName() << " to " << srv_import.GetName() << " because it is already connected" << std::endl;
-			return;
-		}
-	}
-
-	srv_imports.push_back(&srv_import);
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::Bind(ServiceExport<SERVICE_IF>& alias_export)
-{
-	typename std::list<ServiceExport<SERVICE_IF> *>::iterator export_iter;
-
-	for(export_iter = alias_exports.begin(); export_iter != alias_exports.end(); export_iter++)
-	{
-		if(*export_iter == &alias_export)
-		{
-			std::cerr << "WARNING! Can't connect again " << GetName() << " to " << alias_export.GetName() << " because it is already" << std::endl;
-			return;
-		}
-	}
-
-	if(alias_export.actual_export)
-	{
-		std::cerr << "WARNING! Can't connect " << GetName() << " to " << alias_export.GetName() << " because " << alias_export.GetName() << " is already connected to " << alias_export.actual_export->GetName() << std::endl;
-		return;
-	}
-
-	alias_exports.push_back(&alias_export);
-	alias_export.actual_export = this;
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::Unbind(ServiceImport<SERVICE_IF>& srv_import)
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".Unbind(" << srv_import.GetName() << ")" << std::endl;
-#endif
-
-	typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-
-	for(import_iter = srv_imports.begin(); import_iter != srv_imports.end(); import_iter++)
-	{
-		if(*import_iter == &srv_import)
-		{
-			srv_imports.erase(import_iter);
-			UnresolveClient();
-			return;
-		}
-	}
-
-	std::cerr << "WARNING! Unable to disconnect " << GetName() << " and " << srv_import.GetName() << " because connection does not exist" << std::endl;
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::DisconnectClient()
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".DisconnectClient()" << std::endl;
-#endif
-
-	typename std::list<ServiceExport<SERVICE_IF> *>::iterator export_iter;
-
-	for(export_iter = alias_exports.begin(); export_iter != alias_exports.end(); export_iter++)
-	{
-		(*export_iter)->DisconnectClient();
-	}
-
-	typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-
-	if(!srv_imports.empty())
-	{
-		UnresolveClient();
-
-		for(import_iter = srv_imports.begin(); import_iter != srv_imports.end(); import_iter++)
-		{
-			(*import_iter)->Unbind(*this);
-		}
-	
-		srv_imports.clear();
-	}
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::Disconnect()
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".Disconnect()" << std::endl;
-#endif
-
-	DisconnectClient();
-	
-	if(actual_export)
-	{
-		typename std::list<ServiceExport<SERVICE_IF> *>::iterator export_iter;
-	
-		for(export_iter = actual_export->alias_exports.begin(); export_iter != actual_export->alias_exports.end(); export_iter++)
-		{
-			if(*export_iter == this)
-			{
-				actual_export->alias_exports.erase(export_iter);
-				break;
-			}
-		}
-		actual_export = 0;
-	}
-
-	typename std::list<ServiceExport<SERVICE_IF> *>::iterator export_iter;
-
-	for(export_iter = alias_exports.begin(); export_iter != alias_exports.end(); export_iter++)
-	{
-		(*export_iter)->actual_export = 0;
-	}
-
-	alias_exports.clear();
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::ResolveClient()
-{
-	typename std::list<ServiceExport<SERVICE_IF> *>::iterator export_iter;
-
-	for(export_iter = alias_exports.begin(); export_iter != alias_exports.end(); export_iter++)
-	{
-		(*export_iter)->ResolveClient();
-	}
-
-	typename std::list<ServiceImport<SERVICE_IF> *>::iterator import_iter;
-
-	for(import_iter = srv_imports.begin(); import_iter != srv_imports.end(); import_iter++)
-	{
-		(*import_iter)->ResolveClient();
-	}
-}
-
-template <class SERVICE_IF>
-Service<SERVICE_IF> *ServiceExport<SERVICE_IF>::ResolveService(Client<SERVICE_IF> *_client)
-{
-	if(actual_export)
-	{
-		return (actual_export->ResolveService(_client));
-	}
-
-	if(service)
-	{
-		client = _client;
-		return (service);
-	}
-	return (0);
-}
-
-template <class SERVICE_IF>
-ServiceExport<SERVICE_IF> *ServiceExport<SERVICE_IF>::ResolveServiceExport()
-{
-	if(actual_export)
-	{
-		return (actual_export->ResolveServiceExport());
-	}
-
-	return (this);
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::UnresolveClient()
-{
-#ifdef DEBUG_KERNEL
-	std::cerr << GetName() << ".UnresolveClient()" << std::endl;
-#endif
-
-	if(actual_export)
-	{
-		client = 0;
-		return (actual_export->UnresolveClient());
-	}
-
-	if(client)
-	{
-		//client->OnDisconnect(); // Gilles: that's dangerous
-#ifdef DEBUG_KERNEL
-		std::cerr << GetName() << ": Unresolving client " << client->GetName() << std::endl;
-#endif
-		client = 0;
-	}
-}
-
-template <class SERVICE_IF>
-void ServiceExport<SERVICE_IF>::Dump(std::ostream& os) const
-{
-	if(actual_export)
-	{
-		std::cerr << GetName() << " -> " << actual_export->GetName() << std::endl;
-	}
-
-	typename std::list<ServiceExport<SERVICE_IF> *>::const_iterator export_iter;
-
-	for(export_iter = alias_exports.begin(); export_iter != alias_exports.end(); export_iter++)
-	{
-		os << "# " << (*export_iter)->GetName() << " -> " << GetName() << std::endl;
-	}
-}
-
-template <class SERVICE_IF>
-Object *ServiceExport<SERVICE_IF>::GetClient() const
-{
-	return (client);
-}
-
-template <class SERVICE_IF>
-Object *ServiceExport<SERVICE_IF>::GetService() const
-{
-	return (service);
-}
-
-template <class SERVICE_IF>
-std::list<ServiceImportBase *>& ServiceExport<SERVICE_IF>::GetSetupDependencies()
-{
-	return actual_export ? actual_export->GetSetupDependencies() : ServiceExportBase::GetSetupDependencies();
-}
 
 //=============================================================================
 //=                                Operators                                  =
@@ -1276,19 +752,7 @@ template <class SERVICE_IF>
 ServiceExport<SERVICE_IF>& operator >> (ServiceImport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs)
 {
 	lhs.Bind(rhs);
-	rhs.Bind(lhs);
-	lhs.ResolveClient();
-	return (rhs);
-}
-
-// (export <- import) ==> import
-template <class SERVICE_IF>
-ServiceImport<SERVICE_IF>& operator << (ServiceExport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs)
-{
-	rhs.Bind(lhs);
-	lhs.Bind(rhs);
-	rhs.ResolveClient();
-	return (rhs);
+	return rhs;
 }
 
 // (import1 -> import2) ==> import2
@@ -1296,36 +760,36 @@ template <class SERVICE_IF>
 ServiceImport<SERVICE_IF>& operator >> (ServiceImport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs)
 {
 	lhs.Bind(rhs);
-	lhs.ResolveClient();
-	return (rhs);
-}
-
-// (import1 <- import2) ==> import2
-template <class SERVICE_IF>
-ServiceImport<SERVICE_IF>& operator << (ServiceImport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs)
-{
-	rhs.Bind(lhs);
-	rhs.ResolveClient();
-	return (rhs);
+	return rhs;
 }
 
 // (export1 -> export2) ==> export2
 template <class SERVICE_IF>
 ServiceExport<SERVICE_IF>& operator >> (ServiceExport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs)
 {
-	rhs.Bind(lhs);
-	lhs.ResolveClient();
-	return (rhs);
+	lhs.Bind(rhs);
+	return rhs;
 }
 
-// (export1 <- export2) ==> export2
-template <class SERVICE_IF>
-ServiceExport<SERVICE_IF>& operator << (ServiceExport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs)
+#if __cplusplus >= 201103L
+
+template <typename ITEM>
+struct Generator
 {
-	lhs.Bind(rhs);
-	rhs.ResolveClient();
-	return (rhs);
-}
+	typedef ITEM Item;
+	Generator( char const* _prefix, Object* _parent, char const* _description )
+		: prefix(_prefix), parent(_parent), description(_description)
+	{}
+	char const* prefix;
+	Object* parent;
+	char const* description;
+	Item make_item( std::size_t index )
+	{
+		return Item(std::string(prefix) + '[' + std::to_string(index) + ']', parent, description);
+	}
+};
+
+#endif
 
 } // end of namespace kernel
 } // end of namespace unisim

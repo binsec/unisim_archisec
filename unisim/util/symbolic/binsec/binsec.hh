@@ -194,7 +194,7 @@ namespace binsec {
   struct AssertFalse : public ASExprNode
   {
     AssertFalse() {}
-    virtual AssertFalse* Mutate() const { return new AssertFalse( *this ); }
+    virtual AssertFalse* Mutate() const override { return new AssertFalse( *this ); }
     virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const
     {
       sink << "assert (false)";
@@ -212,7 +212,7 @@ namespace binsec {
     BitFilter( Expr const& _input, unsigned _source, unsigned _rshift, unsigned _select, unsigned _extend, bool _sxtend )
       : input(_input), source(_source), pad0(), rshift(_rshift), pad1(), select(_select), pad2(), extend(_extend), sxtend(_sxtend)
     {}
-    virtual BitFilter* Mutate() const { return new BitFilter( *this ); }
+    virtual BitFilter* Mutate() const override { return new BitFilter( *this ); }
     Expr Simplify() const;
     virtual ScalarType::id_t GetType() const { return ScalarType::IntegerType( false, extend ); }
     virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
@@ -262,7 +262,7 @@ namespace binsec {
     Load( Expr const& _addr, unsigned _size, unsigned _alignment, bool _bigendian )
       : MemAccess(_addr, _size, _alignment, _bigendian)
     {}
-    virtual Load* Mutate() const { return new Load(*this); }
+    virtual Load* Mutate() const override { return new Load(*this); }
     virtual ScalarType::id_t GetType() const { return ScalarType::IntegerType(false, 8*bytecount()); }
     virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
     virtual void Repr( std::ostream& sink ) const { MemAccess::Repr(sink); }
@@ -276,7 +276,7 @@ namespace binsec {
       : MemAccess(_addr, _size, _alignment, _bigendian), value(_value)
     {}
     virtual ScalarType::id_t GetType() const { return ScalarType::VOID; }
-    virtual Store* Mutate() const { return new Store(*this); }
+    virtual Store* Mutate() const override { return new Store(*this); }
     virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
     virtual void Repr( std::ostream& sink ) const;
     virtual unsigned SubCount() const { return 2; }
