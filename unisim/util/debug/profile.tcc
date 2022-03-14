@@ -41,58 +41,58 @@ namespace unisim {
 namespace util {
 namespace debug {
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::ProfilePage(ADDRESS _key) :
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::ProfilePage(ADDRESS _key) :
 	key(_key),
 	next(0),
 	cumulative_weight()
 {
-	weight_coverage_map = new uint64_t[(2 * PAGE_SIZE) / 64]();
-	weights = new WEIGHT[PAGE_SIZE]();
+	weight_coverage_map = new uint64_t[(2 * UNIT_SIZE) / 64]();
+	weights = new WEIGHT[UNIT_SIZE]();
 	
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::~ProfilePage()
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::~ProfilePage()
 {
 	delete[] weight_coverage_map;
 	delete[] weights;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-bool ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::IsCovered(ADDRESS offset) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+bool ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::IsCovered(ADDRESS offset) const
 {
 	uint64_t mask = uint64_t(1) << ((2 * offset) % 64);
 	return (weight_coverage_map[(2 * offset) / 64] & mask) != 0;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-bool ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::HasWeight(ADDRESS offset) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+bool ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::HasWeight(ADDRESS offset) const
 {
 	uint64_t mask = uint64_t(2) << ((2 * offset) % 64);
 	return (weight_coverage_map[(2 * offset) / 64] & mask) != 0;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-ADDRESS ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::GetBaseAddress() const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+ADDRESS ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::GetBaseAddress() const
 {
-	return key * PAGE_SIZE;
+	return key * UNIT_SIZE;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-const WEIGHT& ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::GetWeight(unsigned int offset) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+const WEIGHT& ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::GetWeight(unsigned int offset) const
 {
 	return weights[offset];
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-const WEIGHT& ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::GetWeight() const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+const WEIGHT& ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::GetWeight() const
 {
 	return cumulative_weight;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-void ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::Cover(ADDRESS offset, unsigned int length)
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+void ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::Cover(ADDRESS offset, unsigned int length)
 {
 	if(length > 0)
 	{
@@ -105,8 +105,8 @@ void ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::Cover(ADDRESS offset, unsigned int
 	}
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-void ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::Accumulate(ADDRESS offset, const WEIGHT& weight)
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+void ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::Accumulate(ADDRESS offset, const WEIGHT& weight)
 {
 	uint64_t mask = uint64_t(2) << ((2 * offset) % 64);
 	weight_coverage_map[(2 * offset) / 64] |= mask;
@@ -114,8 +114,8 @@ void ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::Accumulate(ADDRESS offset, const W
 	cumulative_weight += weight;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-void ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::GetAddressRanges(std::vector<std::pair<ADDRESS, ADDRESS> >& addr_ranges) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+void ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>::GetAddressRanges(std::vector<std::pair<ADDRESS, ADDRESS> >& addr_ranges) const
 {
 	ADDRESS base_addr = GetBaseAddress();
 	bool addr_range_in_progress = false;
@@ -135,7 +135,7 @@ void ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::GetAddressRanges(std::vector<std::
 	}
 	
 	ADDRESS offset;
-	for(offset = 0; offset < PAGE_SIZE; offset++)
+	for(offset = 0; offset < UNIT_SIZE; offset++)
 	{
 		bool is_covered = IsCovered(offset);
 		
@@ -172,14 +172,14 @@ void ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>::GetAddressRanges(std::vector<std::
 	}
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-std::ostream& operator << (std::ostream& os, const ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>& page)
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+std::ostream& operator << (std::ostream& os, const ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>& page)
 {
 	ADDRESS base_addr = page.GetBaseAddress();
 	ADDRESS offset;
 	bool first = true;
 
-	for(offset = 0; offset < PAGE_SIZE; offset++)
+	for(offset = 0; offset < UNIT_SIZE; offset++)
 	{
 		if(page.HasWeight(offset))
 		{
@@ -199,66 +199,66 @@ std::ostream& operator << (std::ostream& os, const ProfilePage<ADDRESS, WEIGHT, 
 	return os;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-Profile<ADDRESS, WEIGHT, PAGE_SIZE>::Profile()
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+Profile<ADDRESS, WEIGHT, UNIT_SIZE>::Profile()
 	: hash_table()
 	, page_map()
 	, cumulative_weight()
 {
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-Profile<ADDRESS, WEIGHT, PAGE_SIZE>::~Profile()
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+Profile<ADDRESS, WEIGHT, UNIT_SIZE>::~Profile()
 {
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-void Profile<ADDRESS, WEIGHT, PAGE_SIZE>::Clear()
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+void Profile<ADDRESS, WEIGHT, UNIT_SIZE>::Clear()
 {
 	hash_table.Reset();
 	page_map.clear();
 	cumulative_weight = WEIGHT();
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *Profile<ADDRESS, WEIGHT, PAGE_SIZE>::AllocatePage(ADDRESS addr)
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *Profile<ADDRESS, WEIGHT, UNIT_SIZE>::AllocatePage(ADDRESS addr)
 {
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page = GetPage(addr);
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page = GetPage(addr);
 
 	if(!page)
 	{
-		ADDRESS key = addr / PAGE_SIZE;
-		page = new ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>(key);
+		ADDRESS key = addr / UNIT_SIZE;
+		page = new ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>(key);
 		hash_table.Insert(page);
-		page_map.insert(std::pair<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *>(addr & ~(PAGE_SIZE - 1), page));
+		page_map.insert(std::pair<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *>(addr & ~(UNIT_SIZE - 1), page));
 	}
 	
 	return page;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *Profile<ADDRESS, WEIGHT, PAGE_SIZE>::GetPage(ADDRESS addr) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *Profile<ADDRESS, WEIGHT, UNIT_SIZE>::GetPage(ADDRESS addr) const
 {
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page;
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page;
 
-	ADDRESS key = addr / PAGE_SIZE;
+	ADDRESS key = addr / UNIT_SIZE;
 
 	page = hash_table.Find(key);
 	
 	return page;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-void Profile<ADDRESS, WEIGHT, PAGE_SIZE>::Cover(ADDRESS addr, unsigned int length)
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+void Profile<ADDRESS, WEIGHT, UNIT_SIZE>::Cover(ADDRESS addr, unsigned int length)
 {
 	if(length > 0)
 	{
 		do
 		{
-			ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page = AllocatePage(addr);
+			ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page = AllocatePage(addr);
 			
-			ADDRESS offset = addr & (PAGE_SIZE - 1);
-			ADDRESS size_to_page_boundary = PAGE_SIZE - offset;
+			ADDRESS offset = addr & (UNIT_SIZE - 1);
+			ADDRESS size_to_page_boundary = UNIT_SIZE - offset;
 			unsigned int l = (length < size_to_page_boundary) ? length : size_to_page_boundary;
 			page->Cover(offset, l);
 
@@ -269,35 +269,35 @@ void Profile<ADDRESS, WEIGHT, PAGE_SIZE>::Cover(ADDRESS addr, unsigned int lengt
 	}
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-bool Profile<ADDRESS, WEIGHT, PAGE_SIZE>::IsCovered(ADDRESS addr) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+bool Profile<ADDRESS, WEIGHT, UNIT_SIZE>::IsCovered(ADDRESS addr) const
 {
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page = GetPage(addr);
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page = GetPage(addr);
 
 	if(!page) return false;
 	
-	ADDRESS offset = addr & (PAGE_SIZE - 1);
+	ADDRESS offset = addr & (UNIT_SIZE - 1);
 	return page->IsCovered(offset);
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-void Profile<ADDRESS, WEIGHT, PAGE_SIZE>::Accumulate(ADDRESS addr, const WEIGHT& weight)
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+void Profile<ADDRESS, WEIGHT, UNIT_SIZE>::Accumulate(ADDRESS addr, const WEIGHT& weight)
 {
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page = AllocatePage(addr);
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page = AllocatePage(addr);
 
-	ADDRESS offset = addr & (PAGE_SIZE - 1);
+	ADDRESS offset = addr & (UNIT_SIZE - 1);
 	page->Accumulate(offset, weight);
 	cumulative_weight += weight;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-bool Profile<ADDRESS, WEIGHT, PAGE_SIZE>::GetWeight(ADDRESS addr, WEIGHT& weight) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+bool Profile<ADDRESS, WEIGHT, UNIT_SIZE>::GetWeight(ADDRESS addr, WEIGHT& weight) const
 {
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page = GetPage(addr);
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page = GetPage(addr);
 
 	if(!page) return false;
 
-	ADDRESS offset = addr & (PAGE_SIZE - 1);
+	ADDRESS offset = addr & (UNIT_SIZE - 1);
 	if(!page->HasWeight(offset)) return false;
 	
 	weight = page->GetWeight(offset);
@@ -305,31 +305,31 @@ bool Profile<ADDRESS, WEIGHT, PAGE_SIZE>::GetWeight(ADDRESS addr, WEIGHT& weight
 	return true;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-const WEIGHT& Profile<ADDRESS, WEIGHT, PAGE_SIZE>::GetWeight() const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+const WEIGHT& Profile<ADDRESS, WEIGHT, UNIT_SIZE>::GetWeight() const
 {
 	return cumulative_weight;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-void Profile<ADDRESS, WEIGHT, PAGE_SIZE>::GetAddressRanges(std::vector<std::pair<ADDRESS, ADDRESS> >& addr_ranges) const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+void Profile<ADDRESS, WEIGHT, UNIT_SIZE>::GetAddressRanges(std::vector<std::pair<ADDRESS, ADDRESS> >& addr_ranges) const
 {
-	typename std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *>::const_iterator page_map_it;
+	typename std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *>::const_iterator page_map_it;
 	
 	for(page_map_it = page_map.begin(); page_map_it != page_map.end(); page_map_it++)
 	{
-		ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page = (*page_map_it).second;
+		ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page = (*page_map_it).second;
 		
 		page->GetAddressRanges(addr_ranges);
 	}
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-std::ostream& operator << (std::ostream& os, const Profile<ADDRESS, WEIGHT, PAGE_SIZE>& prof)
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+std::ostream& operator << (std::ostream& os, const Profile<ADDRESS, WEIGHT, UNIT_SIZE>& prof)
 {
 	bool first = true;
-	std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *> map = prof.hash_table;
-	typename std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *>::const_iterator iter;
+	std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *> map = prof.hash_table;
+	typename std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *>::const_iterator iter;
 
 	for(iter = map.begin(); iter != map.end(); iter++)
 	{
@@ -347,22 +347,22 @@ std::ostream& operator << (std::ostream& os, const Profile<ADDRESS, WEIGHT, PAGE
 	return os;
 }
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-Profile<ADDRESS, WEIGHT, PAGE_SIZE>::operator std::map<ADDRESS, WEIGHT>() const
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+Profile<ADDRESS, WEIGHT, UNIT_SIZE>::operator std::map<ADDRESS, WEIGHT>() const
 {
 	std::map<ADDRESS, WEIGHT> map;
 
-	std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *> page_map = hash_table;
-	typename std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *>::const_iterator iter;
+	std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *> page_map = hash_table;
+	typename std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *>::const_iterator iter;
 
 	for(iter = page_map.begin(); iter != page_map.end(); iter++)
 	{
-		ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *page = (*iter).second;
+		ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *page = (*iter).second;
 
 		ADDRESS base_addr = page->GetBaseAddress();
 		ADDRESS offset;
 
-		for(offset = 0; offset < PAGE_SIZE; offset++)
+		for(offset = 0; offset < UNIT_SIZE; offset++)
 		{
 			if(page->HasWeight(offset))
 			{

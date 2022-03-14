@@ -45,21 +45,21 @@ namespace unisim {
 namespace util {
 namespace debug {
 
-const uint32_t DEFAULT_PROFILE_PAGE_SIZE = 1024;
+const uint32_t DEFAULT_PROFILE_UNIT_SIZE = 1024;
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
 class Profile;
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
 class ProfilePage;
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-std::ostream& operator << (std::ostream& os, const Profile<ADDRESS, WEIGHT, PAGE_SIZE>& prof);
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+std::ostream& operator << (std::ostream& os, const Profile<ADDRESS, WEIGHT, UNIT_SIZE>& prof);
 
-template <typename ADDRESS, typename WEIGHT, uint32_t PAGE_SIZE>
-std::ostream& operator << (std::ostream& os, const ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>& page);
+template <typename ADDRESS, typename WEIGHT, uint32_t UNIT_SIZE>
+std::ostream& operator << (std::ostream& os, const ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>& page);
 
-template <typename ADDRESS, typename WEIGHT = uint64_t, uint32_t PAGE_SIZE = DEFAULT_PROFILE_PAGE_SIZE>
+template <typename ADDRESS, typename WEIGHT = uint64_t, uint32_t UNIT_SIZE = DEFAULT_PROFILE_UNIT_SIZE>
 class ProfilePage
 {
 public:
@@ -75,20 +75,20 @@ public:
 	const WEIGHT& GetWeight(unsigned int offset) const;
 	const WEIGHT& GetWeight() const;
 	
-	//friend std::ostream& operator << <ADDRESS, WEIGHT, PAGE_SIZE> (std::ostream& os, const ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE>& page);
+	//friend std::ostream& operator << <ADDRESS, WEIGHT, UNIT_SIZE> (std::ostream& os, const ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE>& page);
 private:
-	friend class unisim::util::hash_table::HashTable<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> >;
-	friend class Profile<ADDRESS, WEIGHT, PAGE_SIZE>;
+	friend class unisim::util::hash_table::HashTable<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> >;
+	friend class Profile<ADDRESS, WEIGHT, UNIT_SIZE>;
 
 	ADDRESS key;
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *next;
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *next;
 	
 	uint64_t *weight_coverage_map;
 	WEIGHT *weights;
 	WEIGHT cumulative_weight;
 };
 
-template <typename ADDRESS, typename WEIGHT = uint64_t, uint32_t PAGE_SIZE = DEFAULT_PROFILE_PAGE_SIZE>
+template <typename ADDRESS, typename WEIGHT = uint64_t, uint32_t UNIT_SIZE = DEFAULT_PROFILE_UNIT_SIZE>
 class Profile
 {
 public:
@@ -102,16 +102,16 @@ public:
 	bool GetWeight(ADDRESS addr, WEIGHT& weight) const;
 	const WEIGHT& GetWeight() const;
 	void GetAddressRanges(std::vector<std::pair<ADDRESS, ADDRESS> >& addr_ranges) const;
-	friend std::ostream& operator << <ADDRESS, WEIGHT, PAGE_SIZE> (std::ostream& os, const Profile<ADDRESS, WEIGHT, PAGE_SIZE>& prof);
+	friend std::ostream& operator << <ADDRESS, WEIGHT, UNIT_SIZE> (std::ostream& os, const Profile<ADDRESS, WEIGHT, UNIT_SIZE>& prof);
 	operator std::map<ADDRESS, WEIGHT>() const;
 
 private:
-	unisim::util::hash_table::HashTable<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> > hash_table;
-	std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *> page_map;
+	unisim::util::hash_table::HashTable<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> > hash_table;
+	std::map<ADDRESS, ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *> page_map;
 	WEIGHT cumulative_weight;
 	
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *AllocatePage(ADDRESS addr);
-	ProfilePage<ADDRESS, WEIGHT, PAGE_SIZE> *GetPage(ADDRESS addr) const;
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *AllocatePage(ADDRESS addr);
+	ProfilePage<ADDRESS, WEIGHT, UNIT_SIZE> *GetPage(ADDRESS addr) const;
 };
 
 } // end of namespace debug

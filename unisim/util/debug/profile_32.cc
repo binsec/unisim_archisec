@@ -40,9 +40,9 @@ namespace unisim {
 namespace util {
 namespace debug {
 
-template class Profile<uint32_t, uint64_t, DEFAULT_PROFILE_PAGE_SIZE>;
+template class Profile<uint32_t, uint64_t, DEFAULT_PROFILE_UNIT_SIZE>;
 
-template std::ostream& operator << (std::ostream& os, const Profile<uint32_t, uint64_t, DEFAULT_PROFILE_PAGE_SIZE>& prof);
+template std::ostream& operator << (std::ostream& os, const Profile<uint32_t, uint64_t, DEFAULT_PROFILE_UNIT_SIZE>& prof);
 
 } // end of namespace debug
 } // end of namespace util
