@@ -42,6 +42,7 @@
 #include <unisim/component/cxx/vector/vector.hh>
 #include <unisim/util/endian/endian.hh>
 #include <unisim/util/inlining/inlining.hh>
+#include <unisim/util/arithmetic/i128.hh>
 #include <unisim/service/interfaces/registers.hh>
 #include <unisim/service/interfaces/register.hh>
 #include <iostream>
@@ -85,12 +86,12 @@ namespace intel {
     typedef uint16_t     u16_t;
     typedef uint32_t     u32_t;
     typedef uint64_t     u64_t;
-    //    typedef Twice<u64_t> u128_t;
+    typedef uint128_t    u128_t;
     typedef int8_t       s8_t;
     typedef int16_t      s16_t;
     typedef int32_t      s32_t;
     typedef int64_t      s64_t;
-    //    typedef Twice<s64_t> s128_t;
+    typedef int128_t     s128_t;
     typedef bool         bit_t;
     typedef uint32_t     addr_t;
     

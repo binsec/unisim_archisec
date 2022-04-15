@@ -41,14 +41,45 @@ namespace util {
 namespace symbolic {
 namespace vector {
 
-  void VUConfig::VMix::Repr( std::ostream& sink ) const
+  void VMix::Repr( std::ostream& sink ) const
   {
     sink << "VMix( " << l << ", " << r << " )";
   }
   
-  void VUConfig::VTransBase::Repr( std::ostream& sink ) const
+  void VTransBase::Repr( std::ostream& sink ) const
   {
-    sink << "VTrans<"  << ScalarType(GetType()).name << ">({" << sexp << "," << span << "}, " << rshift << ")";
+    sink << "VTrans<";
+    GetType()->GetName(sink);
+    sink << ">(" << src << ", " << srcsize << ", " << srcpos << ")";
+  }
+
+  ExprNode const* corresponding_origin( Expr const& dst, unsigned dpos, unsigned spos )
+  {
+    struct
+    {
+      bool seek( ExprNode const* exp, unsigned pos )
+      {
+        if (auto vt = dynamic_cast<VTransBase const*>( exp ))
+          {
+            pos += vt->srcpos;
+            if (pos >= vt->srcsize)
+              return false;
+            return seek( vt->src.node, pos );
+          }
+        if (auto vm = dynamic_cast<VMix const*>( exp ))
+          return seek( vm->l.node, pos ) or seek( vm->r.node, pos );
+        
+        sexp = exp;
+        spos = pos;
+        return true;
+      }
+      ExprNode const* sexp;
+      unsigned        spos;
+    } seeker;
+
+    if (not seeker.seek(dst.node, dpos) or seeker.spos != spos)
+      return 0;
+    return seeker.sexp;
   }
   
 } /* end of namespace vector */

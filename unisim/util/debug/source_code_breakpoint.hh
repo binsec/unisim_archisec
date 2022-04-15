@@ -38,10 +38,8 @@
 #include <unisim/util/debug/event.hh>
 #include <unisim/util/debug/breakpoint.hh>
 #include <unisim/util/debug/source_code_location.hh>
-#include <inttypes.h>
 #include <ostream>
-#include <sstream>
-#include <vector>
+#include <set>
 
 namespace unisim {
 namespace util {
@@ -52,7 +50,7 @@ namespace debug {
 ////////////////////////// SourceCodeBreakpoint<> /////////////////////////////
 
 template <typename ADDRESS>
-class SourceCodeBreakpoint : public Event<ADDRESS>
+class SourceCodeBreakpoint : public CustomEvent<ADDRESS, SourceCodeBreakpoint<ADDRESS> >
 {
 public:
 	SourceCodeBreakpoint(const SourceCodeLocation& source_code_location);
@@ -95,14 +93,14 @@ inline std::ostream& operator << (std::ostream& os, const SourceCodeBreakpoint<A
 
 template <typename ADDRESS>
 SourceCodeBreakpoint<ADDRESS>::SourceCodeBreakpoint(const char *source_code_filename, unsigned int lineno, unsigned int colno)
-	: Event<ADDRESS>(Event<ADDRESS>::EV_SOURCE_CODE_BREAKPOINT)
+	: CustomEvent<ADDRESS, SourceCodeBreakpoint<ADDRESS> >()
 	, source_code_location(source_code_filename, lineno, colno)
 {
 }
 
 template <typename ADDRESS>
 SourceCodeBreakpoint<ADDRESS>::SourceCodeBreakpoint(const SourceCodeLocation& _source_code_location)
-	: Event<ADDRESS>(Event<ADDRESS>::EV_SOURCE_CODE_BREAKPOINT)
+	: CustomEvent<ADDRESS, SourceCodeBreakpoint<ADDRESS> >()
 	, source_code_location(_source_code_location)
 {
 }

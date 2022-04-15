@@ -11566,7 +11566,7 @@ void OpLdarb_w<	ARCH>::execute( ARCH & cpu)
 
 		U64 addr( cpu.GetGSR(rn) );
 		U8 data( cpu.MemRead8(addr) );
-		cpu.SetGZR(rt, data);
+		cpu.SetGZR(rt, typename ARCH::U32(data));
 }}
 
 template <	typename	ARCH>
@@ -11591,7 +11591,7 @@ void OpLdarh_w<	ARCH>::execute( ARCH & cpu)
 
 		U64 addr( cpu.GetGSR(rn) );
 		U16 data( cpu.MemRead16(addr) );
-		cpu.SetGZR(rt, data);
+		cpu.SetGZR(rt, typename ARCH::U32(data));
 }}
 
 template <	typename	ARCH>
@@ -12217,7 +12217,7 @@ void OpLdrb_wxi<	ARCH>::execute( ARCH & cpu)
 		U64 addr( cpu.GetGSR(rn) ), oaddr( addr + U64(imm) );
 		addr = (am == 1 ? addr : oaddr);
 		U8 data( cpu.MemRead8(addr) );
-		cpu.SetGZR(rt, data);
+		cpu.SetGZR(rt, typename ARCH::U32(data));
 		if (am & 1)
 		cpu.SetGSR(rn, oaddr);
 }}
@@ -12244,7 +12244,7 @@ void OpLdrb_wuo<	ARCH>::execute( ARCH & cpu)
 
 		U64 addr( cpu.GetGSR(rn) + U64(imm) );
 		U8 data( cpu.MemRead8(addr) );
-		cpu.SetGZR(rt, data);
+		cpu.SetGZR(rt, typename ARCH::U32(data));
 }}
 
 template <	typename	ARCH>
@@ -12373,7 +12373,7 @@ void OpLdrh_wxi<	ARCH>::execute( ARCH & cpu)
 		U64 addr( cpu.GetGSR(rn) ), oaddr( addr + U64(imm) );
 		addr = (am == 1 ? addr : oaddr);
 		U16 data( cpu.MemRead16(addr) );
-		cpu.SetGZR(rt, data);
+		cpu.SetGZR(rt, typename ARCH::U32(data));
 		if (am & 1)
 		cpu.SetGSR(rn, oaddr );
 }}
@@ -12400,7 +12400,7 @@ void OpLdrh_wuo<	ARCH>::execute( ARCH & cpu)
 
 		U64 addr( cpu.GetGSR(rn) + U64(imm) );
 		U16 data( cpu.MemRead16(addr) );
-		cpu.SetGZR(rt, data);
+		cpu.SetGZR(rt, typename ARCH::U32(data));
 }}
 
 template <	typename	ARCH>
@@ -18198,7 +18198,7 @@ void OpCasb_w<	ARCH>::execute( ARCH & cpu)
 
 		if (cpu.Test(data == comparevalue))
 		cpu.MemWrite8(addr, U8(cpu.GetGZR(rt)));
-		cpu.SetGZR(rs, data);
+		cpu.SetGZR(rs, typename ARCH::U32(data));
 		/*END ATOMIC*/
 }}
 
@@ -18230,7 +18230,7 @@ void OpCash_w<	ARCH>::execute( ARCH & cpu)
 
 		if (cpu.Test(data == comparevalue))
 		cpu.MemWrite16(addr, U16(cpu.GetGZR(rt)));
-		cpu.SetGZR(rs, data);
+		cpu.SetGZR(rs, typename ARCH::U32(data));
 		/*END ATOMIC*/
 }}
 
@@ -18488,7 +18488,7 @@ void OpLdstaddb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( oldval + U8(cpu.GetGZR(rs)) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -18521,7 +18521,7 @@ void OpLdstaddh_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( oldval + U16(cpu.GetGZR(rs)) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -18619,7 +18619,7 @@ void OpLdstclrb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( oldval & ~U8(cpu.GetGZR(rs)) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -18652,7 +18652,7 @@ void OpLdstclrh_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( oldval & ~U16(cpu.GetGZR(rs)) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -18750,7 +18750,7 @@ void OpLdsteorb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( oldval ^ U8(cpu.GetGZR(rs)) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -18783,7 +18783,7 @@ void OpLdsteorh_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( oldval ^ U16(cpu.GetGZR(rs)) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -18881,7 +18881,7 @@ void OpLdstsetb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( oldval | U8(cpu.GetGZR(rs)) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -18914,7 +18914,7 @@ void OpLdstseth_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( oldval | U16(cpu.GetGZR(rs)) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19015,7 +19015,7 @@ void OpLdstsmaxb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( U8(Maximum(S8(oldval), S8(cpu.GetGZR(rs)))) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19049,7 +19049,7 @@ void OpLdstsmaxh_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( U16(Maximum(S16(oldval), S16(cpu.GetGZR(rs)))) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19150,7 +19150,7 @@ void OpLdstsminb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( U8(Minimum(S8(oldval), S8(cpu.GetGZR(rs)))) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19184,7 +19184,7 @@ void OpLdstsminh_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( U16(Minimum(S16(oldval), S16(cpu.GetGZR(rs)))) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19282,7 +19282,7 @@ void OpLdstumaxb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( Maximum(oldval, U8(cpu.GetGZR(rs))) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19315,7 +19315,7 @@ void OpLdstumaxh_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( Maximum(oldval, U16(cpu.GetGZR(rs))) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19413,7 +19413,7 @@ void OpLdstuminb_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U8 oldval( cpu.MemRead8(addr) ), newval( Minimum(oldval, U8(cpu.GetGZR(rs))) );
 		cpu.MemWrite8(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 
@@ -19446,7 +19446,7 @@ void OpLdstuminh_w<	ARCH>::execute( ARCH & cpu)
 		/*BEG ATOMIC*/
 		U16 oldval( cpu.MemRead16(addr) ), newval( Minimum(oldval, U16(cpu.GetGZR(rs))) );
 		cpu.MemWrite16(addr, newval);
-		cpu.SetGZR(rt, oldval);
+		cpu.SetGZR(rt, typename ARCH::U32(oldval));
 		/*END ATOMIC*/;
 }}
 

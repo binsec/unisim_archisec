@@ -16,7 +16,11 @@ depends: [
   "dune" {>= "3.0"}
   "conf-gcc" {build}
   "conf-g++" {build}
+  "conf-gmp"
   "odoc" {with-doc}
+]
+conflicts: [
+  "binsec" {< "0.5.0"}
 ]
 build: [
   ["dune" "subst"] {dev}

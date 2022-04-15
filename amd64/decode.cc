@@ -41,14 +41,14 @@ typedef ProcessorBase::u64_t U64;
 typedef ProcessorBase::s64_t S64;
 typedef ProcessorBase::f64_t F64;
 
-void eval_div( P32& arch, U64& hi, U64& lo, U64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-void eval_div( P64& arch, U64& hi, U64& lo, U64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-void eval_div( P32& arch, S64& hi, S64& lo, S64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-void eval_div( P64& arch, S64& hi, S64& lo, S64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-void eval_mul( P32& arch, U64& hi, U64& lo, U64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
-void eval_mul( P64& arch, U64& hi, U64& lo, U64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
-void eval_mul( P32& arch, S64& hi, S64& lo, S64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
-void eval_mul( P64& arch, S64& hi, S64& lo, S64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
+// void eval_div( P32& arch, U64& hi, U64& lo, U64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
+// void eval_div( P64& arch, U64& hi, U64& lo, U64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
+// void eval_div( P32& arch, S64& hi, S64& lo, S64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
+// void eval_div( P64& arch, S64& hi, S64& lo, S64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
+// void eval_mul( P32& arch, U64& hi, U64& lo, U64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
+// void eval_mul( P64& arch, U64& hi, U64& lo, U64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
+// void eval_mul( P32& arch, S64& hi, S64& lo, S64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
+// void eval_mul( P64& arch, S64& hi, S64& lo, S64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
 
 F64 eval_fprem ( P32& arch, F64 const& dividend, F64 const& modulus ) { throw ProcessorBase::Unimplemented(); }
 F64 eval_fprem ( P64& arch, F64 const& dividend, F64 const& modulus ) { throw ProcessorBase::Unimplemented(); }

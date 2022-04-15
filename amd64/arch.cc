@@ -44,11 +44,11 @@ ProcessorBase::ProcessorBase()
     flagvalues[reg.idx()] = newRegRead( reg );
 }
 
-void
-ProcessorBase::FTop::Repr( std::ostream& sink ) const
-{
-  sink << "FpuStackTop";
-}
+// void
+// ProcessorBase::FTop::Repr( std::ostream& sink ) const
+// {
+//   sink << "FpuStackTop";
+// }
 
 unisim::util::symbolic::Expr&
 ProcessorBase::fpaccess( unsigned reg, bool write )
@@ -75,41 +75,59 @@ ProcessorBase::FLAG::Repr( std::ostream& sink ) const
 }
 
 void
-ProcessorBase::FTopWrite::GetRegName(std::ostream& sink) const
+ProcessorBase::VClear::Repr( std::ostream& sink ) const
 {
-  sink << "ftop";
+  sink << "VClear(" << std::dec << size << ")";
+}
+
+int
+ProcessorBase::VClear::GenCode(unisim::util::symbolic::binsec::Label&, unisim::util::symbolic::binsec::Variables&, std::ostream& sink) const
+{
+  if (size % 8) throw 0;
+  sink << unisim::util::symbolic::binsec::dbx(size / 8, 0);
+  return size;
+}
+
+unisim::util::symbolic::ValueType const*
+ProcessorBase::VClear::GetType() const
+{
+  struct VCT : public unisim::util::symbolic::ValueType
+  {
+    VCT(unsigned _bitsize) : unisim::util::symbolic::ValueType(unisim::util::symbolic::ValueType::NA), bitsize(_bitsize) {} unsigned bitsize;
+    virtual unsigned GetBitSize() const override { return bitsize; }
+    virtual void GetName(std::ostream& sink) const override { sink << "VClear" << std::dec << bitsize; }
+    bool operator < (VCT const& rhs) const { return bitsize < rhs.bitsize; }
+  };
+
+  static std::set<VCT> type_descriptors;
+  auto tp = type_descriptors.insert(this->size).first;
+  
+  return &*tp;
 }
 
 void
-ProcessorBase::Goto::GetRegName( std::ostream& sink ) const
+ProcessorBase::VRegID::Repr(std::ostream& sink) const
 {
-  sink << "pc";
+  sink << char(VmmValue::VPREFIX) << "mm" << std::dec << reg;
 }
 
-template <>
-void
-Processor<Compat32>::Call::annotate(std::ostream& sink) const
+unisim::util::symbolic::ValueType const*
+VmmValue::GetType()
 {
-  sink << " // call (" << unisim::util::symbolic::binsec::dbx(4,return_address) << ",0)";
-}
-
-template <>
-void
-Processor<Intel64>::Call::annotate(std::ostream& sink) const
-{
-  sink << " // call (" << unisim::util::symbolic::binsec::dbx(8,return_address) << ",0)";
-}
-
-void
-ProcessorBase::VRegRead::Repr( std::ostream& sink ) const
-{
-  sink << "VRegRead(" << std::dec << reg << ")";
+  static struct Type : unisim::util::symbolic::ValueType
+  {
+    Type() : ValueType(unisim::util::symbolic::ValueType::NA) {}
+    virtual unsigned GetBitSize() const override { return 8*VmmValue::BYTECOUNT; }
+    virtual void GetName(std::ostream& sink) const override { sink << "VmmValue"; }
+  } _;
+  return &_;
 }
 
 void
 ProcessorBase::VmmIndirectReadBase::Repr( std::ostream& sink ) const
 {
-  sink << "VmmIndirectReadRead<" << GetVSize() << ","  << GetVName() << ">(";
+  GetVName(sink << "VmmIndirectReadRead<" << GetVSize() << ",");
+  sink << ">(";
   for (unsigned idx = 0, end = SubCount()-1; idx < end; ++idx)
     sink << GetSub(idx) << ", ";
   sink << index << ")";
@@ -121,11 +139,9 @@ namespace
   void
   noexec_error( OP const& op )
   {
-    std::cerr
-      << "error: no execute method in `" << typeid(op).name() << "'\n"
-      << std::hex << op.address << ":\t";
-    op.disasm( std::cerr );
-    std::cerr << '\n';
+    // std::cerr << "error: no execute method in `" << typeid(op).name() << "'\n" << std::hex << op.address << ":\t";
+    // op.disasm( std::cerr );
+    // std::cerr << '\n';
     throw ProcessorBase::Unimplemented();
   }
 }
@@ -133,3 +149,10 @@ namespace
 template <> void Processor<Compat32>::noexec( Processor<Compat32>::Operation const& op ) { noexec_error(op); }
 template <> void Processor <Intel64>::noexec( Processor<Intel64>::Operation const& op ) { noexec_error(op); }
 
+void show(unsigned idx, unisim::util::symbolic::ExprNode const* node)
+{
+  std::cerr << "[" << idx << "]: ";
+  if (node)
+    node->Repr(std::cerr);
+  std::cerr << "\n";
+}

@@ -37,7 +37,6 @@
 
 #include <unisim/util/simfloat/floating.hh>
 #include <unisim/component/cxx/processor/arm/psr.hh>
-#include <unisim/component/cxx/processor/arm/execute.hh>
 #include <unisim/kernel/variable/variable.hh>
 #include <unisim/service/interfaces/register.hh>
 

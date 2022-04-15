@@ -35,6 +35,7 @@
 #ifndef __UNISIM_UTIL_SYMBOLIC_BINSEC_BINSEC_HH__
 #define __UNISIM_UTIL_SYMBOLIC_BINSEC_BINSEC_HH__
 
+#include <unisim/util/symbolic/vector/vector.hh>
 #include <unisim/util/symbolic/symbolic.hh>
 #include <map>
 #include <set>
@@ -43,10 +44,89 @@
 namespace unisim {
 namespace util {
 namespace symbolic {
+
+  struct Unimplemented {};
+
+  template <typename VALUE_TYPE>
+  struct FpSmartValue : SmartValue<VALUE_TYPE>
+  {
+
+    typedef VALUE_TYPE value_type;
+    typedef SmartValue<value_type> this_type;
+    static ValueType const* GetType() { return CValueType(value_type()); }
+
+    Expr expr;
+
+    FpSmartValue() : SmartValue<value_type>() {}
+
+    FpSmartValue( Expr const& _expr ) : SmartValue<value_type>( _expr ) {}
+
+    explicit FpSmartValue( value_type value ) :
+      FpSmartValue( make_const( value ) ) {}
+
+    template <typename SRC_VALUE_TYPE>
+    explicit FpSmartValue( SmartValue<SRC_VALUE_TYPE> const& other )
+    {
+      if (CmpTypes<SRC_VALUE_TYPE,VALUE_TYPE>::same) {
+        expr = other.expr;
+      } else {
+        expr = new CastNode<VALUE_TYPE,SRC_VALUE_TYPE>( other.expr );
+        expr.ConstSimplify();
+      }
+    }
+
+    static bool const is_signed = std::numeric_limits<value_type>::is_signed;
+
+    this_type& operator = ( this_type const& other ) { expr = other.expr; return *this; }
+
+    template <typename SHT>
+    this_type operator << ( SHT sh ) const { throw Unimplemented(); return FpSmartValue(); }
+    template <typename SHT>
+    this_type operator >> ( SHT sh ) const { throw Unimplemented(); return FpSmartValue(); }
+    template <typename SHT>
+    this_type& operator <<= ( SHT sh ) { throw Unimplemented(); return *this; }
+    template <typename SHT>
+    this_type& operator >>= ( SHT sh ) { throw Unimplemented(); return *this; }
+
+    template <typename SHT>
+    this_type operator << ( SmartValue<SHT> const& sh ) const { throw Unimplemented(); return FpSmartValue(); }
+    template <typename SHT>
+    this_type operator >> ( SmartValue<SHT> const& sh ) const { throw Unimplemented(); return FpSmartValue(); }
+
+    this_type operator - () const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator ~ () const { throw Unimplemented(); return FpSmartValue(); }
+
+    this_type& operator += ( this_type const& other ) { throw Unimplemented(); return *this; }
+    this_type& operator -= ( this_type const& other ) { throw Unimplemented(); return *this; }
+    this_type& operator *= ( this_type const& other ) { throw Unimplemented(); return *this; }
+    this_type& operator /= ( this_type const& other ) { throw Unimplemented(); return *this; }
+    this_type& operator %= ( this_type const& other ) { throw Unimplemented(); return *this; }
+    this_type& operator ^= ( this_type const& other ) { throw Unimplemented(); return *this; }
+    this_type& operator &= ( this_type const& other ) { throw Unimplemented(); return *this; }
+    this_type& operator |= ( this_type const& other ) { throw Unimplemented(); return *this; }
+
+    this_type operator + ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator - ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator * ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator / ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator % ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator ^ ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator & ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+    this_type operator | ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
+
+    SmartValue<bool> operator == ( this_type const& other ) const { return SmartValue<bool>( make_operation( "Teq", expr, other.expr ) ); }
+    SmartValue<bool> operator != ( this_type const& other ) const { return SmartValue<bool>( make_operation( "Tne", expr, other.expr ) ); }
+    SmartValue<bool> operator <= ( this_type const& other ) const { throw Unimplemented(); return SmartValue<bool>(); }
+    SmartValue<bool> operator >= ( this_type const& other ) const { throw Unimplemented(); return SmartValue<bool>(); }
+    SmartValue<bool> operator < ( this_type const& other ) const  { throw Unimplemented(); return SmartValue<bool>(); }
+    SmartValue<bool> operator > ( this_type const& other ) const  { throw Unimplemented(); return SmartValue<bool>(); }
+
+  };
+
 namespace binsec {
   
-  typedef SmartValue<double>   F64;
-  typedef SmartValue<float>    F32;
+  typedef FpSmartValue<double> F64;
+  typedef FpSmartValue<float>  F32;
   typedef SmartValue<bool>     BOOL;
   typedef SmartValue<uint8_t>  U8;
   typedef SmartValue<uint16_t> U16;
@@ -130,7 +210,7 @@ namespace binsec {
     int id;
   };
   
-  typedef std::map<Expr,Expr> Variables;
+  typedef std::map<Expr,std::pair<std::string,int>> Variables;
   
   struct ASExprNode : public ExprNode
   {
@@ -138,6 +218,36 @@ namespace binsec {
     static  int GenerateCode( Expr const& expr, Variables& vars, Label& label, std::ostream& sink );
     virtual Expr Simplify() const { return this; }
     static  Expr Simplify( Expr const& );
+  };
+
+  struct BitFilter : public ASExprNode
+  {
+    BitFilter( Expr const& _input, unsigned _source, unsigned _rshift, unsigned _select, unsigned _extend, bool _sxtend )
+      : input(_input), source(_source), pad0(), rshift(_rshift), pad1(), select(_select), pad2(), extend(_extend), sxtend(_sxtend)
+    {}
+
+    Expr mksimple();
+    virtual BitFilter* Mutate() const override { return new BitFilter( *this ); }
+    virtual Expr Simplify() const override;
+    virtual ValueType const* GetType() const { return CValueType(ValueType::UNSIGNED, extend); }
+    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
+    virtual void Repr( std::ostream& sink ) const;
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<BitFilter const&>( rhs ) ); }
+    int compare( BitFilter const& rhs ) const;
+    virtual unsigned SubCount() const { return 1; }
+    virtual Expr const& GetSub(unsigned idx) const { if (idx != 0) return ExprNode::GetSub(idx); return input; }
+
+    virtual ConstNodeBase const* Eval( unisim::util::symbolic::EvalSpace const& evs, ConstNodeBase const** cnbs ) const;
+    
+    Expr     input;
+    uint64_t source   : 15;
+    uint64_t pad0     :  1;
+    uint64_t rshift   : 15;
+    uint64_t pad1     :  1;
+    uint64_t select   : 15;
+    uint64_t pad2     :  1;
+    uint64_t extend   : 15;
+    uint64_t sxtend   :  1;
   };
 
   struct GetCode
@@ -159,80 +269,126 @@ namespace binsec {
     int expected;
   };
 
-  struct RegRead : public ASExprNode
+  struct RegReadBase : public ASExprNode
   {
     virtual void GetRegName( std::ostream& ) const = 0;
     virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
     virtual void Repr( std::ostream& sink ) const;
     virtual unsigned SubCount() const { return 0; }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegRead const&>( rhs ) ); }
-    int compare( RegRead const& rhs ) const { return 0; }
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegReadBase const&>( rhs ) ); }
+    int compare( RegReadBase const& rhs ) const { return 0; }
   };
 
-  struct RegWrite : public ASExprNode
+  template <typename RID>
+  struct RegRead : public RegReadBase
   {
-    RegWrite( Expr const& _value ) : value(_value) {}
-      
-    virtual void GetRegName( std::ostream& ) const = 0;
-    virtual ScalarType::id_t GetType() const { return ScalarType::VOID; }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
-    virtual void Repr( std::ostream& sink ) const;
+    typedef RegRead<RID> this_type;
+    typedef RegReadBase Super;
+    RegRead( RID _id ) : Super(), id(_id) {}
+    virtual this_type* Mutate() const override { return new this_type( *this ); }
+    virtual ValueType const* GetType() const override { return RID::GetType(); }
+    virtual void GetRegName( std::ostream& sink ) const override { id.Repr(sink); }
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegRead const&>( rhs ) ); }
+    int compare( RegRead const& rhs ) const { if (int delta = Super::compare(rhs)) return delta; return id.cmp( rhs.id ); }
+
+    RID id;
+  };
+
+  struct Assignment : public ExprNode
+  {
+    Assignment( Expr const& _value ) : value(_value) {}
+    
+    virtual ValueType const* GetType() const { return NoValueType(); }
     virtual unsigned SubCount() const { return 1; }
     virtual Expr const& GetSub(unsigned idx) const { if (idx != 0) return ExprNode::GetSub(idx); return value; }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWrite const&>( rhs ) ); }
-    int compare( RegWrite const& rhs ) const { return 0; /* Expr only */ }
     
     Expr value;
   };
-
-  struct Branch : public RegWrite
+  
+  struct RegWriteBase : public Assignment
   {
-    Branch( Expr const& value ) : RegWrite( value ) {}
-    virtual void annotate(std::ostream& sink) const = 0;
+    RegWriteBase( Expr const& _value, int _size ) : Assignment(_value), size(_size), rbase(0), rsize(_size) {}
+    RegWriteBase( Expr const& _value, int _size, int _rbase, int _rsize ) : Assignment(_value), size(_size), rbase(_rbase), rsize(_rsize) {}
+    
+    virtual void GetRegName( std::ostream& ) const = 0;
+    
+    int GenerateCode( Label& label, Variables& vars, std::ostream& sink ) const;
+    virtual void Repr( std::ostream& sink ) const;
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWriteBase const&>( rhs ) ); }
+    int compare( RegWriteBase const& rhs ) const
+    {
+      if (int delta = size - rhs.size) return delta;
+      if (int delta = rbase - rhs.rbase) return delta;
+      return rsize - rhs.rsize;
+    }
+    
+    int size, rbase, rsize;
+  };
+
+  template <typename RID>
+  struct RegWrite : public RegWriteBase
+  {
+    typedef RegWrite<RID> this_type;
+    typedef RegWriteBase Super;
+    RegWrite( RID _id, Expr const& _value ) : Super(_value, TypeInfo<typename RID::value_type>::BITSIZE), id(_id) {}
+    RegWrite( RID _id, int rbase, int rsize, Expr const& _value ) : Super(_value, RID::GetType()->GetBitSize(), rbase, rsize), id(_id) {}
+    virtual this_type* Mutate() const override { return new this_type( *this ); }
+    virtual void GetRegName( std::ostream& sink ) const override { id.Repr(sink); }
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWrite const&>( rhs ) ); }
+    int compare( RegWrite const& rhs ) const { if (int delta = id.cmp( rhs.id )) return delta; return Super::compare( rhs ); }
+
+    RID id;
+  };
+
+  struct Branch : public Assignment
+  {
+    Branch( Expr const& value ) : Assignment( value ) {}
+    virtual Branch* Mutate() const override { return new Branch( *this ); }
+    virtual void annotate(std::ostream& sink) const {};
+    virtual int cmp( ExprNode const& rhs ) const override { return 0; }
+    virtual void Repr( std::ostream& sink ) const;
+  };
+
+  template <typename T>
+  struct Call : public Branch
+  {
+    typedef Call<T> this_type;
+    Call( Expr const& target, T ra ) : Branch(target), return_address(ra) {}
+    virtual this_type* Mutate() const override { return new this_type( *this ); }
+    virtual void annotate(std::ostream& sink) const override
+    {
+      sink << " // call (" << binsec::dbx(sizeof(T), return_address) << ",0)";
+    }
+    virtual void Repr( std::ostream& sink ) const
+    {
+      sink << "Call(";
+      Branch::Repr(sink);
+      sink << ", " << binsec::dbx(sizeof(T), return_address) << ")";
+    }
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<this_type const&>( rhs ) ); }
+    int compare( this_type const& rhs ) const
+    {
+      if (return_address < rhs.return_address) return -1;
+      return int(return_address > rhs.return_address);
+    }
+
+    T return_address;
   };
   
   struct AssertFalse : public ASExprNode
   {
     AssertFalse() {}
     virtual AssertFalse* Mutate() const override { return new AssertFalse( *this ); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const
+    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const override
     {
       sink << "assert (false)";
       return 0;
     }
-    virtual ScalarType::id_t GetType() const { return ScalarType::VOID; }
+    virtual ValueType const* GetType() const override{ return NoValueType(); }
 
     virtual int cmp( ExprNode const& brhs ) const override { return 0; }
-    virtual unsigned SubCount() const { return 0; }
-    virtual void Repr( std::ostream& sink ) const { sink << "assert (false)"; }
-  };
-
-  struct BitFilter : public ASExprNode
-  {
-    BitFilter( Expr const& _input, unsigned _source, unsigned _rshift, unsigned _select, unsigned _extend, bool _sxtend )
-      : input(_input), source(_source), pad0(), rshift(_rshift), pad1(), select(_select), pad2(), extend(_extend), sxtend(_sxtend)
-    {}
-    virtual BitFilter* Mutate() const override { return new BitFilter( *this ); }
-    Expr Simplify() const;
-    virtual ScalarType::id_t GetType() const { return ScalarType::IntegerType( false, extend ); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
-    virtual void Repr( std::ostream& sink ) const;
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<BitFilter const&>( rhs ) ); }
-    int compare( BitFilter const& rhs ) const;
-    virtual unsigned SubCount() const { return 1; }
-    virtual Expr const& GetSub(unsigned idx) const { if (idx != 0) return ExprNode::GetSub(idx); return input; }
-
-    virtual ConstNodeBase const* Eval( unisim::util::symbolic::EvalSpace const& evs, ConstNodeBase const** cnbs ) const;
-    
-    Expr     input;
-    uint64_t source   : 15;
-    uint64_t pad0     :  1;
-    uint64_t rshift   : 15;
-    uint64_t pad1     :  1;
-    uint64_t select   : 15;
-    uint64_t pad2     :  1;
-    uint64_t extend   : 15;
-    uint64_t sxtend   :  1;
+    virtual unsigned SubCount() const override { return 0; }
+    virtual void Repr( std::ostream& sink ) const override { sink << "assert (false)"; }
   };
 
   struct MemAccess : public ASExprNode
@@ -263,11 +419,11 @@ namespace binsec {
       : MemAccess(_addr, _size, _alignment, _bigendian)
     {}
     virtual Load* Mutate() const override { return new Load(*this); }
-    virtual ScalarType::id_t GetType() const { return ScalarType::IntegerType(false, 8*bytecount()); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
-    virtual void Repr( std::ostream& sink ) const { MemAccess::Repr(sink); }
-    virtual unsigned SubCount() const { return 1; }
-    virtual Expr const& GetSub(unsigned idx) const { if (idx != 0) return ExprNode::GetSub(idx); return addr; }
+    virtual ValueType const* GetType() const override { return CValueType(ValueType::UNSIGNED, 8*bytecount()); }
+    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const override;
+    virtual void Repr( std::ostream& sink ) const override { MemAccess::Repr(sink); }
+    virtual unsigned SubCount() const override { return 1; }
+    virtual Expr const& GetSub(unsigned idx) const override { if (idx != 0) return ExprNode::GetSub(idx); return addr; }
   };
 
   struct Store : public MemAccess
@@ -275,12 +431,12 @@ namespace binsec {
     Store( Expr const& _addr, Expr const& _value, unsigned _size, unsigned _alignment, bool _bigendian )
       : MemAccess(_addr, _size, _alignment, _bigendian), value(_value)
     {}
-    virtual ScalarType::id_t GetType() const { return ScalarType::VOID; }
+    virtual ValueType const* GetType() const override { return NoValueType(); }
     virtual Store* Mutate() const override { return new Store(*this); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
-    virtual void Repr( std::ostream& sink ) const;
-    virtual unsigned SubCount() const { return 2; }
-    virtual Expr const& GetSub(unsigned idx) const { switch (idx) { case 0: return addr; case 1: return value; } return ExprNode::GetSub(idx); }
+    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const override;
+    virtual void Repr( std::ostream& sink ) const override;
+    virtual unsigned SubCount() const override { return 2; }
+    virtual Expr const& GetSub(unsigned idx) const override { switch (idx) { case 0: return addr; case 1: return value; } return ExprNode::GetSub(idx); }
       
     Expr value;
   };

@@ -117,14 +117,16 @@ public:
 	TYPE_CLASS GetClass() const;
 	bool IsComposite() const;
 	bool IsBase() const;
+	bool IsFloat() const;
+	bool IsPointer() const;
+	bool IsArray() const;
+	bool IsUnspecified() const;
 	bool IsNamed() const;
 	const DeclLocation *GetDeclLocation() const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 	void Catch() const;
 	void Release() const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
-// protected:
 	template <typename VISITOR> bool Visit(VISITOR& visitor) const;
 private:
 	TYPE_CLASS type_class;
@@ -213,7 +215,6 @@ public:
 	const Type *GetType() const;
 	uint64_t GetBitSize() const;
 	std::string BuildCDecl() const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	std::string name;
@@ -233,7 +234,6 @@ public:
 	bool IsIncomplete() const;
 	unsigned int GetMemberCount() const;
 	const Member *GetMember(unsigned int idx) const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
@@ -280,7 +280,6 @@ public:
 	int64_t GetLowerBound() const;
 	int64_t GetUpperBound() const;
 	int64_t GetCount() const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
@@ -297,8 +296,6 @@ public:
 	PointerType(const Type *type_of_dereferenced_object, const DeclLocation *decl_location);
 	virtual ~PointerType();
 	const Type *GetTypeOfDereferencedObject() const;
-	bool IsNullTerminatedStringPointer() const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
@@ -312,7 +309,6 @@ public:
 	Typedef(const Type *type, const char *name, const DeclLocation *decl_location);
 	virtual ~Typedef();
 	const Type *GetType() const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
@@ -355,7 +351,6 @@ public:
 	ConstType(const Type *type, const DeclLocation *decl_location);
 	virtual ~ConstType();
 	const Type *GetType() const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
@@ -407,20 +402,89 @@ public:
 	VolatileType(const Type *type, const DeclLocation *decl_location);
 	virtual ~VolatileType();
 	const Type *GetType() const;
-	virtual void DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const;
 	virtual std::string BuildCDecl(char const **identifier = 0, bool collapsed = false) const;
 	template <typename VISITOR> void Scan(VISITOR& visitor) const;
 private:
 	const Type *type;
 };
 
-class TypeVisitor
+class TypeResolver
 {
 public:
-	virtual ~TypeVisitor() {}
-	virtual void Visit(const char *path, const Type *type, TypeInitializerToken tok = TINIT_TOK_LITERAL) const = 0;
-	virtual void Visit(const Member *member) const = 0;
+	static Type const *Resolve(Type const *type);
 private:
+	struct Visitor
+	{
+		Visitor();
+		bool Visit(CharType const *type);
+		bool Visit(IntegerType const *type);
+		bool Visit(FloatingPointType const *type);
+		bool Visit(BooleanType const *type);
+		bool Visit(CompositeType const *type);
+		bool Visit(ArrayType const *type);
+		bool Visit(PointerType const *type);
+		bool Visit(Typedef const *type);
+		bool Visit(FunctionType const *type);
+		bool Visit(ConstType const *type);
+		bool Visit(EnumType const *type);
+		bool Visit(UnspecifiedType const *type);
+		bool Visit(VolatileType const *type);
+		bool Visit(Member const *member);
+		bool Visit(FormalParameter const *formal_param);
+		
+		Type const *resolved_type;
+	};
+};
+
+class TypeIsBase
+{
+public:
+	static bool Test(Type const *type);
+};
+
+class TypeIsFloat
+{
+public:
+	static bool Test(Type const *type);
+};
+
+class TypeIsComposite
+{
+public:
+	static bool Test(Type const *type);
+};
+
+class TypeIsPointer
+{
+public:
+	static bool Test(Type const *type);
+};
+
+class TypeIsArray
+{
+public:
+	static bool Test(Type const *type);
+};
+
+class TypeIsCharPointer
+{
+public:
+	static bool Test(Type const *type);
+private:
+	struct Visitor
+	{
+		Visitor();
+		bool Visit(Type const *type);
+		bool Visit(CharType const *type);
+		bool Visit(PointerType const *type);
+		bool Visit(Member const *member);
+		bool Visit(Typedef const *type);
+		bool Visit(ConstType const *type);
+		bool Visit(VolatileType const *type);
+		bool Visit(FormalParameter const *formal_param);
+		int state;
+		bool is_char_pointer;
+	};
 };
 
 template <typename VISITOR> void Type::Scan(VISITOR& visitor) const
@@ -432,18 +496,18 @@ template <typename VISITOR> void Type::Scan(VISITOR& visitor) const
 		case T_INTEGER  : break;
 		case T_FLOAT    : break;
 		case T_BOOL     : break;
-		case T_STRUCT   : return dynamic_cast<StructureType     const *>(this)->Scan(visitor);
-		case T_UNION    : return dynamic_cast<UnionType         const *>(this)->Scan(visitor);
-		case T_CLASS    : return dynamic_cast<ClassType         const *>(this)->Scan(visitor);
-		case T_INTERFACE: return dynamic_cast<InterfaceType     const *>(this)->Scan(visitor);
-		case T_ARRAY    : return dynamic_cast<ArrayType         const *>(this)->Scan(visitor);
-		case T_POINTER  : return dynamic_cast<PointerType       const *>(this)->Scan(visitor);
-		case T_TYPEDEF  : return dynamic_cast<Typedef           const *>(this)->Scan(visitor);
-		case T_FUNCTION : return dynamic_cast<FunctionType      const *>(this)->Scan(visitor);
-		case T_CONST    : return dynamic_cast<ConstType         const *>(this)->Scan(visitor);
+		case T_STRUCT   : dynamic_cast<StructureType     const *>(this)->Scan(visitor); break;
+		case T_UNION    : dynamic_cast<UnionType         const *>(this)->Scan(visitor); break;
+		case T_CLASS    : dynamic_cast<ClassType         const *>(this)->Scan(visitor); break;
+		case T_INTERFACE: dynamic_cast<InterfaceType     const *>(this)->Scan(visitor); break;
+		case T_ARRAY    : dynamic_cast<ArrayType         const *>(this)->Scan(visitor); break;
+		case T_POINTER  : dynamic_cast<PointerType       const *>(this)->Scan(visitor); break;
+		case T_TYPEDEF  : dynamic_cast<Typedef           const *>(this)->Scan(visitor); break;
+		case T_FUNCTION : dynamic_cast<FunctionType      const *>(this)->Scan(visitor); break;
+		case T_CONST    : dynamic_cast<ConstType         const *>(this)->Scan(visitor); break;
 		case T_ENUM     : break;
 		case T_VOID     : break;
-		case T_VOLATILE : return dynamic_cast<VolatileType      const *>(this)->Scan(visitor);
+		case T_VOLATILE : dynamic_cast<VolatileType      const *>(this)->Scan(visitor); break;
 	}
 }
 

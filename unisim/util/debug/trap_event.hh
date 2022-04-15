@@ -49,11 +49,18 @@ template <class ADDRESS>
 std::ostream& operator << (std::ostream& os, const TrapEvent<ADDRESS>& te);
 
 template <class ADDRESS>
-class TrapEvent : public Event<ADDRESS>
+// class TrapEvent : public Event<ADDRESS>
+class TrapEvent : public CustomEvent<ADDRESS, TrapEvent<ADDRESS> >
 {
 public:
+// 	TrapEvent()
+// 		: Event<ADDRESS>(Event<ADDRESS>::EV_TRAP)
+// 		, obj(0)
+// 		, msg()
+// 	{
+// 	}
 	TrapEvent()
-		: Event<ADDRESS>(Event<ADDRESS>::EV_TRAP)
+		: CustomEvent<ADDRESS, TrapEvent<ADDRESS> >()
 		, obj(0)
 		, msg()
 	{

@@ -273,9 +273,8 @@ struct JmpJ : public Operation<ARCH>
      
   void execute( ARCH& arch ) const
   {
-    typedef typename TypeFor<ARCH,OPSIZE>::u ip_t;
     typedef typename ARCH::addr_t addr_t;
-    arch.setnip( addr_t( ip_t( arch.getnip() + addr_t( offset ) ) ) );
+    arch.setnip( arch.getnip() + addr_t( offset ) );
   }
 };
   

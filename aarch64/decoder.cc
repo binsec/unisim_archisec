@@ -64,73 +64,14 @@ struct Processor
     
   typedef unisim::util::symbolic::FP                   FP;
   typedef unisim::util::symbolic::Expr                 Expr;
-  typedef unisim::util::symbolic::ScalarType           ScalarType;
+  typedef unisim::util::symbolic::ValueType           ValueType;
   typedef unisim::util::symbolic::binsec::ActionNode   ActionNode;
 
-  typedef unisim::util::symbolic::binsec::Store        Store;
-  typedef unisim::util::symbolic::binsec::Load         Load;
-  typedef unisim::util::symbolic::binsec::Branch       Branch;
-  
   template <typename RID>
-  struct RegRead : public unisim::util::symbolic::binsec::RegRead
-  {
-    typedef RegRead<RID> this_type;
-    typedef unisim::util::symbolic::binsec::RegRead Super;
-    RegRead( RID _id, ScalarType::id_t _tp ) : Super(), tp(_tp), id(_id) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual ScalarType::id_t GetType() const override { return tp; }
-    virtual void GetRegName( std::ostream& sink ) const override { sink << id.c_str(); }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegRead const&>( rhs ) ); }
-    int compare( RegRead const& rhs ) const { if (int delta = int(tp) - int(rhs.tp)) return delta; if (int delta = id.cmp( rhs.id )) return delta; return Super::compare(rhs); }
-    virtual Expr Simplify() const { return this; }
-
-    ScalarType::id_t tp;
-    RID id;
-  };
+  static Expr newRegRead( RID id ) { return new unisim::util::symbolic::binsec::RegRead<RID>( id ); }
 
   template <typename RID>
-  static Expr newRegRead( RID id, ScalarType::id_t tp ) { return new RegRead<RID>( id, tp ); }
-
-  template <typename RID>
-  struct RegWrite : public unisim::util::symbolic::binsec::RegWrite
-  {
-    typedef RegWrite<RID> this_type;
-    typedef unisim::util::symbolic::binsec::RegWrite Super;
-    RegWrite( RID _id, Expr const& _value ) : Super(_value), id(_id) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    
-    virtual void GetRegName( std::ostream& sink ) const override { sink << id.c_str(); }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWrite const&>( rhs ) ); }
-    int compare( RegWrite const& rhs ) const { if (int delta = id.cmp( rhs.id )) return delta; return Super::cmp( rhs ); }
-    virtual Expr Simplify() const override
-    {
-      Expr nvalue( ASExprNode::Simplify( value ) );
-      return nvalue != value ? new RegWrite<RID>( id, nvalue ) : this;
-    }
-    
-    RID id;
-  };
-  
-  template <typename RID>
-  static RegWrite<RID>* newRegWrite( RID id, Expr const& value )
-  { return new RegWrite<RID>( id, value ); }
-  
-  struct Goto : public unisim::util::symbolic::binsec::Branch
-  {
-    Goto( Expr const& value ) : unisim::util::symbolic::binsec::Branch( value ) {}
-    virtual Goto* Mutate() const override { return new Goto( *this ); }
-    virtual void GetRegName( std::ostream& sink ) const override { sink << "pc"; }
-    virtual void annotate(std::ostream& sink) const override { return; }
-  };
-
-  struct Call : public Goto
-  {
-    Call( Expr const& value, uint32_t ra ) : Goto( value ), return_address( ra ) {}
-    virtual Call* Mutate() const override { return new Call( *this ); }
-    virtual void annotate(std::ostream& sink) const override { sink << " // call (" << unisim::util::symbolic::binsec::dbx(4,return_address) << ",0)"; }
-
-    uint32_t return_address;
-  };
+  static Expr newRegWrite( RID id, Expr const& value ) { return new unisim::util::symbolic::binsec::RegWrite<RID>( id, value ); }
 
   //   =====================================================================
   //   =                      Construction/Destruction                     =
@@ -153,9 +94,9 @@ struct Processor
     , unpredictable( false )
   {
     for (GPR reg; reg.next();)
-      gpr[reg.idx()] = newRegRead(reg, ScalarType::U64);
+      gpr[reg.idx()] = newRegRead(reg);
     for (Flag flag; flag.next();)
-      flags[flag.idx()] = newRegRead(flag, ScalarType::BOOL);
+      flags[flag.idx()] = newRegRead(flag);
   }
   
   bool
@@ -163,9 +104,9 @@ struct Processor
   {
     bool complete = path->close();
     if (branch_type == B_CALL)
-      path->sinks.insert( Expr( new Call( next_instruction_address.expr, linear_nia ) ) );
+      path->sinks.insert( Expr( new unisim::util::symbolic::binsec::Call<uint64_t>( next_instruction_address.expr, linear_nia ) ) );
     else
-      path->sinks.insert( Expr( new Goto( next_instruction_address.expr ) ) );
+      path->sinks.insert( Expr( new unisim::util::symbolic::binsec::Branch( next_instruction_address.expr ) ) );
     if (unpredictable)
       {
         path->sinks.insert( Expr( new unisim::util::symbolic::binsec::AssertFalse() ) );
@@ -328,15 +269,15 @@ struct Processor
   //   =                       Memory access methods                       =
   //   =====================================================================
   
-  U64  MemRead64(U64 addr) { return U64( Expr( new Load( addr.expr, 8, 0, false ) ) ); }
-  U32  MemRead32(U64 addr) { return U32( Expr( new Load( addr.expr, 4, 0, false ) )); }
-  U16  MemRead16(U64 addr) { return U16( Expr( new Load( addr.expr, 2, 0, false ) ) ); }
-  U8   MemRead8 (U64 addr) { return U8 ( Expr( new Load( addr.expr, 1, 0, false ) ) ); }
+  U64  MemRead64(U64 addr) { return U64( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 8, 0, false ) ) ); }
+  U32  MemRead32(U64 addr) { return U32( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 4, 0, false ) ) ); }
+  U16  MemRead16(U64 addr) { return U16( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 2, 0, false ) ) ); }
+  U8   MemRead8 (U64 addr) { return U8 ( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 1, 0, false ) ) ); }
     
-  void MemWrite64(U64 addr, U64 value) { stores.insert( new Store( addr.expr, value.expr, 8, 0, false ) ); }
-  void MemWrite32(U64 addr, U32 value) { stores.insert( new Store( addr.expr, value.expr, 4, 0, false ) ); }
-  void MemWrite16(U64 addr, U16 value) { stores.insert( new Store( addr.expr, value.expr, 2, 0, false ) ); }
-  void MemWrite8 (U64 addr, U8  value) { stores.insert( new Store( addr.expr, value.expr, 1, 0, false ) ); }
+  void MemWrite64(U64 addr, U64 value) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 8, 0, false ) ); }
+  void MemWrite32(U64 addr, U32 value) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 4, 0, false ) ); }
+  void MemWrite16(U64 addr, U16 value) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 2, 0, false ) ); }
+  void MemWrite8 (U64 addr, U8  value) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 1, 0, false ) ); }
     
   void ClearExclusiveLocal() { throw 0; }
   void SetExclusiveMonitors( U64, unsigned size ) { throw 0; }
@@ -348,8 +289,11 @@ struct Processor
   //   =                         Processor Storage                         =
   //   =====================================================================
 
-  struct GPR : public unisim::util::identifier::Identifier<GPR>
+  struct GPR
+    : public unisim::util::identifier::Identifier<GPR>
+    , public unisim::util::symbolic::WithValueType<GPR>
   {
+    typedef uint64_t value_type;
     enum Code
       {
         x0,  x1,  x2,  x3,  x4,  x5,  x6,  x7,  x8,  x9,  x10, x11, x12, x13, x14, x15,
@@ -365,14 +309,19 @@ struct Processor
         };
       return names[int(code)];
     }
+
+    void Repr(std::ostream& sink) const { sink << c_str(); }
     
     GPR() : code(end) {}
     GPR( Code _code ) : code(_code) {}
     GPR( char const* _code ) : code(end) { init( _code ); }
   };
 
-  struct Flag : public unisim::util::identifier::Identifier<Flag>
+  struct Flag
+    : public unisim::util::identifier::Identifier<Flag>
+    , unisim::util::symbolic::WithValueType<Flag>
   {
+    typedef bool value_type;
     enum Code { N, Z, C, V, end } code;
 
     char const* c_str() const
@@ -380,6 +329,8 @@ struct Processor
       static char const* names[] = {"n", "z", "c", "v", "NA"};
       return names[int(code)];
     }
+
+    void Repr(std::ostream& sink) const { sink << c_str(); }
     
     Flag() : code(end) {}
     Flag( Code _code ) : code(_code) {}

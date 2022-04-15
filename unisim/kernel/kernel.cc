@@ -54,6 +54,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cassert>
+#include <algorithm>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -1205,7 +1206,7 @@ void Object::DoServiceSetup()
 
 
 //=============================================================================
-//=                            Service<SERVICE_IF>                            =
+//=                                ServiceBase                                =
 //=============================================================================
 
 ServiceBase::ServiceBase(const char *name, Object *parent, const char *description)
@@ -1244,6 +1245,15 @@ ServicePortBase::ServicePortBase(const char *_name, Object *_owner)
 
 ServicePortBase::~ServicePortBase()
 {
+	if(fwd_port)
+	{
+		fwd_port->Disconnect(this);
+	}
+	for (auto & bwd_port : bwd_ports)
+	{
+		bwd_port->fwd_port = 0;
+	}
+	
 	Simulator::Instance()->Unregister(this);
 }
 
@@ -1278,7 +1288,26 @@ void ServicePortBase::Connect(ServicePortBase* fwd)
 	std::cerr << GetName() << " -> " << srv_export.GetName() << std::endl;
 #endif
 	fwd_port = fwd;
-        fwd->bwd_ports.push_back(this);
+	fwd->bwd_ports.push_back(this);
+}
+
+void ServicePortBase::Disconnect(ServicePortBase* bwd)
+{
+	BwdPorts::iterator it = std::find(bwd_ports.begin(), bwd_ports.end(), bwd);
+	if(it != bwd_ports.end())
+	{
+		bwd_ports.erase(it);
+	}
+}
+
+void
+ServicePortBase::SpreadFwd( ServicePortBase::Visitor& visitor )
+{
+	if(fwd_port)
+	{
+		fwd_port->SpreadFwd(visitor);
+	}
+	visitor.Process(*this);
 }
 
 void

@@ -43,6 +43,55 @@ namespace unisim {
 namespace util {
 namespace symbolic {
 
+  ValueType const* CValueType(ValueType::encoding_t encoding, unsigned bitsize)
+  {
+    typedef long double f80_t;
+    switch (encoding)
+      {
+      case ValueType::FLOAT:
+        switch (bitsize) {
+        default: break;
+        case 32: return CValueType(float());
+        case 64: return CValueType(double());
+        case 80: return CValueType(f80_t());
+        } break;
+      case ValueType::UNSIGNED:
+        switch (bitsize) {
+        default: break;;
+        case  8: return CValueType(uint8_t());
+        case 16: return CValueType(uint16_t());
+        case 32: return CValueType(uint32_t());
+        case 64: return CValueType(uint64_t());
+        } break;
+      case ValueType::SIGNED:
+        switch (bitsize) {
+        default: break;;
+        case  8: return CValueType(int8_t());
+        case 16: return CValueType(int16_t());
+        case 32: return CValueType(int32_t());
+        case 64: return CValueType(int64_t());
+        } break;
+      case ValueType::BOOL:
+        if (bitsize != 1) break;
+        return CValueType(bool());
+      default:
+        break;
+      }
+    struct Bad {}; throw Bad();
+    return 0;
+  }
+
+  ValueType const* NoValueType()
+  {
+    static struct NoType: public ValueType
+    {
+      NoType() : ValueType(ValueType::NA) {}
+      virtual unsigned GetBitSize() const override { return 0; }
+      virtual void GetName(std::ostream& sink) const override { sink << "NoType"; }
+    } type_desc;
+    return &type_desc;
+  }
+
   std::ostream&
   operator << (std::ostream& sink, Expr const& expr )
   {
@@ -132,10 +181,12 @@ namespace symbolic {
   long double   EvalSHL( long double, uint8_t ) { throw std::logic_error( "No << for long double." ); }
   double   EvalSHL( double, uint8_t ) { throw std::logic_error( "No << for double." ); }
   float    EvalSHL( float, uint8_t ) { throw std::logic_error( "No << for float." ); }
+  int128_t    EvalSHL( int128_t, uint8_t ) { throw std::logic_error( "No << for int128_t." ); }
   
   long double   EvalSHR( long double, uint8_t ) { throw std::logic_error( "No >> for long double." ); }
   double   EvalSHR( double, uint8_t ) { throw std::logic_error( "No >> for double." ); }
   float    EvalSHR( float, uint8_t ) { throw std::logic_error( "No >> for float." ); }
+  int128_t    EvalSHR( int128_t, uint8_t ) { throw std::logic_error( "No >> for int128_t." ); }
   
   uint32_t EvalByteSwap( uint32_t v ) { return unisim::util::endian::ByteSwap( v ); }
   uint16_t EvalByteSwap( uint16_t v ) { return unisim::util::endian::ByteSwap( v ); }

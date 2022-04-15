@@ -49,12 +49,12 @@ namespace debug {
 template <typename ADDRESS> class Watchpoint;
 
 template <typename ADDRESS>
-class Watchpoint : public Event<ADDRESS>
+class Watchpoint : public CustomEvent<ADDRESS, Watchpoint<ADDRESS> >
 {
 public:
 
 	Watchpoint(unisim::util::debug::MemoryAccessType _mat, unisim::util::debug::MemoryType _mt, ADDRESS _addr, uint32_t _size, bool _overlook)
-		: Event<ADDRESS>(Event<ADDRESS>::EV_WATCHPOINT)
+		: CustomEvent<ADDRESS, Watchpoint<ADDRESS> >()
 		, mat(_mat)
 		, mt(_mt)
 		, addr(_addr)

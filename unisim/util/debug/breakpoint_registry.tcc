@@ -150,7 +150,7 @@ void BreakpointRegistry<ADDRESS, NUM_PROCESSORS, MAX_FRONT_ENDS>::Reset()
 				Breakpoint<ADDRESS> *breakpoint = (*breakpoint_it).second;
 				breakpoint->Release();
 			}
-
+			
 			breakpoints[prc_num][front_end_num].clear();
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012,
+ *  Copyright (c) 2020,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -31,64 +31,97 @@
  *
  * Authors: Gilles Mouchard (gilles.mouchard@cea.fr)
  */
- 
-#ifndef __UNISIM_UTIL_DEBUG_EVENT_HH__
-#define __UNISIM_UTIL_DEBUG_EVENT_HH__
 
-#include <inttypes.h>
-#include <ostream>
+#ifndef __UNISIM_UTIL_DEBUG_HOOK_HH__
+#define __UNISIM_UTIL_DEBUG_HOOK_HH__
+
+#include <unisim/util/debug/source_code_location.hh>
+#include <unisim/util/debug/data_object.hh>
 
 namespace unisim {
 namespace util {
 namespace debug {
 
+////////////////////////////// declarations ///////////////////////////////////
+
 template <typename ADDRESS>
-class Event
+class Hook
 {
 public:
 	typedef unsigned int Type;
+	typedef unisim::util::debug::DataObjectRef<ADDRESS> ReturnValue;
 	
-	Event(Type _type) : type(_type), event_id(next_event_id++), prc_num(-1), front_end_num(-1), ref_count(0) {}
-	virtual ~Event() {}
+	Hook(Type _type) : type(_type), id(next_id++) {}
+	virtual ~Hook() {}
+
 	Type GetType() const { return type; }
-	unsigned int GetEventId() const { return event_id; }
-	int GetProcessorNumber() const { return prc_num; }
-	int GetFrontEndNumber() const { return front_end_num; }
-	void SetProcessorNumber(int _prc_num) { if((prc_num >= 0) || (_prc_num < 0)) return; prc_num = _prc_num; }
-	void SetFrontEndNumber(int _front_end_num) { if((front_end_num >= 0) || (_front_end_num < 0)) return; front_end_num = _front_end_num; }
-	void Catch() const { ref_count++; }
-	void Release() const { if(ref_count && (--ref_count == 0)) delete this; }
+	unsigned int GetId() const { return id; }
 	
+	virtual bool Run(ReturnValue& return_value) = 0;
+
 private:
 	Type type;
-	unsigned int event_id;
-	int prc_num;
-	int front_end_num;
-	mutable unsigned int ref_count;
-	
-	static unsigned int next_event_id;
-	
+	unsigned int id;
+	static unsigned int next_id;
 protected:
-	static Type AllocateCustomEventType() { static Type next_event_type = 0; return next_event_type++; }
+	static Type AllocateCustomHookType() { static Type next_hook_type = 0; return next_hook_type++; }
 };
 
 template <typename ADDRESS>
-unsigned int Event<ADDRESS>::next_event_id;
+unsigned int Hook<ADDRESS>::next_id;
 
 template <typename ADDRESS, typename T>
-class CustomEvent : public Event<ADDRESS>
+class CustomHook : public Hook<ADDRESS>
 {
 public:
-	static const typename Event<ADDRESS>::Type TYPE;
+	static const typename Hook<ADDRESS>::Type TYPE;
 	
-	CustomEvent() : Event<ADDRESS>(TYPE) {}
+	CustomHook() : Hook<ADDRESS>(TYPE) {}
 };
 
 template <typename ADDRESS, typename T>
-const typename Event<ADDRESS>::Type CustomEvent<ADDRESS, T>::TYPE = Event<ADDRESS>::AllocateCustomEventType();
+const typename Hook<ADDRESS>::Type CustomHook<ADDRESS, T>::TYPE = Hook<ADDRESS>::AllocateCustomHookType();
+
+template <typename ADDRESS>
+class AddressHook : public CustomHook<ADDRESS, AddressHook<ADDRESS> >
+{
+public:
+	typedef unisim::util::debug::DataObjectRef<ADDRESS> ReturnValue;
+	
+	AddressHook(ADDRESS _addr) : addr(_addr) {}
+	
+	ADDRESS GetAddress() const { return addr; }
+
+private:
+	ADDRESS addr;
+};
+
+template <typename ADDRESS>
+class SourceCodeHook : public CustomHook<ADDRESS, SourceCodeHook<ADDRESS> >
+{
+public:
+	SourceCodeHook(const unisim::util::debug::SourceCodeLocation& _source_code_location) : source_code_location(_source_code_location) {}
+	
+	const unisim::util::debug::SourceCodeLocation& GetSourceCodeLocation() const { return source_code_location; }
+	
+private:
+	SourceCodeLocation source_code_location;
+};
+
+template <typename ADDRESS>
+class SubProgramHook : public CustomHook<ADDRESS, SubProgramHook<ADDRESS> >
+{
+public:
+	SubProgramHook(const SubProgram<ADDRESS> *_subprogram) : subprogram(_subprogram) {}
+	
+	const SubProgram<ADDRESS> *GetSubProgram() const { return subprogram; }
+	
+private:
+	const SubProgram<ADDRESS> *subprogram;
+};
 
 } // end of namespace debug
 } // end of namespace util
 } // end of namespace unisim
 
-#endif
+#endif // __UNISIM_UTIL_DEBUG_HOOK_HH__

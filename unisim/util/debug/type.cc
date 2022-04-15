@@ -98,6 +98,26 @@ bool Type::IsBase() const
 	       (type_class == unisim::util::debug::T_BOOL);
 }
 
+bool Type::IsFloat() const
+{
+	return type_class == unisim::util::debug::T_FLOAT;
+}
+
+bool Type::IsPointer() const
+{
+	return type_class == unisim::util::debug::T_POINTER;
+}
+
+bool Type::IsArray() const
+{
+	return type_class == unisim::util::debug::T_ARRAY;
+}
+
+bool Type::IsUnspecified() const
+{
+	return type_class == unisim::util::debug::T_VOID;
+}
+
 bool Type::IsNamed() const
 {
 	return IsBase() ||
@@ -109,11 +129,6 @@ bool Type::IsNamed() const
 const DeclLocation *Type::GetDeclLocation() const
 {
 	return decl_location;
-}
-
-void Type::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	visitor->Visit(path.c_str(), this, TINIT_TOK_LITERAL);
 }
 
 std::string Type::BuildCDecl(char const **identifier, bool collapsed) const
@@ -379,18 +394,6 @@ uint64_t Member::GetBitSize() const
 	return bit_size;
 }
 
-void Member::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	visitor->Visit(this);
-	std::string member_path = path;
-	if(has_name)
-	{
-		member_path += '.';
-		member_path += name;
-	}
-	type->DFS(member_path, visitor, follow_pointer);
-}
-
 std::string Member::BuildCDecl() const
 {
 	std::stringstream sstr;
@@ -453,23 +456,6 @@ const Member *CompositeType::GetMember(unsigned int _idx) const
 	unsigned int member_count = members.size();
 	
 	return (_idx < member_count) ? members[_idx] : 0;
-}
-
-void CompositeType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	visitor->Visit(path.c_str(), this, TINIT_TOK_BEGIN_OF_STRUCT);
-	unsigned int member_count = members.size();
-	unsigned int i;
-	for(i = 0; i < member_count; i++)
-	{
-		const Member *member = members[i];
-		member->DFS(path, visitor, follow_pointer);
-		if(i != (member_count - 1))
-		{
-			visitor->Visit(path.c_str(), this, TINIT_TOK_STRUCT_MEMBER_SEPARATOR);
-		}
-	}
-	visitor->Visit(path.c_str(), this, TINIT_TOK_END_OF_STRUCT);
 }
 
 std::string CompositeType::BuildCDecl(char const **identifier, bool collapsed) const
@@ -583,23 +569,6 @@ int64_t ArrayType::GetCount() const
 	return upper_bound - lower_bound + 1;
 }
 
-void ArrayType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	visitor->Visit(path.c_str(), this, TINIT_TOK_BEGIN_OF_ARRAY);
-	int64_t subscript;
-	for(subscript = lower_bound; subscript <= upper_bound; subscript++)
-	{
-		std::stringstream element_path_sstr;
-		element_path_sstr << path << '[' << subscript << ']';
-		type_of_element->DFS(element_path_sstr.str(), visitor, follow_pointer);
-		if(subscript != upper_bound)
-		{
-			visitor->Visit(path.c_str(), this, TINIT_TOK_ARRAY_ELEMENT_SEPARATOR);
-		}
-	}
-	visitor->Visit(path.c_str(), this, TINIT_TOK_END_OF_ARRAY);
-}
-
 std::string ArrayType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	std::stringstream sstr;
@@ -670,75 +639,6 @@ PointerType::~PointerType()
 const Type *PointerType::GetTypeOfDereferencedObject() const
 {
 	return type_of_dereferenced_object;
-}
-
-bool PointerType::IsNullTerminatedStringPointer() const
-{
-	if(type_of_dereferenced_object->GetClass() == T_CHAR)
-	{
-		// char *
-		return true;
-	}
-	else
-	{
-		if(type_of_dereferenced_object->GetClass() == T_CONST)
-		{
-			const ConstType *const_type = static_cast<const ConstType *>(type_of_dereferenced_object);
-			if(const_type->GetType()->GetClass() == T_VOLATILE)
-			{
-				const VolatileType *volatile_type = static_cast<const VolatileType *>(const_type->GetType());
-				if(volatile_type->GetType()->GetClass() == T_CHAR)
-				{
-					// char volatile const *
-					return true;
-				}
-			}
-			else
-			{
-				if(const_type->GetType()->GetClass() == T_CHAR)
-				{
-					// char const *
-					return true;
-				}
-			}
-		}
-		else if(type_of_dereferenced_object->GetClass() == T_VOLATILE)
-		{
-			const VolatileType *volatile_type = static_cast<const VolatileType *>(type_of_dereferenced_object);
-			if(volatile_type->GetType()->GetClass() == T_CONST)
-			{
-				const ConstType *const_type = static_cast<const ConstType *>(volatile_type->GetType());
-				if(const_type->GetClass() == T_CHAR)
-				{
-					// char const volatile *
-					return true;
-				}
-			}
-			else
-			{
-				if(volatile_type->GetType()->GetClass() == T_CHAR)
-				{
-					// char volatile *
-					return true;
-				}
-			}
-		}
-	}
-	
-	return false;
-}
-
-void PointerType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	if(follow_pointer)
-	{
-		std::string dereferenced_object_path = std::string("*(") + std::string(path) + ')';
-		type_of_dereferenced_object->DFS(dereferenced_object_path, visitor, follow_pointer);
-	}
-	else
-	{
-		visitor->Visit(path.c_str(), this, TINIT_TOK_LITERAL);
-	}
 }
 
 std::string PointerType::BuildCDecl(char const **identifier, bool collapsed) const
@@ -840,11 +740,6 @@ std::string Typedef::BuildCDecl(char const **identifier, bool collapsed) const
 		}
 		return sstr.str();
 	}
-}
-
-void Typedef::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	type->DFS(path, visitor, follow_pointer);
 }
 
 FormalParameter::FormalParameter(const char *_name, const Type *_type)
@@ -981,11 +876,6 @@ ConstType::~ConstType()
 const Type *ConstType::GetType() const
 {
 	return type;
-}
-
-void ConstType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	type->DFS(path, visitor, follow_pointer);
 }
 
 std::string ConstType::BuildCDecl(char const **identifier, bool collapsed) const
@@ -1154,11 +1044,6 @@ const Type *VolatileType::GetType() const
 	return type;
 }
 
-void VolatileType::DFS(const std::string& path, const TypeVisitor *visitor, bool follow_pointer) const
-{
-	type->DFS(path, visitor, follow_pointer);
-}
-
 std::string VolatileType::BuildCDecl(char const **identifier, bool collapsed) const
 {
 	if(type->GetClass() != T_ARRAY)
@@ -1187,6 +1072,202 @@ std::string VolatileType::BuildCDecl(char const **identifier, bool collapsed) co
 	
 	// Discarding volatile for arrays
 	return type->BuildCDecl(identifier, collapsed);
+}
+
+Type const *TypeResolver::Resolve(Type const *type)
+{
+	Visitor visitor;
+	type->Visit(visitor);
+	return visitor.resolved_type;
+}
+
+TypeResolver::Visitor::Visitor()
+	: resolved_type(0)
+{
+}
+
+bool TypeResolver::Visitor::Visit(CharType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(IntegerType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(FloatingPointType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(BooleanType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(CompositeType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(ArrayType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(PointerType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(Typedef const *type)
+{
+	type->Scan(*this);
+	return true;
+}
+
+bool TypeResolver::Visitor::Visit(FunctionType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(ConstType const *type)
+{
+	type->Scan(*this);
+	return true;
+}
+
+bool TypeResolver::Visitor::Visit(EnumType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(UnspecifiedType const *type)
+{
+	resolved_type = type;
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(VolatileType const *type)
+{
+	type->Scan(*this);
+	return true;
+}
+
+bool TypeResolver::Visitor::Visit(Member const *member)
+{
+	return false;
+}
+
+bool TypeResolver::Visitor::Visit(FormalParameter const *formal_param)
+{
+	return false;
+}
+
+
+bool TypeIsBase::Test(Type const *type)
+{
+	Type const *resolved_type = TypeResolver::Resolve(type);
+	return resolved_type && resolved_type->IsBase();
+}
+
+bool TypeIsFloat::Test(Type const *type)
+{
+	Type const *resolved_type = TypeResolver::Resolve(type);
+	return resolved_type && resolved_type->IsFloat();
+}
+
+bool TypeIsComposite::Test(Type const *type)
+{
+	Type const *resolved_type = TypeResolver::Resolve(type);
+	return resolved_type && resolved_type->IsComposite();
+}
+
+bool TypeIsPointer::Test(Type const *type)
+{
+	Type const *resolved_type = TypeResolver::Resolve(type);
+	return resolved_type && resolved_type->IsPointer();
+}
+
+bool TypeIsArray::Test(Type const *type)
+{
+	Type const *resolved_type = TypeResolver::Resolve(type);
+	return resolved_type && resolved_type->IsArray();
+}
+
+TypeIsCharPointer::Visitor::Visitor()
+	: state(0)
+	, is_char_pointer(false)
+{
+}
+
+bool TypeIsCharPointer::Visitor::Visit(Type const *type)
+{
+	return false;
+}
+
+bool TypeIsCharPointer::Visitor::Visit(CharType const *type)
+{
+	if(state == 1)
+	{
+		is_char_pointer = true;
+	}
+	return false;
+}
+
+bool TypeIsCharPointer::Visitor::Visit(PointerType const *type)
+{
+	if(state == 0)
+	{
+		state = 1;
+		type->Scan(*this);
+	}
+	return false;
+}
+
+bool TypeIsCharPointer::Visitor::Visit(Typedef const *type)
+{
+	type->Scan(*this);
+	return true;
+}
+
+bool TypeIsCharPointer::Visitor::Visit(ConstType const *type)
+{
+	type->Scan(*this);
+	return true;
+}
+
+bool TypeIsCharPointer::Visitor::Visit(VolatileType const *type)
+{
+	type->Scan(*this);
+	return true;
+}
+
+bool TypeIsCharPointer::Visitor::Visit(Member const *member)
+{
+	return false;
+}
+
+bool TypeIsCharPointer::Visitor::Visit(FormalParameter const *formal_param)
+{
+	return false;
+}
+
+bool TypeIsCharPointer::Test(Type const *type)
+{
+	Visitor visitor;
+	type->Visit(visitor);
+	return visitor.is_char_pointer;
 }
 
 } // end of namespace debug

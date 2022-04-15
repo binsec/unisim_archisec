@@ -46,11 +46,11 @@ namespace debug {
 template <typename ADDRESS> class Breakpoint;
 
 template <typename ADDRESS>
-class Breakpoint : public Event<ADDRESS>
+class Breakpoint : public CustomEvent<ADDRESS, Breakpoint<ADDRESS> >
 {
 public:
-	Breakpoint(ADDRESS _addr) : Event<ADDRESS>(Event<ADDRESS>::EV_BREAKPOINT), addr(_addr), ref(), id(-1) {}
-	Breakpoint(ADDRESS _addr, Event<ADDRESS> *_ref) : Event<ADDRESS>(Event<ADDRESS>::EV_BREAKPOINT) , addr(_addr), ref(_ref), id(-1) {}
+	Breakpoint(ADDRESS _addr) : CustomEvent<ADDRESS, Breakpoint<ADDRESS> >(), addr(_addr), ref(), id(-1) {}
+	Breakpoint(ADDRESS _addr, Event<ADDRESS> *_ref) : CustomEvent<ADDRESS, Breakpoint<ADDRESS> >() , addr(_addr), ref(_ref), id(-1) {}
 	
 	inline int GetId() const { return id; }
 	inline ADDRESS GetAddress() const { return addr; }

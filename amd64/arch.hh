@@ -35,6 +35,7 @@
 #ifndef ARMD64DBA_ARCH_HH
 #define ARMD64DBA_ARCH_HH
 
+#include <unisim/util/arithmetic/i128.hh>
 #include <unisim/component/cxx/processor/intel/isa/intel.hh>
 #include <unisim/component/cxx/processor/intel/modrm.hh>
 #include <unisim/component/cxx/processor/intel/disasm.hh>
@@ -52,14 +53,18 @@
 // template <typename ARCH> struct TypeFor<ARCH,32> { typedef typename ARCH::S32 S; typedef typename ARCH::U32 U; typedef typename ARCH::F32 F; };
 // template <typename ARCH> struct TypeFor<ARCH,64> { typedef typename ARCH::S64 S; typedef typename ARCH::U64 U; typedef typename ARCH::F64 F; };
 
-struct VmmRegister
+void show(unsigned, unisim::util::symbolic::ExprNode const*);
+
+
+struct VmmValue
 {
-  enum { BYTECOUNT = 32 };
+  enum { BYTECOUNT = 32, VPREFIX='y' };
   struct value_type { char _[BYTECOUNT]; };
-  VmmRegister() = default;
-  VmmRegister(unisim::util::symbolic::Expr const& _expr) : expr(_expr) {}
+  VmmValue() = default;
+  VmmValue(unisim::util::symbolic::Expr const& _expr) : expr(_expr) {}
   unisim::util::symbolic::Expr expr;
-  static unisim::util::symbolic::ScalarType::id_t GetType() { return unisim::util::symbolic::ScalarType::VOID; }
+  static unisim::util::symbolic::ValueType const* GetType();
+  //{ return unisim::util::symbolic::NoValueType(); }
 };
 
 struct ProcessorBase
@@ -75,10 +80,12 @@ struct ProcessorBase
   typedef SmartValue<uint16_t>    u16_t;
   typedef SmartValue<uint32_t>    u32_t;
   typedef SmartValue<uint64_t>    u64_t;
+  typedef SmartValue<uint128_t>   u128_t;
   typedef SmartValue<int8_t>      s8_t;
   typedef SmartValue<int16_t>     s16_t;
   typedef SmartValue<int32_t>     s32_t;
   typedef SmartValue<int64_t>     s64_t;
+  typedef SmartValue<int128_t>    s128_t;
   typedef SmartValue<bool>        bit_t;
 
   typedef SmartValue<float>       f32_t;
@@ -87,12 +94,9 @@ struct ProcessorBase
 
   typedef unisim::util::symbolic::Expr Expr;
   typedef unisim::util::symbolic::ExprNode ExprNode;
-  typedef unisim::util::symbolic::ScalarType ScalarType;
+  typedef unisim::util::symbolic::ValueType ValueType;
 
   typedef unisim::util::symbolic::binsec::ActionNode   ActionNode;
-  typedef unisim::util::symbolic::binsec::Load         Load;
-  typedef unisim::util::symbolic::binsec::Store        Store;
-  typedef unisim::util::symbolic::binsec::Branch       Br;
 
   ProcessorBase();
 
@@ -102,39 +106,13 @@ struct ProcessorBase
   /*** INTEGER REGISTERS ***/
 
   template <typename RID>
-  struct RegRead : public unisim::util::symbolic::binsec::RegRead
-  {
-    typedef unisim::util::symbolic::binsec::RegRead Super;
-    RegRead( RID _id ) : Super(), id(_id) {}
-    virtual RegRead* Mutate() const override { return new RegRead( *this ); }
-    virtual ScalarType::id_t GetType() const
-    { return unisim::util::symbolic::TypeInfo<typename RID::register_type>::GetType(); }
-    virtual void GetRegName( std::ostream& sink ) const { id.Repr(sink); }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegRead const&>( rhs ) ); }
-    int compare( RegRead const& rhs ) const { if (int delta = Super::compare(rhs)) return delta; return id.cmp( rhs.id ); }
-
-    RID id;
-  };
+  static Expr newRegRead( RID id ) { return new unisim::util::symbolic::binsec::RegRead<RID>( id ); }
 
   template <typename RID>
-  static Expr newRegRead( RID id ) { return new RegRead<RID>( id ); }
+  static Expr newRegWrite( RID id, Expr const& value ) { return new unisim::util::symbolic::binsec::RegWrite<RID>( id, value ); }
 
   template <typename RID>
-  struct RegWrite : public unisim::util::symbolic::binsec::RegWrite
-  {
-    typedef RegWrite<RID> this_type;
-    typedef unisim::util::symbolic::binsec::RegWrite Super;
-    RegWrite( RID _id, Expr const& _value ) : Super(_value), id(_id) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual void GetRegName( std::ostream& sink ) const { id.Repr(sink); }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWrite const&>( rhs ) ); }
-    int compare( RegWrite const& rhs ) const { if (int delta = id.cmp( rhs.id )) return delta; return Super::compare( rhs ); }
-
-    RID id;
-  };
-
-  template <typename RID>
-  static Expr newRegWrite( RID id, Expr const& value ) { return new RegWrite<RID>( id, value ); }
+  static Expr newPartialRegWrite( RID id, unsigned pos, unsigned size, Expr const& value ) { return new unisim::util::symbolic::binsec::RegWrite<RID>( id, pos, size, value ); }
 
   /*** FLOATING POINT REGISTERS ***/
 
@@ -149,26 +127,27 @@ struct ProcessorBase
 
   void                        fxam() { throw Unimplemented(); }
 
-  struct FTop : public unisim::util::symbolic::ExprNode
-  {
-    virtual FTop* Mutate() const override { return new FTop(*this); }
-    virtual unsigned SubCount() const { return 0; }
-    virtual int cmp(ExprNode const&) const override { return 0; }
-    virtual ScalarType::id_t GetType() const { return ScalarType::U8; }
-    virtual void Repr( std::ostream& sink ) const;
-  };
+  // struct FTop : public unisim::util::symbolic::ExprNode
+  // {
+  //   virtual FTop* Mutate() const override { return new FTop(*this); }
+  //   virtual unsigned SubCount() const { return 0; }
+  //   virtual int cmp(ExprNode const&) const override { return 0; }
+  //   virtual ValueType const* GetType() const { return ValueType::U8; }
+  //   virtual void Repr( std::ostream& sink ) const;
+  // };
 
-  struct FTopWrite : public unisim::util::symbolic::binsec::RegWrite
-  {
-    typedef unisim::util::symbolic::binsec::RegWrite Super;
-    FTopWrite( u8_t const& ftop ) : Super( ftop.expr ) {}
-    virtual FTopWrite* Mutate() const override { return new FTopWrite(*this); }
-    virtual void GetRegName(std::ostream& sink) const;
-    virtual int cmp(ExprNode const& rhs) const override { return Super::compare(dynamic_cast<Super const&>(rhs)); }
-  };
+  // struct FTopWrite : public unisim::util::symbolic::binsec::RegWrite
+  // {
+  //   using unisim::util::symbolic::binsec::RegWrite;
+  //   //typedef unisim::util::symbolic::binsec::RegWrite Super;
+  //   FTopWrite( u8_t const& ftop ) : RegWrite( ftop.expr, 8 ) {}
+  //   virtual FTopWrite* Mutate() const override { return new FTopWrite(*this); }
+  //   virtual void GetRegName(std::ostream& sink) const;
+  //   virtual int cmp(ExprNode const& rhs) const override { return Super::compare(dynamic_cast<Super const&>(rhs)); }
+  // };
 
   u16_t                       ftopread() { throw Unimplemented(); /*FCW access*/; return u16_t(); }
-  unsigned                    ftop;
+  // unsigned                    ftop;
 
   Expr&                       fpaccess(unsigned r, bool w);
   bool                        fpdiff(unsigned r);
@@ -181,7 +160,7 @@ struct ProcessorBase
 
   struct FRegID : public unisim::util::identifier::Identifier<FRegID>
   {
-    typedef double register_type;
+    static unisim::util::symbolic::ValueType const* GetType() { return unisim::util::symbolic::CValueType(double()); }
     enum Code { st0=0, st1, st2, st3, st4, st5, st6, st7, end } code;
     char const* c_str() const { return &"st0\0st1\0st2\0st3\0st4\0st5\0st6\0st7"[(unsigned(code) % 8)*4]; }
     FRegID() : code(end) {}
@@ -190,44 +169,55 @@ struct ProcessorBase
   };
 
   /*** VECTOR REGISTERS ***/
+  struct VRegID
+  {
+    VRegID(unsigned _reg) : reg(_reg) {} unsigned reg;
+    static unisim::util::symbolic::ValueType const* GetType() { return VmmValue::GetType(); }
+    void Repr( std::ostream& ) const;
+    int cmp(VRegID const& rhs) const { return int(reg) - int(rhs.reg); }
+  };
+
+  struct VClear : public unisim::util::symbolic::binsec::ASExprNode
+  {
+    VClear(unsigned _size) : size(_size) {} unsigned size;
+    virtual VClear* Mutate() const override { return new VClear( *this ); };
+    virtual unsigned SubCount() const override { return 0; };
+    virtual void Repr( std::ostream& sink ) const override;
+    ValueType const* GetType() const override;
+    virtual int cmp( ExprNode const& rhs ) const override { return 0; }
+    virtual int GenCode(unisim::util::symbolic::binsec::Label&, unisim::util::symbolic::binsec::Variables&, std::ostream& sink) const;
+  };
   
   // VRegRead should never be a binsec::node (no dba available for it)
-  struct VRegRead : public unisim::util::symbolic::ExprNode
-  {
-    VRegRead( unsigned _reg ) : reg(_reg) {}
-    virtual VRegRead* Mutate() const override { return new VRegRead( *this ); }
-    virtual ScalarType::id_t GetType() const { return ScalarType::VOID; }
-    virtual unsigned SubCount() const override { return 0; }
-    virtual void Repr( std::ostream& sink ) const override;
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<VRegRead const&>( rhs ) ); }
-    int compare( VRegRead const& rhs ) const { return int(reg) - int(rhs.reg); }
-    unsigned reg;
-  };
+  // struct VRegRead : public unisim::util::symbolic::ExprNode
+  // {
+  //   VRegRead( unsigned _reg ) : reg(_reg) {}
+  //   virtual VRegRead* Mutate() const override { return new VRegRead( *this ); }
+  //   virtual ValueType const* GetType() const { return ValueType::VOID; }
+  //   virtual unsigned SubCount() const override { return 0; }
+  //   virtual void Repr( std::ostream& sink ) const override;
+  //   virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<VRegRead const&>( rhs ) ); }
+  //   int compare( VRegRead const& rhs ) const { return int(reg) - int(rhs.reg); }
+  //   unsigned reg;
+  // };
 
   struct VmmIndirectReadBase : public ExprNode
   {// Parent of VmmIndirectRead
     VmmIndirectReadBase(Expr const& _index) : index(_index) {}
     virtual void Repr( std::ostream& sink ) const override;
     virtual unsigned GetVSize() const = 0;
-    virtual char const* GetVName() const = 0;
+    virtual void GetVName( std::ostream& sink ) const = 0;
     Expr index;
-  };
-
-  /*** CONTROL FLOW  ***/
-
-  struct Goto : public Br
-  {
-    Goto( Expr const& value ) : Br( value ) {}
-    virtual Goto* Mutate() const override { return new Goto( *this ); }
-    virtual void GetRegName( std::ostream& sink ) const override;
-    virtual void annotate(std::ostream& sink) const override { return; }
   };
 
   /*** FLAGS ***/
 
-  struct FLAG : public unisim::util::identifier::Identifier<FLAG>
+  struct FLAG
+    : public unisim::util::identifier::Identifier<FLAG>
+    , unisim::util::symbolic::WithValueType<FLAG>
   {
-    typedef bool register_type;
+    typedef bool value_type;
+
     enum Code { CF = 0, PF, AF, ZF, SF, DF, OF, C0, C1, C2, C3, end } code;
 
     char const* c_str() const
@@ -314,12 +304,12 @@ struct Processor : public ProcessorBase
 
   typedef unisim::component::cxx::processor::intel::RMOp<Processor> RMOp;
 
-  typedef                typename MODE::IRegID  IRegID;
-  typedef typename MODE::IRegID::register_type  nat_gr_type;
-  typedef                    typename MODE::GR  GR;
-  typedef                          nat_gr_type  nat_addr_t;
-  typedef              SmartValue<nat_gr_type>  gr_type;
-  typedef                              gr_type  addr_t;
+  typedef             typename MODE::IRegID  IRegID;
+  typedef typename MODE::IRegID::value_type  nat_gr_type;
+  typedef                 typename MODE::GR  GR;
+  typedef                       nat_gr_type  nat_addr_t;
+  typedef           SmartValue<nat_gr_type>  gr_type;
+  typedef                           gr_type  addr_t;
 
 
   struct OpHeader { OpHeader( nat_addr_t _address ) : address( _address ) {} nat_addr_t address; };
@@ -327,7 +317,7 @@ struct Processor : public ProcessorBase
   /*** SEGMENTS ***/
   struct SegBaseID : public SegmentID
   {
-    typedef nat_addr_t register_type;
+    static unisim::util::symbolic::ValueType const* GetType() { return unisim::util::symbolic::CValueType(nat_addr_t()); }
     void Repr(std::ostream& sink) const { sink << c_str() << "_base"; }
     SegBaseID() = default;
     SegBaseID( Code _code ) : SegmentID(_code) {}
@@ -348,13 +338,13 @@ struct Processor : public ProcessorBase
   {
     if (segment >= 4) /*FS|GS relative addressing*/
       addr = addr_t(GetSegBase(segment)) + addr;
-    return new Load( addr.expr, bytes, 0, false );
+    return new unisim::util::symbolic::binsec::Load( addr.expr, bytes, 0, false );
   }
   void PerformStore( unsigned bytes, unsigned segment, addr_t addr, Expr const& value )
   {
     if (segment >= 4) /*FS|GS relative addressing*/
       addr = addr_t(GetSegBase(segment)) + addr;
-    stores.insert( Expr( new Store( addr.expr, value, bytes, 0, false ) ) );
+    stores.insert( Expr( new unisim::util::symbolic::binsec::Store( addr.expr, value, bytes, 0, false ) ) );
   }
 
   template<unsigned OPSIZE>
@@ -372,24 +362,17 @@ struct Processor : public ProcessorBase
     PerformStore( OPSIZE/8, seg, addr, val.expr );
   }
 
-  void                        fmemwrite32( unsigned seg, addr_t const& addr, f32_t val ) { throw Unimplemented(); }
-  void                        fmemwrite64( unsigned seg, addr_t const& addr, f64_t val ) { throw Unimplemented(); }
+  void                        fmemwrite32( unsigned seg, addr_t const& addr, f32_t val ) { PerformStore( 4, seg, addr, val.expr ); }
+  void                        fmemwrite64( unsigned seg, addr_t const& addr, f64_t val ) { PerformStore( 8, seg, addr, val.expr ); }
   void                        fmemwrite80( unsigned seg, addr_t const& addr, f80_t val ) { throw Unimplemented(); }
 
-  f32_t                       fmemread32( unsigned seg, addr_t const& addr ) { throw Unimplemented(); return f32_t(); }
-  f64_t                       fmemread64( unsigned seg, addr_t const& addr ) { throw Unimplemented(); return f64_t(); }
+  f32_t                       fmemread32( unsigned seg, addr_t const& addr )
+  { return f32_t(PerformLoad( 4, seg, addr.expr )); }
+  f64_t                       fmemread64( unsigned seg, addr_t const& addr )
+  { return f64_t(PerformLoad( 8, seg, addr.expr )); }
   f80_t                       fmemread80( unsigned seg, addr_t const& addr ) { throw Unimplemented(); return f80_t(); }
 
   /*** CONTROL FLOW ***/
-
-  struct Call : public Goto
-  {
-    Call( Expr const& value, nat_addr_t ra ) : Goto( value ), return_address( ra ) {}
-    virtual Call* Mutate() const override { return new Call( *this ); }
-    virtual void annotate(std::ostream& sink) const override;
-
-    nat_addr_t return_address;
-  };
 
   u64_t                       tscread() { throw Unimplemented(); return u64_t( 0 ); }
 
@@ -397,54 +380,34 @@ struct Processor : public ProcessorBase
 
   enum { GREGSIZE = MODE::GREGSIZE, GREGCOUNT = MODE::GREGCOUNT, VREGCOUNT = MODE::VREGCOUNT };
 
-  Expr                        eregread( unsigned reg, unsigned size, unsigned pos );
+  Expr                        eregread( unsigned reg, unsigned size, unsigned pos ) const;
   void                        eregwrite( unsigned reg, unsigned size, unsigned pos, Expr const& xpr );
 
   Expr                        regvalues[GREGCOUNT][GREGSIZE];
 
-  void                        eregsinks( unsigned reg );
-
+  void                        eregsinks( Processor<MODE> const& ref, unsigned reg ) const;
+  
   template <class GOP>
   typename TypeFor<Processor,GOP::SIZE>::u regread( GOP const&, unsigned idx )
   {
-    return typename TypeFor<Processor,GOP::SIZE>::u( eregread( idx, GOP::SIZE / 8, 0 ) );
+    return typename TypeFor<Processor,GOP::SIZE>::u( gr_type(eregread( idx, GOP::SIZE / 8, 0 )) );
   }
 
-  u8_t regread( GObLH const&, unsigned idx ) { return u8_t( eregread( idx%4, 1, (idx >> 2) & 1 ) ); }
+  u8_t regread( GObLH const&, unsigned idx ) { return u8_t( gr_type(eregread( idx%4, 1, (idx >> 2) & 1 )) ); }
 
   template <class GOP> void regwrite( GOP const&, unsigned idx, typename TypeFor<Processor,GOP::SIZE>::u const& val )
-  { eregwrite( idx, GREGSIZE, 0, gr_type(val).expr ); }
+  {
+    eregwrite( idx, GOP::SIZE / 8, 0, gr_type(val).expr );
+  }
 
-  void regwrite( GObLH const&, unsigned idx, u8_t val ) { eregwrite( idx%4, 1, (idx>>2) & 1, val.expr ); }
-  void regwrite( GOb const&, unsigned idx, u8_t val )   { eregwrite( idx, 1, 0, val.expr ); }
-  void regwrite( GOw const&, unsigned idx, u16_t val )  { eregwrite( idx, 2, 0, val.expr ); }
-
+  void regwrite( GObLH const&, unsigned idx, u8_t val )  { eregwrite( idx%4, 1, (idx>>2) & 1, gr_type(val).expr ); }
+  void regwrite( GOd const&,   unsigned idx, u32_t val ) { eregwrite( idx,   GREGSIZE,     0, gr_type(val).expr ); }
+  
   addr_t                      getnip() { return next_insn_addr; }
   void                        setnip( addr_t nip, ipproc_t ipproc = ipjmp )
   {
     next_insn_addr = nip;
     next_insn_mode = ipproc;
-  }
-
-  template <unsigned OPSIZE>
-  typename TypeFor<Processor,OPSIZE>::u
-  regread( unsigned idx )
-  {
-    typedef typename TypeFor<Processor,OPSIZE>::u u_type;
-
-    if (OPSIZE==8)                    return u_type( eregread( idx%4, 1, (idx>>2) & 1 ) );
-    if ((OPSIZE==16) or (OPSIZE==32)) return u_type( eregread( idx, OPSIZE/8, 0 ) );
-    throw 0;
-    return u_type(0);
-  }
-
-  template <unsigned OPSIZE>
-  void
-  regwrite( unsigned idx, typename TypeFor<Processor,OPSIZE>::u const& value )
-  {
-    if  (OPSIZE==8)                   return eregwrite( idx%4, 1, (idx>>2) & 1, value.expr );
-    if ((OPSIZE==16) or (OPSIZE==32)) return eregwrite( idx, OPSIZE/8, 0, value.expr );
-    throw 0;
   }
 
   template <unsigned OPSIZE>
@@ -527,7 +490,7 @@ struct Processor : public ProcessorBase
 
   struct VUConfig : public unisim::util::symbolic::vector::VUConfig
   {
-    static unsigned const BYTECOUNT = VmmRegister::BYTECOUNT;
+    static unsigned const BYTECOUNT = VmmValue::BYTECOUNT;
     static unsigned const REGCOUNT = VREGCOUNT;
   };
 
@@ -543,7 +506,7 @@ struct Processor : public ProcessorBase
   struct VmmIndirectRead : public VmmIndirectReadBase
   {
     typedef unisim::util::symbolic::TypeInfo<typename ELEM::value_type> traits;
-    enum { elemcount = VR::SIZE / 8 / traits::BYTECOUNT };
+    enum { elemcount = VR::SIZE / traits::BITSIZE };
     
     VmmIndirectRead( ELEM const* elems, u8_t const& _index)
       : VmmIndirectReadBase(_index.expr)
@@ -554,7 +517,7 @@ struct Processor : public ProcessorBase
     typedef VmmIndirectRead<VR,ELEM> this_type;
     virtual this_type* Mutate() const override { return new this_type( *this ); }
     virtual unsigned GetVSize() const override { return VR::SIZE; }
-    virtual char const* GetVName() const override { return ScalarType(GetType()).name; }
+    virtual void GetVName(std::ostream& sink) const override { return GetType()->GetName(sink); }
     virtual unsigned SubCount() const { return elemcount+1; }
     virtual Expr const& GetSub(unsigned idx) const
     {
@@ -562,12 +525,14 @@ struct Processor : public ProcessorBase
       if (idx == elemcount) return index;
       return ExprNode::GetSub(idx);
     }
-    virtual ScalarType::id_t GetType() const override { return traits::GetType(); }
+    virtual ValueType const* GetType() const override { return ELEM::GetType(); }
     virtual int cmp( ExprNode const& brhs ) const override { return compare( dynamic_cast<this_type const&>(brhs) ); }
     int compare( this_type const& rhs ) const { return 0; }
     
     Expr sources[elemcount];
   };
+
+  void vregsinks( Processor<MODE> const& ref, unsigned reg ) const;
 
   template <class VR, class ELEM>
   ELEM vmm_read( VR const& vr, unsigned reg, u8_t const& sub, ELEM const& e )
@@ -702,32 +667,17 @@ Processor<MODE>::Processor()
 
   for (unsigned reg = 0; reg < VREGCOUNT; ++reg)
     {
-      VmmRegister v( new VRegRead( reg ) );
+      VmmValue v( newRegRead( VRegID(reg) ) );
       *(umms[reg].GetStorage( &vmm_storage[reg][0], v, VUConfig::BYTECOUNT )) = v;
     }
 }
 
 template <class MODE>
 ProcessorBase::Expr
-Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos )
+Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos ) const
 {
   using unisim::util::symbolic::ExprNode;
   using unisim::util::symbolic::make_const;
-
-  struct
-  {
-    Expr ui( unsigned sz, Expr const& src ) const
-    {
-      switch (sz) {
-      default: throw 0;
-      case 1: return new unisim::util::symbolic::CastNode<uint8_t,nat_gr_type>( src );
-      case 2: return new unisim::util::symbolic::CastNode<uint16_t,nat_gr_type>( src );
-      case 4: return new unisim::util::symbolic::CastNode<uint32_t,nat_gr_type>( src );
-      case 8: return new unisim::util::symbolic::CastNode<uint64_t,nat_gr_type>( src );
-      }
-      return 0;
-    }
-  } cast;
 
   if (not regvalues[reg][pos].node)
     {
@@ -735,22 +685,22 @@ Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos )
       unsigned src = pos;
       do { src = src & (src-1); } while (not regvalues[reg][src].node);
       unsigned shift = 8*(pos - src);
-      return cast.ui( size, make_operation( "Lsr", regvalues[reg][src], make_const( shift ) ) );
+      return new unisim::util::symbolic::binsec::BitFilter( regvalues[reg][src], 64, shift, 8*size, 64, false );
     }
   else if (not regvalues[reg][(pos|size)&(GREGSIZE-1)].node)
     {
       // requested read is in lower bits of a larger value
-      return cast.ui( size, regvalues[reg][pos] );
+      return new unisim::util::symbolic::binsec::BitFilter( regvalues[reg][pos], 64, 0, 8*size, 64, false );
     }
   else if ((size > 1) and (regvalues[reg][pos|(size >> 1)].node))
     {
       // requested read is a concatenation of multiple source values
-      Expr concat = cast.ui( size, regvalues[reg][pos] );
-      for (unsigned idx = 0; ++idx < size;)
+      Expr concat = regvalues[reg][pos];
+      for (unsigned idx = 1; ++idx < size;)
         {
           if (not regvalues[reg][pos+idx].node)
             continue;
-          concat = make_operation( "Or", make_operation( "Lsl", cast.ui( size, regvalues[reg][idx] ), make_const( 8*idx ) ), concat );
+          concat = make_operation( "Or", make_operation( "Lsl", regvalues[reg][idx], make_const( uint8_t(8*idx) ) ), concat );
         }
       return concat;
     }
@@ -766,7 +716,7 @@ Processor<MODE>::eregwrite( unsigned reg, unsigned size, unsigned pos, Expr cons
   Expr nxt[GREGSIZE];
 
   for (unsigned ipos = pos, isize = size, cpos;
-       cpos = (ipos^isize) & (GREGSIZE-1), (not regvalues[reg][ipos].node) or (not regvalues[reg][cpos].node);
+       (cpos = (ipos^isize) & (GREGSIZE-1)), (not regvalues[reg][ipos].node) or (not regvalues[reg][cpos].node);
        isize *= 2, ipos &= -isize
        )
     {
@@ -789,49 +739,79 @@ Processor<MODE>::eregwrite( unsigned reg, unsigned size, unsigned pos, Expr cons
 
 template <class MODE>
 void
-Processor<MODE>::eregsinks( unsigned reg )
+Processor<MODE>::vregsinks( Processor<MODE> const& ref, unsigned reg ) const
 {
-  using unisim::util::symbolic::binsec::BitFilter;
-  unsigned regsize = GREGSIZE;
-  // using unisim::util::symbolic::make_const;
+  struct VCorruption {};
 
-  { // Check for constant values
-    Expr dr = unisim::util::symbolic::binsec::ASExprNode::Simplify( eregread( reg, regsize, 0 ) );
-    if (dr.ConstSimplify())
-      {
-        path->add_sink( newRegWrite( IRegID(reg), dr ) );
-        return;
-      }
-  }
+  unsigned const vector_size = umms[reg].size;
+  
+  if (unsigned psize = 8*(VUConfig::BYTECOUNT - vector_size))
+    path->add_sink( newPartialRegWrite( VRegID(reg), 8*vector_size, psize, new VClear(psize) ) );
+  
+  if (vector_size == 0)
+    return;
+  
+  typename VUConfig::Byte bytes[VUConfig::BYTECOUNT];
+  umms[reg].transfer( &bytes[0], const_cast<VmmBrick*>(&vmm_storage[reg][0]), vector_size, false );
 
-  // Check for monolithic value
-  if (not regvalues[reg][GREGSIZE/2].node)
+  unsigned const elem_size = bytes[0].is_source();
+  if (elem_size == 0 or vector_size % elem_size)
+    { throw VCorruption(); }
+
+  for (unsigned beg = 0; beg < vector_size; beg += elem_size)
     {
-      path->add_sink( newRegWrite( IRegID(reg), eregread(reg,GREGSIZE,0) ) );
-      return;
+      if (bytes[beg].is_source() != elem_size)
+        throw VCorruption();
+      for (unsigned idx = 0; idx < elem_size; ++idx)
+        {
+          if (auto x = unisim::util::symbolic::vector::corresponding_origin(bytes[beg].get_node(), idx, beg+idx ))
+            if (auto vr = dynamic_cast<unisim::util::symbolic::binsec::RegRead<VRegID> const*>( x ))
+              if (vr->id.reg == reg)
+                continue;
+          // Found one difference !
+          path->add_sink( newPartialRegWrite( VRegID(reg), 8*beg, 8*elem_size, bytes[beg].get_node() ) );
+          break;
+        }
     }
+}
 
-  throw Unimplemented(); // Yet
-  // // Requested read is a concatenation of multiple source values
-  // struct _
-  // {
-  //   _( ProcessorBase& _core, unsigned _reg ) : core(_core), reg(_reg) { Process( 0, GREGSIZE ); } ProcessorBase& core; unsigned reg;
-  //   void Process( unsigned pos, unsigned size )
-  //   {
-  //     unsigned half = size / 2, mid = pos+half;
-  //     if (size > 1 and core.regvalues[reg][mid].node)
-  //       {
-  //         Process( pos, half );
-  //         Process( mid, half );
-  //       }
-  //     else
-  //       {
-  //         unsigned begin = pos*8, end = begin+size*8;
-  //         Expr value( new BitFilter( core.eregread(reg,size,pos), 64, size*8, size*8, false ) );
-  //         core.path->add_sink( new GregPartialWrite( reg, begin, end, value ) );
-  //       }
-  //   }
-  // } concat( *this, reg );
+template <class MODE>
+void
+Processor<MODE>::eregsinks( Processor<MODE> const& ref, unsigned reg ) const
+{
+  // Requested read is a concatenation of multiple source values
+  // Crawl register expression tree to produce sinks
+  struct _
+  {
+    _( Processor<MODE> const& _core, Processor<MODE> const& _ref, unsigned _reg ) : core(_core), ref(_ref), reg(_reg) { Process( 0, GREGSIZE ); }
+    Processor<MODE> const& core; Processor<MODE> const& ref; unsigned reg;
+    void Process( unsigned pos, unsigned size )
+    {
+      Expr value = core.eregread(reg,size,pos);
+      if (value == ref.eregread(reg,size,pos))
+        return;
+      value = unisim::util::symbolic::binsec::ASExprNode::Simplify( value );
+      unsigned half = size / 2, mid = pos+half;
+      if (value.ConstSimplify() or size <= 1 or not core.regvalues[reg][mid].node)
+        {
+          if (size == core.GREGSIZE)
+            core.path->add_sink( newRegWrite( IRegID(reg), value ) );
+          else
+            {
+              unisim::util::symbolic::binsec::BitFilter bf( value, 64, 0, size*8, size*8, false );
+              bf.Retain(); // Not a heap-allocated object (never delete);
+              value = bf.Simplify();
+              if (value.node == &bf) value = new unisim::util::symbolic::binsec::BitFilter( bf );
+              core.path->add_sink( newPartialRegWrite( IRegID(reg), 8*pos, 8*size, value ) );
+            }
+        }
+      else
+        {
+          Process( pos, half );
+          Process( mid, half );
+        }      
+    }
+  } concat( *this, ref, reg );
 }
 
 template <class MODE>
@@ -841,9 +821,9 @@ Processor<MODE>::close( Processor<MODE> const& ref )
   bool complete = path->close();
 
   if (next_insn_mode == ipcall)
-    path->add_sink( new Call( next_insn_addr.expr, return_address ) );
+    path->add_sink( new unisim::util::symbolic::binsec::Call<nat_addr_t>( next_insn_addr.expr, return_address ) );
   else
-    path->add_sink( new Goto( next_insn_addr.expr ) );
+    path->add_sink( new unisim::util::symbolic::binsec::Branch( next_insn_addr.expr ) );
 
   if (abort)
     {
@@ -851,16 +831,16 @@ Processor<MODE>::close( Processor<MODE> const& ref )
       return complete;
     }
 
-  for (int reg = GREGCOUNT; --reg >= 0;)
-    {
-      if (regvalues[reg][0] != ref.regvalues[reg][0])
-        eregsinks(reg);
-    }
+  for (unsigned reg = GREGCOUNT; reg-- > 0;)
+    eregsinks(ref, reg);
 
   // Flags
   for (FLAG reg; reg.next();)
     if (flagvalues[reg.idx()] != ref.flagvalues[reg.idx()])
       path->add_sink( newRegWrite( reg, flagvalues[reg.idx()] ) );
+
+  for (unsigned reg = VREGCOUNT; reg-- > 0; )
+    vregsinks(ref, reg);
 
   for (Expr const& store : stores)
     path->add_sink( store );
@@ -881,12 +861,15 @@ Processor<MODE>::step( Operation const& op )
 struct Intel64
 {
   enum {GREGSIZE = 8, GREGCOUNT = 16, VREGCOUNT = 16};
-  
+
   typedef unisim::component::cxx::processor::intel::GOq GR;
   
-  struct IRegID : public unisim::util::identifier::Identifier<IRegID>
+  struct IRegID
+    : public unisim::util::identifier::Identifier<IRegID>
+    , public unisim::util::symbolic::WithValueType<IRegID>
   {
-    typedef uint64_t register_type;
+    typedef uint64_t value_type;
+
     enum Code { rax = 0, rcx = 1, rdx = 2, rbx = 3, rsp = 4, rbp = 5, rsi = 6, rdi = 7,
                 r8, r9, r10, r11, r12, r13, r14, r15,
                 end } code;
@@ -917,7 +900,7 @@ struct Intel64
       return "NA";
     }
 
-    void Repr(std::ostream& sink) const;
+    void Repr( std::ostream& sink ) const;
 
     IRegID() : code(end) {}
     IRegID( Code _code ) : code(_code) {}
@@ -933,9 +916,12 @@ struct Compat32
 
   typedef unisim::component::cxx::processor::intel::GOd GR;
   
-  struct IRegID : public unisim::util::identifier::Identifier<IRegID>
+  struct IRegID
+    : public unisim::util::identifier::Identifier<IRegID>
+    , unisim::util::symbolic::WithValueType<IRegID>
   {
-    typedef uint32_t register_type;
+    typedef uint32_t value_type;
+    
     enum Code { eax = 0, ecx = 1, edx = 2, ebx = 3, esp = 4, ebp = 5, esi = 6, edi = 7, end } code;
 
     char const* c_str() const

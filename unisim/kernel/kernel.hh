@@ -600,14 +600,17 @@ public:
 	void Dump(std::ostream& os) const;
 
 	struct Visitor { virtual ~Visitor() {} virtual void Process(ServicePortBase& port) = 0; };
+	void SpreadFwd( Visitor& visitor );
 	void SpreadBwd( Visitor& visitor );
 
 protected:
 	void Connect(ServicePortBase* fwd);
+	void Disconnect(ServicePortBase* bwd);
 
 	std::string name;
 	Object *owner;
-	std::list<ServicePortBase *> bwd_ports;
+	typedef std::list<ServicePortBase *> BwdPorts;
+	BwdPorts bwd_ports;
 	ServicePortBase *fwd_port;
 };
 
@@ -618,6 +621,7 @@ public:
 	ServicePort(const char *name, Service<SERVICE_IF> *owner);
 	ServicePort(const char *name, Client<SERVICE_IF> *owner);
 	ServicePort(const char *name, Object *owner);
+	virtual ~ServicePort();
 
 	virtual bool IsConnected() const override;
 
@@ -657,6 +661,30 @@ ServicePort<SERVICE_IF>::ServicePort(const char *_name, Object *_owner)
 	, service(0)
 	, client(0)
 {}
+
+template <class SERVICE_IF>
+ServicePort<SERVICE_IF>::~ServicePort()
+{
+	// Now service/client is no longer available, it needs to be propagated upstream.
+	struct ClientAssignment : public Visitor
+	{
+		void Process(ServicePortBase& port) override
+		{
+			static_cast<ServicePort<SERVICE_IF>&>(port).client = 0;
+		}
+	} fwd_visitor;
+	
+	struct ServiceAssignment : public Visitor
+	{
+		void Process(ServicePortBase& port) override
+		{
+			static_cast<ServicePort<SERVICE_IF>&>(port).service = 0;
+		}
+	} bwd_visitor;
+	
+	SpreadFwd( fwd_visitor );
+	SpreadBwd( bwd_visitor );
+}
 
 template <class SERVICE_IF>
 bool ServicePort<SERVICE_IF>::IsConnected() const
@@ -705,16 +733,16 @@ void ServicePort<SERVICE_IF>::Bind(ServicePort<SERVICE_IF>& fwd)
 		return;
 
 	// Now service is known, it needs to be propagated upstream.
-        struct ServiceAssignment : public Visitor
-        {
-          ServiceAssignment(Service<SERVICE_IF> *srv) : service(srv) {} Service<SERVICE_IF> *service;
-          void Process(ServicePortBase& port) override
-          {
-            static_cast<ServicePort<SERVICE_IF>&>(port).service = service;
-          }
-        } visitor( fwd.service );
-        
-        SpreadBwd( visitor );
+	struct ServiceAssignment : public Visitor
+	{
+		ServiceAssignment(Service<SERVICE_IF> *srv) : service(srv) {} Service<SERVICE_IF> *service;
+		void Process(ServicePortBase& port) override
+		{
+			static_cast<ServicePort<SERVICE_IF>&>(port).service = service;
+		}
+	} visitor( fwd.service );
+	
+	SpreadBwd( visitor );
 }
 
 //=============================================================================

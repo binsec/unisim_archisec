@@ -99,42 +99,16 @@ struct Processor
 
   typedef unisim::util::symbolic::FP                   FP;
   typedef unisim::util::symbolic::Expr                 Expr;
-  typedef unisim::util::symbolic::ScalarType           ScalarType;
+  typedef unisim::util::symbolic::ValueType           ValueType;
 
   typedef unisim::util::symbolic::binsec::ActionNode   ActionNode;
-  typedef unisim::util::symbolic::binsec::Store        Store;
-  typedef unisim::util::symbolic::binsec::Load         Load;
-  typedef unisim::util::symbolic::binsec::Branch       Br;
 
-  template <typename RID>
-  struct RegRead : public unisim::util::symbolic::binsec::RegRead
+  struct ForeignRegisterID : unisim::util::symbolic::WithValueType<ForeignRegisterID>
   {
-    typedef RegRead<RID> this_type;
-    typedef unisim::util::symbolic::binsec::RegRead Super;
-    RegRead( RID _id, ScalarType::id_t _tp ) : Super(), tp(_tp), id(_id) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual ScalarType::id_t GetType() const { return tp; }
-    virtual void GetRegName( std::ostream& sink ) const { sink << id.c_str(); }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegRead const&>( rhs ) ); }
-    int compare( RegRead const& rhs ) const { if (int delta = int(tp) - int(rhs.tp)) return delta; if (int delta = id.cmp( rhs.id )) return delta; return Super::compare(rhs); }
-
-    ScalarType::id_t tp;
-    RID id;
-  };
-
-  template <typename RID>
-  static Expr newRegRead( RID id, ScalarType::id_t tp ) { return new RegRead<RID>( id, tp ); }
-
-  struct ForeignRegister : public unisim::util::symbolic::binsec::RegRead
-  {
-    typedef unisim::util::symbolic::binsec::RegRead Super;
-    ForeignRegister( uint8_t _mode, unsigned _idx )
-      : Super(), idx(_idx), mode(_mode)
-    {
-      if (mode == SYSTEM_MODE) mode = USER_MODE;
-    }
-    virtual ForeignRegister* Mutate() const override { return new ForeignRegister( *this ); }
-    virtual ScalarType::id_t GetType() const { return ScalarType::U32; }
+    typedef uint32_t value_type;
+    ForeignRegisterID( uint8_t _mode, unsigned _idx )
+      : idx(_idx), mode(_mode == SYSTEM_MODE ? USER_MODE : _mode)
+    {}
 
     char const* mode_ident() const
     {
@@ -153,12 +127,11 @@ struct Processor
       return "";
     }
 
-    virtual void GetRegName( std::ostream& sink ) const
+    void Repr( std::ostream& sink ) const
     {
       sink << (RegID("r0") + idx).c_str() << '_' << mode_ident();
     }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<ForeignRegister const&>( rhs ) ); }
-    int compare( ForeignRegister const& rhs ) const
+    int cmp( ForeignRegisterID const& rhs ) const
     {
       if (int delta = int(mode) - int(rhs.mode)) return delta;
       return idx - rhs.idx;
@@ -169,38 +142,13 @@ struct Processor
   };
 
   template <typename RID>
-  struct RegWrite : public unisim::util::symbolic::binsec::RegWrite
-  {
-    typedef RegWrite<RID> this_type;
-    typedef unisim::util::symbolic::binsec::RegWrite Super;
-    RegWrite( RID _id, Expr const& _value ) : Super(_value), id(_id) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual void GetRegName( std::ostream& sink ) const { sink << id.c_str(); }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWrite const&>( rhs ) ); }
-    int compare( RegWrite const& rhs ) const { if (int delta = id.cmp( rhs.id )) return delta; return Super::compare( rhs ); }
-
-    RID id;
-  };
+  static Expr newRegRead( RID id ) { return new unisim::util::symbolic::binsec::RegRead<RID>( id ); }
 
   template <typename RID>
-  static Expr newRegWrite( RID id, Expr const& value ) { return new RegWrite<RID>( id, value ); }
+  static Expr newRegWrite( RID id, Expr const& value ) { return new unisim::util::symbolic::binsec::RegWrite<RID>( id, value ); }
 
-  struct Goto : public Br
-  {
-    Goto( Expr const& value ) : Br( value ) {}
-    virtual Goto* Mutate() const override { return new Goto( *this ); }
-    virtual void GetRegName( std::ostream& sink ) const override { sink << "pc"; }
-    virtual void annotate(std::ostream& sink) const override { return; }
-  };
-
-  struct Call : public Goto
-  {
-    Call( Expr const& value, uint32_t ra ) : Goto( value ), return_address( ra ) {}
-    virtual Call* Mutate() const override { return new Call( *this ); }
-    virtual void annotate(std::ostream& sink) const override { sink << " // call (" << unisim::util::symbolic::binsec::dbx(4,return_address) << ",0)"; }
-
-    uint32_t return_address;
-  };
+  template <typename RID>
+  static Expr newPartialRegWrite( RID id, unsigned pos, unsigned size, Expr const& value ) { return new unisim::util::symbolic::binsec::RegWrite<RID>( id, pos, size, value ); }
 
   struct ITCond {};
 
@@ -250,13 +198,13 @@ struct Processor
     PSR( Processor& p, StatusRegister const& ref )
       : StatusRegister(ref)
       , proc(p)
-      , n(newRegRead(RegID("n"), ScalarType::BOOL))
-      , z(newRegRead(RegID("z"), ScalarType::BOOL))
-      , c(newRegRead(RegID("c"), ScalarType::BOOL))
-      , v(newRegRead(RegID("v"), ScalarType::BOOL))
-      , q(newRegRead(RegID("q"), ScalarType::BOOL))
-      , itstate(ref.itstate >> 8 ? newRegRead(RegID("itstate"), ScalarType::U8) : U8(ref.itstate).expr )
-      , bg(newRegRead(RegID("cpsr"), ScalarType::U32))
+      , n(newRegRead(Flag("n")))
+      , z(newRegRead(Flag("z")))
+      , c(newRegRead(Flag("c")))
+      , v(newRegRead(Flag("v")))
+      , q(newRegRead(Flag("q")))
+      , itstate(ref.itstate >> 8 ? newRegRead(ITStateID()) : U8(ref.itstate).expr )
+      , bg(newRegRead(RegID("cpsr")))
     {
     }
 
@@ -332,10 +280,10 @@ public:
     , next_insn_addr()
     , branch_type(B_JMP)
     , cpsr( *this, ref_psr )
-    , spsr( newRegRead(RegID("spsr"), ScalarType::U32) )
+    , spsr( newRegRead(RegID("spsr")) )
     , sregs()
-    , FPSCR( newRegRead(RegID("fpscr"), ScalarType::U32) )
-    , FPEXC( newRegRead(RegID("fpexc"), ScalarType::U32) )
+    , FPSCR( newRegRead(RegID("fpscr")) )
+    , FPEXC( newRegRead(RegID("fpexc")) )
     , stores()
     , unpredictable(false)
     , is_it_assigned(false)
@@ -345,40 +293,40 @@ public:
   {
     // GPR regs
     for (unsigned reg = 0; reg < 15; ++reg)
-      reg_values[reg] = U32( newRegRead( RegID("r0") + reg, ScalarType::U32 ) );
+      reg_values[reg] = U32( newRegRead( RegID("r0") + reg ) );
 
     // Special registers
     for (SRegID reg; reg.next();)
-      sregs[reg.idx()] = U32( newRegRead( reg, ScalarType::U32 ) );
+      sregs[reg.idx()] = U32( newRegRead( reg ) );
 
     for (unsigned reg = 0; reg < 32; ++reg)
-      neonregs[reg][0] = new NeonRead( reg );
+      neonregs[reg][0] = newRegRead( NeonReg(reg) );
   }
 
   bool close( Processor const& ref, uint32_t linear_nia )
   {
     bool complete = path->close();
     if (branch_type == B_CALL)
-      path->add_sink( new Call( next_insn_addr.expr, linear_nia ) );
+      path->add_sink( new unisim::util::symbolic::binsec::Call<uint32_t>( next_insn_addr.expr, linear_nia ) );
     else
-      path->add_sink( new Goto( next_insn_addr.expr ) );
+      path->add_sink( new unisim::util::symbolic::binsec::Branch( next_insn_addr.expr ) );
     if (unpredictable)
       {
         path->add_sink( new unisim::util::symbolic::binsec::AssertFalse() );
         return complete;
       }
     if (cpsr.n != ref.cpsr.n)
-      path->add_sink( newRegWrite( RegID("n"), cpsr.n ) );
+      path->add_sink( newRegWrite( Flag("n"), cpsr.n ) );
     if (cpsr.z != ref.cpsr.z)
-      path->add_sink( newRegWrite( RegID("z"), cpsr.z ) );
+      path->add_sink( newRegWrite( Flag("z"), cpsr.z ) );
     if (cpsr.c != ref.cpsr.c)
-      path->add_sink( newRegWrite( RegID("c"), cpsr.c ) );
+      path->add_sink( newRegWrite( Flag("c"), cpsr.c ) );
     if (cpsr.v != ref.cpsr.v)
-      path->add_sink( newRegWrite( RegID("v"), cpsr.v ) );
+      path->add_sink( newRegWrite( Flag("v"), cpsr.v ) );
     if (cpsr.q != ref.cpsr.q)
-      path->add_sink( newRegWrite( RegID("q"), cpsr.q ) );
+      path->add_sink( newRegWrite( Flag("q"), cpsr.q ) );
     if (cpsr.itstate.expr != ref.cpsr.itstate.expr)
-      path->add_sink( newRegWrite( RegID("itstate"), cpsr.itstate.expr ) );
+      path->add_sink( newRegWrite( ITStateID(), cpsr.itstate.expr ) );
     if (cpsr.bg.expr != ref.cpsr.bg.expr)
       path->add_sink( newRegWrite( RegID("cpsr"), cpsr.bg.expr ) );
 
@@ -411,19 +359,16 @@ public:
       }
     for (ForeignRegisters::iterator itr = foreign_registers.begin(), end = foreign_registers.end(); itr != end; ++itr)
       {
-        ForeignRegister ref(itr->first.first, itr->first.second);
+        unisim::util::symbolic::binsec::RegRead<ForeignRegisterID> ref(ForeignRegisterID(itr->first.first, itr->first.second));
         ref.Retain(); // Prevent deletion of this static instance
-        Expr xref( new ForeignRegister(itr->first.first, itr->first.second) );
         if (itr->second == Expr(&ref)) continue;
         std::ostringstream buf;
         ref.Repr( buf );
         path->add_sink( newRegWrite( RegID(buf.str().c_str()), itr->second ) );
       }
     for (unsigned reg = 0; reg < 32; ++reg)
-      {
-        if (neonregs[reg][0] != ref.neonregs[reg][0])
-          GetNeonSinks(reg);
-      }
+      GetNeonSinks(ref, reg);
+
     for (std::set<Expr>::const_iterator itr = stores.begin(), end = stores.end(); itr != end; ++itr)
       path->add_sink( *itr );
     return complete;
@@ -498,7 +443,7 @@ public:
   {
     Expr& result = foreign_registers[std::make_pair( foreign_mode, idx )];
     if (not result.node)
-      result = new ForeignRegister( foreign_mode, idx );
+      result = newRegRead( ForeignRegisterID( foreign_mode, idx ) );
     return result;
   }
 
@@ -599,108 +544,57 @@ public:
     void _(char c) { *--begin = c; } operator char const* () const { return begin; } char buf[4]; char* begin;
   };
 
-  struct NeonRead : public unisim::util::symbolic::binsec::RegRead
+  struct NeonReg : public unisim::util::symbolic::WithValueType<NeonReg>
   {
-    typedef NeonRead this_type;
-    typedef unisim::util::symbolic::binsec::RegRead Super;
-    NeonRead( unsigned _reg ) : Super(), reg(_reg) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual ScalarType::id_t GetType() const { return ScalarType::U64; }
-    virtual void GetRegName( std::ostream& sink ) const { sink << 'd' << std::dec << reg; }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<NeonRead const&>( rhs ) ); }
-    int compare( this_type const& rhs ) const { return int(reg) - int(rhs.reg); }
+    typedef uint64_t value_type;
+    NeonReg( unsigned _reg ) : reg(_reg) {}
+    void Repr( std::ostream& sink ) const { sink << 'd' << std::dec << reg; }
+    int cmp( NeonReg const& rhs ) const { return int(reg) - int(rhs.reg); }
 
     unsigned reg;
-  };
-
-  struct NeonWrite : public unisim::util::symbolic::binsec::RegWrite
-  {
-    typedef NeonWrite this_type;
-    typedef unisim::util::symbolic::binsec::RegWrite Super;
-    NeonWrite( unsigned _reg, Expr const& value ) : Super(value), reg(_reg) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual void GetRegName( std::ostream& sink ) const { sink << 'd' << std::dec << reg; }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<this_type const&>( rhs ) ); }
-    int compare( this_type const& rhs ) const { if (int delta = int(reg) - int(rhs.reg)) return delta; return Super::compare( rhs ); }
-
-    unsigned reg;
-  };
-
-  struct NeonPartialWrite : public unisim::util::symbolic::binsec::RegWrite
-  {
-    typedef NeonPartialWrite this_type;
-    typedef unisim::util::symbolic::binsec::RegWrite Super;
-    typedef unisim::util::symbolic::binsec::Label Label;
-    typedef unisim::util::symbolic::binsec::Variables Variables;
-    typedef unisim::util::symbolic::binsec::GetCode GetCode;
-
-    NeonPartialWrite( unsigned _reg, unsigned _beg, unsigned _end, Expr const& _value ) : Super(_value), reg(_reg), beg(_beg), end(_end) {}
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual void GetRegName( std::ostream& sink ) const { sink << 'd' << std::dec << reg << '_' << beg << '_' << end; }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const
-    {
-      sink << 'd' << std::dec << reg << "<64>" << '{' << beg << ',' << end << '}' << " := " << GetCode(value, vars, label);
-      return 0;
-    }
-    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<this_type const&>( rhs ) ); }
-    int compare( this_type const& rhs ) const
-    {
-      if (int delta = int(reg) - int(rhs.reg)) return delta;
-      if (int delta = int(beg) - int(rhs.beg)) return delta;
-      if (int delta = int(end) - int(rhs.end)) return delta;
-      return Super::compare( rhs );
-    }
-
-    unsigned reg, beg, end;
   };
 
   static unsigned const NEONSIZE = 8;
 
   void
-  GetNeonSinks( unsigned reg )
+  GetNeonSinks( Processor const& ref, unsigned reg )
   {
-    using unisim::util::symbolic::binsec::BitFilter;
-    // using unisim::util::symbolic::make_const;
-
-    { // Check for constant values
-      Expr dr = unisim::util::symbolic::binsec::ASExprNode::Simplify( GetVDU(reg).expr );
-      if (dr.ConstSimplify())
-        {
-          path->add_sink( new NeonWrite( reg, dr ) );
-          return;
-        }
-    }
-
-    // Check for monolithic value
-    if (not neonregs[reg][NEONSIZE/2].node)
-      {
-        path->add_sink( new NeonWrite( reg, eneonread(reg,NEONSIZE,0) ) );
-        return;
-      }
-
     // Requested read is a concatenation of multiple source values
+    // Crawl register expression tree to produce sinks
     struct _
     {
-      _( Processor& _core, unsigned _reg ) : core(_core), reg(_reg) { Process( 0, NEONSIZE ); } Processor& core; unsigned reg;
+      _( Processor& _core, Processor const& _ref,unsigned _reg ) : core(_core), ref(_ref), reg(_reg) { Process( 0, NEONSIZE ); }
+      Processor& core; Processor const& ref; unsigned reg;
       void Process( unsigned pos, unsigned size )
       {
+        Expr value = core.eneonread(reg,size,pos);
+        if (value == ref.eneonread(reg,size,pos))
+          return;
+        value = unisim::util::symbolic::binsec::ASExprNode::Simplify( value );
         unsigned half = size / 2, mid = pos+half;
-        if (size > 1 and core.neonregs[reg][mid].node)
+        if (value.ConstSimplify() or size <= 1 or not core.neonregs[reg][mid].node)
+          {
+            if (size == NEONSIZE)
+              core.path->add_sink( newRegWrite( NeonReg(reg), value ) );
+            else
+              {
+                unisim::util::symbolic::binsec::BitFilter bf( value, 64, 0, size*8, size*8, false );
+                bf.Retain(); // Not a heap-allocated object (never delete);
+                value = bf.Simplify();
+                if (value.node == &bf) value = new unisim::util::symbolic::binsec::BitFilter( bf );
+                core.path->add_sink( newPartialRegWrite( NeonReg(reg), 8*pos, 8*size, value ) );
+              }
+          }
+        else
           {
             Process( pos, half );
             Process( mid, half );
           }
-        else
-          {
-            unsigned begin = pos*8, end = begin+size*8 - 1;
-            Expr value( new BitFilter( core.eneonread(reg,size,pos), 64, 0, size*8, size*8, false ) );
-            core.path->add_sink( new NeonPartialWrite( reg, begin, end, value ) );
-          }
       }
-    } concat( *this, reg );
+    } concat( *this, ref, reg );
   }
 
-  Expr eneonread( unsigned reg, unsigned size, unsigned pos )
+  Expr eneonread( unsigned reg, unsigned size, unsigned pos ) const
   {
     using unisim::util::symbolic::ExprNode;
     using unisim::util::symbolic::make_const;
@@ -868,17 +762,17 @@ public:
 
   void CheckAlignment( U32 const& addr, uint32_t alignment ) { /*TODO*/ }
 
-  U32  MemURead32( U32 const& addr ) { return U32( Expr( new Load( addr.expr, 4, 0, false ) ) ); }
-  U16  MemURead16( U32 const& addr ) { return U16( Expr( new Load( addr.expr, 2, 0, false ) ) ); }
-  U32  MemRead32( U32 const& addr ) { return U32( Expr( new Load( addr.expr, 4, 2, false ) ) ); }
-  U16  MemRead16( U32 const& addr ) { return U16( Expr( new Load( addr.expr, 2, 1, false ) ) ); }
-  U8   MemRead8( U32 const& addr ) { return U8( Expr( new Load( addr.expr, 1, 0, false ) ) ); }
+  U32  MemURead32( U32 const& addr ) { return U32( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 4, 0, false ) ) ); }
+  U16  MemURead16( U32 const& addr ) { return U16( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 2, 0, false ) ) ); }
+  U32  MemRead32( U32 const& addr ) { return U32( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 4, 2, false ) ) ); }
+  U16  MemRead16( U32 const& addr ) { return U16( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 2, 1, false ) ) ); }
+  U8   MemRead8( U32 const& addr ) { return U8( Expr( new unisim::util::symbolic::binsec::Load( addr.expr, 1, 0, false ) ) ); }
 
-  void MemUWrite32( U32 const& addr, U32 const& value ) { stores.insert( new Store( addr.expr, value.expr, 4, 0, false ) ); }
-  void MemUWrite16( U32 const& addr, U16 const& value ) { stores.insert( new Store( addr.expr, value.expr, 2, 0, false ) ); }
-  void MemWrite32( U32 const& addr, U32 const& value ) { stores.insert( new Store( addr.expr, value.expr, 4, 2, false ) ); }
-  void MemWrite16( U32 const& addr, U16 const& value ) { stores.insert( new Store( addr.expr, value.expr, 2, 1, false ) ); }
-  void MemWrite8( U32 const& addr, U8 const& value ) { stores.insert( new Store( addr.expr, value.expr, 1, 0, false ) ); }
+  void MemUWrite32( U32 const& addr, U32 const& value ) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 4, 0, false ) ); }
+  void MemUWrite16( U32 const& addr, U16 const& value ) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 2, 0, false ) ); }
+  void MemWrite32( U32 const& addr, U32 const& value ) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 4, 2, false ) ); }
+  void MemWrite16( U32 const& addr, U16 const& value ) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 2, 1, false ) ); }
+  void MemWrite8( U32 const& addr, U8 const& value ) { stores.insert( new unisim::util::symbolic::binsec::Store( addr.expr, value.expr, 1, 0, false ) ); }
 
   void SetExclusiveMonitors( U32 const& address, unsigned size ) { std::cerr << "SetExclusiveMonitors\n"; }
   bool ExclusiveMonitorsPass( U32 const& address, unsigned size ) { std::cerr << "ExclusiveMonitorsPass\n"; return true; }
@@ -923,8 +817,11 @@ public:
   /* mask for valid bits in processor control and status registers */
   static uint32_t const PSR_UNALLOC_MASK = 0x00f00000;
 
-  struct SRegID : public unisim::util::identifier::Identifier<SRegID>
+  struct SRegID
+    : public unisim::util::identifier::Identifier<SRegID>
+    , public unisim::util::symbolic::WithValueType<SRegID>
   {
+    typedef uint32_t value_type;
     enum Code {
       SCTLR, ACTLR,
       CTR, MPIDR,
@@ -987,6 +884,8 @@ public:
       return "NA";
     }
 
+    void Repr(std::ostream& sink) const { sink << c_str(); }
+
     SRegID() : code(end) {}
     SRegID( Code _code ) : code(_code) {}
     SRegID( char const* _code ) : code(end) { init(_code); }
@@ -999,13 +898,16 @@ public:
     return sregs[reg.idx()];
   }
 
-  struct RegID : public unisim::util::identifier::Identifier<RegID>
+  struct RegID
+    : public unisim::util::identifier::Identifier<RegID>
+    , unisim::util::symbolic::WithValueType<RegID>
   {
+    typedef uint32_t value_type;
+
     enum Code
       {
         NA = 0,
         r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, sl, fp, ip, sp, lr,
-        n, z, c, v, q, t, itstate, // q, ge0, ge1, ge2, ge3,
         cpsr, spsr,
         fpscr, fpexc,
         r8_fiq,
@@ -1054,13 +956,6 @@ public:
         case         ip: return "ip";
         case         sp: return "sp";
         case         lr: return "lr";
-        case          n: return "n";
-        case          z: return "z";
-        case          c: return "c";
-        case          v: return "v";
-	case          q: return "q";
-        case          t: return "t";
-        case    itstate: return "itstate";
         case       cpsr: return "cpsr";
         case       spsr: return "spsr";
         case      fpscr: return "fpscr";
@@ -1095,9 +990,40 @@ public:
       return "NA";
     }
 
+    void Repr(std::ostream& sink) const { sink << c_str(); }
+
     RegID() : code(end) {}
     RegID( Code _code ) : code(_code) {}
     RegID( char const* _code ) : code(end) { init( _code ); }
+  };
+
+  struct Flag
+    : public unisim::util::identifier::Identifier<Flag>
+    , public unisim::util::symbolic::WithValueType<Flag>
+  {
+    typedef bool value_type;
+
+    enum Code { N, Z, C, V, Q, T, end } code;
+
+    char const* c_str() const
+    {
+      static char const* names[] = {"n", "z", "c", "v", "q", "t", "NA"};
+      return names[int(code)];
+    }
+
+    void Repr(std::ostream& sink) const { sink << c_str(); }
+    
+    Flag() : code(end) {}
+    Flag( Code _code ) : code(_code) {}
+    Flag( char const* _code ) : code(end) { init( _code ); }
+  };
+
+  struct ITStateID
+    : public unisim::util::symbolic::WithValueType<ITStateID>
+  {
+    typedef uint8_t value_type;
+    void Repr(std::ostream& sink) const { sink << "itstate"; }
+    int cmp(ITStateID const&) const { return 0; }
   };
 
   ActionNode*      path;

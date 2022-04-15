@@ -49,11 +49,11 @@ template <class ADDRESS>
 std::ostream& operator << (std::ostream& os, const CommitInsnEvent<ADDRESS>& cie);
 
 template <class ADDRESS>
-class CommitInsnEvent : public Event<ADDRESS>
+class CommitInsnEvent : public CustomEvent<ADDRESS, CommitInsnEvent<ADDRESS> >
 {
 public:
 	CommitInsnEvent()
-		: Event<ADDRESS>(Event<ADDRESS>::EV_COMMIT_INSN)
+		: CustomEvent<ADDRESS, CommitInsnEvent<ADDRESS> >()
 		, addr(0)
 		, length(0)
 	{

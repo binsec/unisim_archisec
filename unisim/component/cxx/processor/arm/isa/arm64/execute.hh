@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016,
+ *  Copyright (c) 2016-2022,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -36,6 +36,8 @@
 #define __UNISIM_COMPONENT_CXX_PROCESSOR_ARM_ISA_ARM64_EXECUTE_HH__
 
 #include <inttypes.h>
+#include <unisim/component/cxx/processor/arm/psr.hh>
+#include <unisim/component/cxx/processor/arm/execute.hh>
 
 namespace unisim {
 namespace component {
@@ -99,6 +101,167 @@ OUT PolyMod2(IN value, uint32_t _poly)
   
   return OUT(value);
 }
+
+  template <class ARCH, typename FLOAT>
+  FLOAT FPNaN( ARCH& arch, FLOAT value )
+  {
+    if (arch.Test( arch.GetFPSR( DN )))
+      return defaultnan( value );
+    return clearsignaling( value );
+  }
+  
+  template <class ARCH, unsigned posT>
+  void FPProcessException( ARCH& arch, RegisterField<posT,1> const& rf )
+  {
+    RegisterField<posT+8,1> const enable;
+    if (arch.Test(arch.GetFPSR( enable )))
+      arch.FPTrap( posT );
+    else
+      arch.SetFPCR( rf, 1 );
+  }
+    
+  template <typename operT>
+  struct OutNaN
+  {
+    operT result;
+    bool invalid;
+
+    operator bool () const { return invalid; }
+    operator operT () const { return result; }
+  };
+  
+  template <typename ARCH, typename operT>
+  OutNaN<operT> FPProcessNaNs(ARCH& arch, std::initializer_list<operT> l)
+  {
+    OutNaN<operT> nan = {operT(), false};
+    
+    for (auto val : l)
+      {
+        if (not arch.Test( isnan( val )) )
+          continue;
+
+        if (arch.Test( issignaling( val ) ))
+          {
+            FPProcessException( arch, IOC );
+            return {FPNaN( arch, val ), true};
+          }
+
+        if (not nan.invalid)
+          nan = {FPNaN( arch, val ), true};
+      }
+    
+    return nan;
+  }
+
+  struct FPRounding
+  {
+    enum Code {TIEEVEN, POSINF, NEGINF, ZERO, TIEAWAY, ODD} code;
+  };
+  
+  struct NearestTieEven { template <typename T> static T roundint(T op) { return nearbyint(op); } };
+  struct TowardPosInf   { template <typename T> static T roundint(T op) { return ceil(op); } };
+  struct TowardNegInf   { template <typename T> static T roundint(T op) { return floor(op); } };
+  struct TowardZero     { template <typename T> static T roundint(T op) { return trunc(op); } };
+  struct NearestTieAway { template <typename T> static T roundint(T op) { return round(op); } };
+  
+  struct RoundingMode
+  {
+    RoundingMode( FPRounding::Code _mode ) : rmode(_mode) {} FPRounding::Code rmode;
+    template <typename T> T roundint(T op)
+    {
+      switch (rmode)
+        {
+        case FPRounding::TIEEVEN: return nearbyint(op);
+        case FPRounding::POSINF:  return ceil(op);
+        case FPRounding::NEGINF:  return floor(op);
+        case FPRounding::ZERO:    return trunc(op);
+        case FPRounding::TIEAWAY: return round(op);
+        }
+      return op;
+    }
+  };
+
+  // template <class ARCH> void FPRoundingMode( ARCH& arch )
+
+  template <typename ARCH, typename RMODE, typename FLOAT>
+  FLOAT FPRoundInt(ARCH& arch, RMODE&& rmode, FLOAT op, bool exact)
+  {
+    if (auto nan = FPProcessNaNs(arch, {op}))
+      return nan;
+
+    FLOAT res = rmode.roundint(op);
+
+    if (exact and arch.Test(res != op))
+      FPProcessException( arch, IXC );
+
+    return res;
+  }
+
+  template <typename ARCH, typename operT> operT FPRound( ARCH& arch, operT op ) { return op; }
+
+  template <typename DST, typename ARCH, typename SRC>
+  DST FPConvert( ARCH& arch, SRC op )
+  {
+    if (FPProcessNaNs(arch, {op}))
+      return DST(op);
+
+    return FPRound(arch, DST(op));
+  }
+
+  template <typename operT, typename ARCH>
+  operT FPSub( ARCH& arch, operT op1, operT op2 )
+  {
+    if (auto nan = FPProcessNaNs(arch, {op1, op2}))
+      return nan;
+
+    return FPRound(arch, op1 - op2);
+  }
+
+  template <typename operT, typename ARCH>
+  operT FPAdd( ARCH& arch, operT op1, operT op2 )
+  {
+    if (auto nan = FPProcessNaNs(arch, {op1, op2}))
+      return nan;
+
+    return FPRound(arch, op1 + op2);
+  }
+
+  template <typename operT, typename ARCH>
+  operT FPMul( ARCH& arch, operT op1, operT op2 )
+  {
+    if (auto nan = FPProcessNaNs(arch, {op1, op2}))
+      return nan;
+
+    return FPRound(arch, op1 * op2);
+  }
+
+  template <typename operT, typename ARCH>
+  operT FPMin( ARCH& arch, operT op1, operT op2 )
+  {
+    if (auto nan = FPProcessNaNs(arch, {op1, op2}))
+      return nan;
+
+    operT res  = fmin(op1, op2);
+
+    // TODO: The use of FPRound() covers the case where there is a trapped
+    // underflow// for a denormalized number even though the result is
+    // exact.
+    return res;
+  }
+
+  template <typename operT, typename ARCH>
+  operT FPMax( ARCH& arch, operT op1, operT op2 )
+  {
+    if (auto nan = FPProcessNaNs(arch, {op1, op2}))
+      return nan;
+
+    operT res = fmax(op1, op2);
+
+    // TODO: The use of FPRound() covers the case where there is a trapped
+    // underflow// for a denormalized number even though the result is
+    // exact.
+    return res;
+  }
 
 } // end of namespace arm64
 } // end of namespace isa

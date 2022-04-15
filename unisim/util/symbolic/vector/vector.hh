@@ -42,6 +42,44 @@ namespace util {
 namespace symbolic {
 namespace vector {
 
+  struct VMix : public ExprNode
+  {
+    VMix( Expr const& _l, Expr const& _r ) : l(_l), r(_r) {}
+    virtual unsigned SubCount() const override { return 2; }
+    virtual Expr const& GetSub(unsigned idx) const override { switch (idx) { case 0: return l; case 1: return r; } return ExprNode::GetSub(idx); };
+    virtual void Repr( std::ostream& sink ) const override;
+    virtual int cmp( ExprNode const& brhs ) const override { return 0; }
+    virtual VMix* Mutate() const override { return new VMix( *this ); }
+    virtual ValueType const* GetType() const override { return l->GetType(); }
+    Expr l, r;
+  };
+
+  struct VTransBase : public ExprNode
+  {
+    VTransBase( Expr const& _src, unsigned _srcsize, int _srcpos ) : src(_src), srcsize(_srcsize), srcpos(_srcpos) {}
+    virtual unsigned SubCount() const override { return 1; }
+    virtual Expr const& GetSub(unsigned idx) const override { if (idx!= 0) return ExprNode::GetSub(idx); return src; }
+    virtual void Repr( std::ostream& sink ) const override;
+    virtual int cmp( ExprNode const& brhs ) const override { return compare( dynamic_cast<VTransBase const&>(brhs) ); }
+    int compare( VTransBase const& rhs ) const
+    {
+      if (int delta = int(srcsize) - int(srcsize)) return delta;
+      return srcpos - rhs.srcpos;
+    }
+    Expr     src;
+    unsigned srcsize;
+    int      srcpos;
+  };
+
+  template <typename T>
+  struct VTrans : public VTransBase
+  {
+    VTrans( Expr const& src, unsigned srcsize, int srcpos ) : VTransBase( src, srcsize, srcpos ) {}
+    typedef VTrans<T> this_type;
+    virtual this_type* Mutate() const override { return new this_type( *this ); }
+    virtual ValueType const* GetType() const override { return T::GetType(); }
+  };
+
   struct VUConfig
   {
     struct Byte
@@ -63,40 +101,6 @@ namespace vector {
     protected:
       Expr     sexp;
       unsigned span;
-    };
-
-    struct VMix : public ExprNode
-    {
-      VMix( Expr const& _l, Expr const& _r ) : l(_l), r(_r) {}
-      virtual unsigned SubCount() const override { return 0; }
-      virtual void Repr( std::ostream& sink ) const override;
-      virtual int cmp( ExprNode const& brhs ) const override { return 0; }
-      virtual VMix* Mutate() const override { return new VMix( *this ); }
-      virtual ScalarType::id_t GetType() const override { return l->GetType(); }
-      Expr l, r;
-    };
-
-    struct VTransBase : public Byte, public ExprNode
-    {
-      VTransBase( Byte const& byte, int _rshift ) : Byte( byte ), rshift(_rshift) {}
-      virtual unsigned SubCount() const override { return 0; }
-      virtual void Repr( std::ostream& sink ) const override;
-      virtual int cmp( ExprNode const& brhs ) const override { return compare( dynamic_cast<VTransBase const&>(brhs) ); }
-      int compare( VTransBase const& rhs ) const
-      {
-        if (int delta = int(Byte::span) - int(rhs.span)) return delta;
-        return rshift - rhs.rshift;
-      }
-      int rshift;
-    };
-    
-    template <typename T>
-    struct VTrans : public VTransBase
-    {
-      VTrans( Byte const& byte, int rshift ) : VTransBase( byte, rshift ) {}
-      typedef VTrans<T> this_type;
-      virtual this_type* Mutate() const override { return new this_type( *this ); }
-      virtual ScalarType::id_t GetType() const override { return T::GetType(); }
     };
 
     template <typename T>
@@ -122,24 +126,24 @@ namespace vector {
           {
             Byte const* base = byte - pos;
             if (not base->is_source()) { struct Bad {}; throw Bad(); }
-            dst = T(Expr(new VTrans<T>(*base, -pos)));
+            dst = T(Expr(new VTrans<T>(base->expr(), base->size(), pos)));
             return;
           }
 
         if (unsigned src_size = byte->is_source())
           {
-            Expr res = new VTrans<T>(*byte, 0);
+            Expr res = new VTrans<T>(byte->expr(), byte->size(), 0);
             for (unsigned next = src_size, idx = 1; next < bytecount; ++idx)
               {
                 // Requested read is a concatenation of multiple source values
                 for (;idx < next; ++idx)
                   if (byte[idx].get_node()) throw CorruptedSource();
-                if (ExprNode const* node = byte[idx].get_node())
-                  res = new VMix( new VTrans<T>(byte[idx], int(idx)), res );
+                if (ExprNode const* node = byte[next].get_node())
+                  res = new VMix( new VTrans<T>(byte[next].expr(), byte[next].size(), -int(next)), res );
                 else
                   throw CorruptedSource(); // missing value
-                if (unsigned span = byte[idx].is_source())
-                  next = idx + span;
+                if (unsigned span = byte[next].is_source())
+                  next = next + span;
                 else
                   throw CorruptedSource();
               }
@@ -154,6 +158,10 @@ namespace vector {
     };
   };
 
+
+  ExprNode const* corresponding_origin( Expr const& dst, unsigned dpos, unsigned spos );
+  
+  
 } /* end of namespace vector */
 } /* end of namespace symbolic */
 } /* end of namespace util */

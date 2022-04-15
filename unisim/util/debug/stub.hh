@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012,
+ *  Copyright (c) 2020,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -32,44 +32,40 @@
  * Authors: Gilles Mouchard (gilles.mouchard@cea.fr)
  */
 
-#ifndef __UNISIM_UTIL_DEBUG_SUBPROGRAM_HH__
-#define __UNISIM_UTIL_DEBUG_SUBPROGRAM_HH__
+#ifndef __UNISIM_UTIL_DEBUG_STUB_HH__
+#define __UNISIM_UTIL_DEBUG_STUB_HH__
 
-#include <unisim/util/debug/type.hh>
-#include <unisim/util/debug/decl_location.hh>
-#include <string>
+#include <unisim/util/debug/subprogram.hh>
+#include <unisim/util/debug/data_object.hh>
+#include <map>
 
 namespace unisim {
 namespace util {
 namespace debug {
 
-template <class ADDRESS>
-class SubProgram
+////////////////////////////// declarations ///////////////////////////////////
+
+template <typename ADDRESS>
+class Stub
 {
 public:
-	SubProgram();
-	virtual ~SubProgram();
-	virtual const char *GetName() const = 0;
-	virtual bool IsExternal() const = 0;
-	virtual bool IsDeclaration() const = 0;
-	virtual bool IsInline() const = 0;
-	virtual bool IsInlined() const = 0;
-	virtual const Type *GetReturnType() const = 0;
-	virtual unsigned int GetArity() const = 0;
-	virtual const FormalParameter *GetFormalParameter(unsigned int idx) const = 0;
-	virtual const DeclLocation *GetDeclLocation() const = 0;
-	virtual ADDRESS GetAddress() const = 0;
-	const std::string& BuildCDecl() const;
-	void Catch() const;
-	void Release() const;
-	template <typename VISITOR> void Scan(VISITOR& visitor) const;
+	typedef unisim::util::debug::DataObjectRef<ADDRESS> Parameter;
+	typedef std::map<std::string, Parameter> Parameters;
+	typedef unisim::util::debug::DataObjectRef<ADDRESS> ReturnValue;
+	
+	Stub(const SubProgram<ADDRESS> *_subprogram) : subprogram(_subprogram) {}
+	virtual ~Stub() {}
+	
+	const SubProgram<ADDRESS> *GetSubProgram() const { return subprogram; }
+	
+	virtual bool Run(Parameters& parameters, ReturnValue& return_value) = 0;
+
 private:
-	mutable unsigned int ref_count;
-	mutable std::string *cdecl;
+	const SubProgram<ADDRESS> *subprogram;
 };
 
 } // end of namespace debug
 } // end of namespace util
 } // end of namespace unisim
 
-#endif // __UNISIM_UTIL_DEBUG_SUBPROGRAM_HH__
+#endif // __UNISIM_UTIL_DEBUG_STUB_HH__

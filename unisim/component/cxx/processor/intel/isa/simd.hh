@@ -2214,13 +2214,13 @@ struct Pshdq : public Operation<ARCH>
   {
     typedef typename ARCH::u8_t u8_t;
     
-    unsigned const size = 128 / 8;
-    for (unsigned chunk = 0, cend = VR::size() / size; chunk < cend; ++chunk )
+    unsigned const size = 128 / 8, delta = (sr ? -im : im);
+    for (unsigned chunk = 0, cend = VR::size() / 128; chunk < cend; ++chunk )
       {
         u8_t res[size];
         for (unsigned idx = 0; idx < size; ++idx)
           {
-            unsigned sidx = idx + (sr ? -im : im);
+            unsigned sidx = idx + delta;
             res [idx] = sidx < size ? arch.vmm_read( VR(), rn, sidx + chunk*size, u8_t() ) : u8_t(0);
           }
         for (unsigned idx = 0; idx < size; ++idx)

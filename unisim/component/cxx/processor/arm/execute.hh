@@ -47,8 +47,6 @@ namespace cxx {
 namespace processor {
 namespace arm {
 
-  using unisim::util::arithmetic::RotateRight;
-  
   namespace CondTruthTable {
     template <uintptr_t Tbit, uintptr_t Tbits = 16>
     struct Source {
@@ -388,9 +386,9 @@ namespace arm {
     return op >> -sh;
   }
   
-  // Min Max operations
-  template <typename T> T const& Minimum( T const& l, T const& r ) { return l < r ? l : r; }
-  template <typename T> T const& Maximum( T const& l, T const& r ) { return l > r ? l : r; }
+  // Min Max operations. Note: Fall back for native-like types.
+  template <typename T> T const& Minimum( T const& l, T const& r ) { return std::min(l, r); }
+  template <typename T> T const& Maximum( T const& l, T const& r ) { return std::max(l, r); }
 
   /******************/
   /* Floating Point */
@@ -440,7 +438,6 @@ namespace arm {
       rf.Set( arch.FPSCR, 1u );
   }
     
-  
   template <typename ARCH, typename FPCTRL, typename operT>
   struct __FPProcessNaN__
   {
