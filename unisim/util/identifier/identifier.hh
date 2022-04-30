@@ -52,6 +52,8 @@ namespace identifier {
           return;
     }
     int cmp( T rhs ) const { return int(static_cast<T const*>(this)->code) - int(rhs.code); }
+    bool operator == ( T rhs ) const { return static_cast<T const*>(this)->code == rhs.code; }
+    bool operator != ( T rhs ) const { return static_cast<T const*>(this)->code != rhs.code; }
     T operator + ( int offset ) const { return T( typename T::Code(int(static_cast<T const*>(this)->code) + offset) ); }
     bool next()
     {

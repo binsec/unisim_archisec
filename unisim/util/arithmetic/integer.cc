@@ -1,6 +1,6 @@
 /*
- *  Copyright (c) 2012,
- *  Commissariat a l'Energie Atomique (CEA)
+ *  Copyright (c) 2007-2017,
+ *  Commissariat a l'Energie Atomique (CEA),
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without modification,
@@ -29,56 +29,16 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Authors: Gilles Mouchard (gilles.mouchard@cea.fr)
+ * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
  */
-
-#ifndef __UNISIM_UTIL_DEBUG_DATA_OBJECT_INITIALIZER_HH__
-#define __UNISIM_UTIL_DEBUG_DATA_OBJECT_INITIALIZER_HH__
-
-#include <unisim/util/endian/endian.hh>
-#include <unisim/util/debug/data_object.hh>
-#include <string>
-#include <sstream>
-#include <iosfwd>
-
-namespace unisim {
-namespace service {
-namespace interfaces {
-
-template <class ADDRESS> class DataObjectLookup;
-
-} // end of namespace interfaces
-} // end of namespace service
-} // end of namespace unisim
+ 
+#include <inttypes.h>
 
 namespace unisim {
 namespace util {
-namespace debug {
+namespace arithmetic {
 
-template <class ADDRESS> class DataObjectInitializer;
-
-template <class ADDRESS>
-std::ostream& operator << (std::ostream& os, const DataObjectInitializer<ADDRESS>& data_object_initializer);
-
-template <class ADDRESS>
-class DataObjectInitializer : public TypeVisitor
-{
-public:
-	DataObjectInitializer(const DataObject<ADDRESS> *data_object, ADDRESS pc, const unisim::service::interfaces::DataObjectLookup<ADDRESS> *data_object_lookup_if);
-	virtual ~DataObjectInitializer();
-	
-	virtual void Visit(const char *data_object_name, const Type *type, TypeInitializerToken tok) const;
-	virtual void Visit(const Member *member) const;
-private:
-	const DataObject<ADDRESS> *data_object;
-	ADDRESS pc;
-	const unisim::service::interfaces::DataObjectLookup<ADDRESS> *data_object_lookup_if;
-	std::stringstream *os;
-	friend std::ostream& operator << <ADDRESS>(std::ostream& os, const DataObjectInitializer<ADDRESS>& data_object_initializer);
-};
-
-} // end of namespace debug
+} // end of namespace arithmetic
 } // end of namespace util
 } // end of namespace unisim
 
-#endif // __UNISIM_UTIL_DEBUG_DATA_OBJECT_INITIALIZER_HH__

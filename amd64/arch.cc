@@ -101,7 +101,7 @@ ProcessorBase::VClear::GetType() const
 
   static std::set<VCT> type_descriptors;
   auto tp = type_descriptors.insert(this->size).first;
-  
+
   return &*tp;
 }
 

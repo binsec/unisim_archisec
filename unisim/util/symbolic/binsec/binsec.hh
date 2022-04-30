@@ -139,7 +139,7 @@ namespace binsec {
 
   struct dbx
   {
-    dbx( unsigned _bytes, uint64_t _value ) : value(_value), bytes(_bytes) {} uint64_t value; unsigned bytes;
+    dbx( unsigned _bytes, uint64_t _value ) : value(_value << (64 - 8 * _bytes) >> (64 - 8 * _bytes)), bytes(_bytes) {} uint64_t value; unsigned bytes;
     friend std::ostream& operator << ( std::ostream& sink, dbx const& _ );
   };
   

@@ -177,16 +177,14 @@ namespace symbolic {
   double   EvalNot( double val ) { throw std::logic_error( "No ~ for double." ); }
   float    EvalNot( float val ) { throw std::logic_error( "No ~ for float." ); }
   
-  bool   EvalSHL( bool, uint8_t ) { throw std::logic_error( "No << for bool." ); }
-  long double   EvalSHL( long double, uint8_t ) { throw std::logic_error( "No << for long double." ); }
-  double   EvalSHL( double, uint8_t ) { throw std::logic_error( "No << for double." ); }
-  float    EvalSHL( float, uint8_t ) { throw std::logic_error( "No << for float." ); }
-  int128_t    EvalSHL( int128_t, uint8_t ) { throw std::logic_error( "No << for int128_t." ); }
+  bool   EvalSHL( bool, shift_type ) { throw std::logic_error( "No << for bool." ); }
+  long double   EvalSHL( long double, shift_type ) { throw std::logic_error( "No << for long double." ); }
+  double   EvalSHL( double, shift_type ) { throw std::logic_error( "No << for double." ); }
+  float    EvalSHL( float, shift_type ) { throw std::logic_error( "No << for float." ); }
   
-  long double   EvalSHR( long double, uint8_t ) { throw std::logic_error( "No >> for long double." ); }
-  double   EvalSHR( double, uint8_t ) { throw std::logic_error( "No >> for double." ); }
-  float    EvalSHR( float, uint8_t ) { throw std::logic_error( "No >> for float." ); }
-  int128_t    EvalSHR( int128_t, uint8_t ) { throw std::logic_error( "No >> for int128_t." ); }
+  long double   EvalSHR( long double, shift_type ) { throw std::logic_error( "No >> for long double." ); }
+  double   EvalSHR( double, shift_type ) { throw std::logic_error( "No >> for double." ); }
+  float    EvalSHR( float, shift_type ) { throw std::logic_error( "No >> for float." ); }
   
   uint32_t EvalByteSwap( uint32_t v ) { return unisim::util::endian::ByteSwap( v ); }
   uint16_t EvalByteSwap( uint16_t v ) { return unisim::util::endian::ByteSwap( v ); }
@@ -198,10 +196,10 @@ namespace symbolic {
   uint32_t EvalPopCount( uint32_t v ) { return unisim::util::arithmetic::PopCount( v ); }
   uint64_t EvalPopCount( uint64_t v ) { return unisim::util::arithmetic::PopCount( v ); }
   
-  uint32_t EvalRotateRight( uint32_t v, uint8_t s ) { return unisim::util::arithmetic::RotateRight( v, s ); }
-  uint64_t EvalRotateRight( uint64_t v, uint8_t s ) { return unisim::util::arithmetic::RotateRight( v, s ); }
+  uint32_t EvalRotateRight( uint32_t v, shift_type s ) { return unisim::util::arithmetic::RotateRight( v, s ); }
+  uint64_t EvalRotateRight( uint64_t v, shift_type s ) { return unisim::util::arithmetic::RotateRight( v, s ); }
 
-  uint32_t EvalRotateLeft( uint32_t v, uint8_t s ) { return unisim::util::arithmetic::RotateLeft( v, s ); }
+  uint32_t EvalRotateLeft( uint32_t v, shift_type s ) { return unisim::util::arithmetic::RotateLeft( v, s ); }
 
 } /* end of namespace symbolic */
 } /* end of namespace util */

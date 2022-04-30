@@ -2,7 +2,7 @@
 (generate_opam_files true)
 
 (name unisim_archisec)
-(version "0.0.1")
+(version "0.0.3")
 (maintainers "BINSEC <binsec@saxifrage.saclay.cea.fr>")
 (authors
   "Yves Lhuillier"
@@ -22,7 +22,6 @@ BINSEC. It exposes disassembly metadata and DBA (Dynamic Bitvector Automata)
 semantics of several instruction set architectures, including ARM and x86.")
  (depends
   (conf-gcc :build)
-  (conf-g++ :build)
-  conf-gmp)
+  (conf-g++ :build))
  (conflicts
   (binsec (< 0.5.0))))

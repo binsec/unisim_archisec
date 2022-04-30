@@ -273,8 +273,9 @@ struct JmpJ : public Operation<ARCH>
      
   void execute( ARCH& arch ) const
   {
+    typedef typename TypeFor<ARCH,OPSIZE>::u ip_t;
     typedef typename ARCH::addr_t addr_t;
-    arch.setnip( arch.getnip() + addr_t( offset ) );
+    arch.setnip( addr_t( ip_t( arch.getnip() + addr_t( offset ) ) ) );
   }
 };
   
@@ -316,8 +317,8 @@ template <class ARCH> struct DC<ARCH,JMP> { Operation<ARCH>* get( InputCode<ARCH
     
   if (auto _ = match( ic, OpSize<32>() & opcode( "\xe9" ) & Imm<32>() ))
     {
-      if (ic.mode64()) return new JmpJ<ARCH,32>( _.opbase(), _.i( int32_t() ) );
-      else             return new JmpJ<ARCH,64>( _.opbase(), _.i( int32_t() ) );
+      if (ic.mode64()) return new JmpJ<ARCH,64>( _.opbase(), _.i( int32_t() ) );
+      else             return new JmpJ<ARCH,32>( _.opbase(), _.i( int32_t() ) );
     }
   
   if (auto _ = match( ic, OpSize<16>() & opcode( "\xea" ) & Imm<16>() & Imm<16>() ))
@@ -530,7 +531,7 @@ struct Leave : public Operation<ARCH>
   void execute( ARCH& arch ) const
   {
     /* TODO: STACKSIZE */
-    if (GOP::size() != ARCH::GR::size()) throw 0;
+    if (GOP::size() != ARCH::GR::size()) arch.unimplemented();
     arch.regwrite( GOP(), 4, arch.regread( GOP(), 5 ) );
     arch.regwrite( GOP(), 5, arch.template pop<GOP::SIZE>() );
   }

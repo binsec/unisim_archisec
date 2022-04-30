@@ -41,14 +41,44 @@ typedef ProcessorBase::u64_t U64;
 typedef ProcessorBase::s64_t S64;
 typedef ProcessorBase::f64_t F64;
 
-// void eval_div( P32& arch, U64& hi, U64& lo, U64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-// void eval_div( P64& arch, U64& hi, U64& lo, U64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-// void eval_div( P32& arch, S64& hi, S64& lo, S64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-// void eval_div( P64& arch, S64& hi, S64& lo, S64 const& divisor ) { throw ProcessorBase::Unimplemented(); }
-// void eval_mul( P32& arch, U64& hi, U64& lo, U64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
-// void eval_mul( P64& arch, U64& hi, U64& lo, U64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
-// void eval_mul( P32& arch, S64& hi, S64& lo, S64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
-// void eval_mul( P64& arch, S64& hi, S64& lo, S64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
+template <class I64>
+void eval_div_128( P64& arch, I64& hi, I64& lo, I64 const& divisor )
+{
+  typedef unisim::util::symbolic::Expr Expr;
+  typedef unisim::util::symbolic::binsec::BitFilter BitFilter;
+  if (arch.Test(divisor == I64(0))) arch._DE();
+
+  bool const sext = hi.is_signed;
+  Expr dividend = new unisim::util::symbolic::vector::VMix( hi.expr, lo.expr );
+  Expr divisor128 = BitFilter( divisor.expr, 64, 0, 64, 128, sext ).mksimple();
+  Expr divres = unisim::util::symbolic::make_operation(divisor.is_signed ? "Div" : "Divu", dividend, divisor128);
+  Expr modres = unisim::util::symbolic::make_operation(divisor.is_signed ? "Mod" : "Modu", dividend, divisor128);
+  lo.expr = BitFilter( divres, 128,  0, 64, 64, false ).mksimple();
+  hi.expr = BitFilter( modres, 128,  0, 64, 64, false ).mksimple();
+}
+
+template <class I64>
+void eval_mul_128( P64& arch, I64& hi, I64& lo, I64 const& multiplier )
+{
+  typedef unisim::util::symbolic::Expr Expr;
+  typedef unisim::util::symbolic::binsec::BitFilter BitFilter;
+  bool const sext = hi.is_signed;
+  Expr result = unisim::util::symbolic::make_operation("Mul", BitFilter( lo.expr, 64, 0, 64, 128, sext ).mksimple(), BitFilter( multiplier.expr, 64, 0, 64, 128, sext ).mksimple());
+  hi.expr = BitFilter( result, 128, 64, 64, 64, false ).mksimple();
+  lo.expr = BitFilter( result, 128,  0, 64, 64, false ).mksimple();
+  P64::bit_t ovf( unisim::util::symbolic::make_operation("Tne", BitFilter( result, 128, 0, 64, 128, sext ).mksimple(), result) );
+  arch.flagwrite( P64::FLAG::OF, ovf );
+  arch.flagwrite( P64::FLAG::CF, ovf );
+}
+
+void eval_div( P32& arch, U64& hi, U64& lo, U64 const& divisor )    { throw ProcessorBase::Unimplemented(); }
+void eval_div( P64& arch, U64& hi, U64& lo, U64 const& divisor )    { eval_div_128(arch, hi, lo, divisor); }
+void eval_div( P32& arch, S64& hi, S64& lo, S64 const& divisor )    { throw ProcessorBase::Unimplemented(); }
+void eval_div( P64& arch, S64& hi, S64& lo, S64 const& divisor )    { eval_div_128(arch, hi, lo, divisor); }
+void eval_mul( P32& arch, U64& hi, U64& lo, U64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
+void eval_mul( P64& arch, U64& hi, U64& lo, U64 const& multiplier ) { eval_mul_128(arch, hi, lo, multiplier); }
+void eval_mul( P32& arch, S64& hi, S64& lo, S64 const& multiplier ) { throw ProcessorBase::Unimplemented(); }
+void eval_mul( P64& arch, S64& hi, S64& lo, S64 const& multiplier ) { eval_mul_128(arch, hi, lo, multiplier);}
 
 F64 eval_fprem ( P32& arch, F64 const& dividend, F64 const& modulus ) { throw ProcessorBase::Unimplemented(); }
 F64 eval_fprem ( P64& arch, F64 const& dividend, F64 const& modulus ) { throw ProcessorBase::Unimplemented(); }

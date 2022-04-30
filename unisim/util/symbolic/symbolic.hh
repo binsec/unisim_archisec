@@ -35,7 +35,6 @@
 #ifndef __UNISIM_UTIL_SYMBOLIC_SYMBOLIC_HH__
 #define __UNISIM_UTIL_SYMBOLIC_SYMBOLIC_HH__
 
-#include <unisim/util/arithmetic/i128.hh>
 #include <unisim/util/arithmetic/arithmetic.hh>
 #include <unisim/util/identifier/identifier.hh>
 #include <ostream>
@@ -232,21 +231,14 @@ namespace symbolic {
     virtual ConstNodeBase const* Eval( EvalSpace const&, ConstNodeBase const** ) const override { return this; }
     ConstNodeBase const* AsConstNode() const override { return this; };
     virtual ConstNodeBase* apply( Op op, ConstNodeBase const** args ) const = 0;
-    virtual float Get( float ) const = 0;
-    virtual double Get( double ) const = 0;
-    virtual long double Get( long double ) const = 0;
-    virtual bool Get( bool ) const = 0;
-    virtual uint8_t Get( uint8_t ) const = 0;
-    virtual uint16_t Get( uint16_t ) const = 0;
-    virtual uint32_t Get( uint32_t ) const = 0;
-    virtual uint64_t Get( uint64_t ) const = 0;
-    virtual int8_t Get( int8_t ) const = 0;
-    virtual int16_t Get( int16_t ) const = 0;
-    virtual int32_t Get( int32_t ) const = 0;
-    virtual int64_t Get( int64_t ) const = 0;
-    virtual int128_t Get( int128_t ) const = 0;
+    virtual float GetFloat( float ) const = 0;
+    virtual double GetFloat( double ) const = 0;
+    virtual long double GetFloat( long double ) const = 0;
+    virtual uint64_t GetBits( unsigned ) const = 0;
     static std::ostream& warn();
   };
+
+  typedef uint8_t shift_type;
 
   template <typename VALUE_TYPE>
   VALUE_TYPE EvalMul( VALUE_TYPE l, VALUE_TYPE r ) { return l * r; }
@@ -279,18 +271,16 @@ namespace symbolic {
   float      EvalNot( float val );
 
   template <typename VALUE_TYPE>
-  VALUE_TYPE EvalSHL( VALUE_TYPE l, uint8_t shift ) { return l << shift; }
-  bool       EvalSHL( bool, uint8_t );
-  long double EvalSHL( long double, uint8_t );
-  double     EvalSHL( double, uint8_t );
-  float      EvalSHL( float, uint8_t );
-  int128_t   EvalSHL( int128_t, uint8_t );
+  VALUE_TYPE EvalSHL( VALUE_TYPE l, shift_type shift ) { return l << shift; }
+  bool       EvalSHL( bool, shift_type );
+  long double EvalSHL( long double, shift_type );
+  double     EvalSHL( double, shift_type );
+  float      EvalSHL( float, shift_type );
   template <typename VALUE_TYPE>
-  VALUE_TYPE EvalSHR( VALUE_TYPE l, uint8_t shift ) { return l >> shift; }
-  long double EvalSHR( long double, uint8_t );
-  double     EvalSHR( double, uint8_t );
-  float      EvalSHR( float, uint8_t );
-  int128_t   EvalSHR( int128_t, uint8_t );
+  VALUE_TYPE EvalSHR( VALUE_TYPE l, shift_type shift ) { return l >> shift; }
+  long double EvalSHR( long double, shift_type );
+  double     EvalSHR( double, shift_type );
+  float      EvalSHR( float, shift_type );
   template <typename VALUE_TYPE>
   VALUE_TYPE EvalByteSwap( VALUE_TYPE v ) { throw std::logic_error( "No ByteSwap for this type" ); }
   uint32_t   EvalByteSwap( uint32_t v );
@@ -306,12 +296,12 @@ namespace symbolic {
   uint32_t   EvalPopCount( uint32_t v );
   uint64_t   EvalPopCount( uint64_t v );
   template <typename VALUE_TYPE>
-  VALUE_TYPE EvalRotateRight( VALUE_TYPE v, uint8_t shift ) { throw std::logic_error( "No RotateRight for this type" ); }
-  uint32_t   EvalRotateRight( uint32_t v, uint8_t shift );
-  uint64_t   EvalRotateRight( uint64_t v, uint8_t shift );
+  VALUE_TYPE EvalRotateRight( VALUE_TYPE v, shift_type shift ) { throw std::logic_error( "No RotateRight for this type" ); }
+  uint32_t   EvalRotateRight( uint32_t v, shift_type shift );
+  uint64_t   EvalRotateRight( uint64_t v, shift_type shift );
   template <typename VALUE_TYPE>
-  VALUE_TYPE EvalRotateLeft( VALUE_TYPE v, uint8_t shift ) { throw std::logic_error( "No RotateLeft for this type" ); }
-  uint32_t   EvalRotateLeft( uint32_t v, uint8_t shift );
+  VALUE_TYPE EvalRotateLeft( VALUE_TYPE v, shift_type shift ) { throw std::logic_error( "No RotateLeft for this type" ); }
+  uint32_t   EvalRotateLeft( uint32_t v, shift_type shift );
 
   struct Expr
   {
@@ -449,9 +439,9 @@ namespace symbolic {
         case Op::Xor:    return new this_type( EvalXor( value, GetValue( args[1] ) ) );
         case Op::And:    return new this_type( EvalAnd( value, GetValue( args[1] ) ) );
         case Op::Or:     return new this_type( EvalOr( value, GetValue( args[1] ) ) );
-        case Op::Lsl:    return new this_type( EvalSHL( value, args[1]->Get( uint8_t() ) ) );
+        case Op::Lsl:    return new this_type( EvalSHL( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
         case Op::Lsr:
-        case Op::Asr:    return new this_type( EvalSHR( value, args[1]->Get( uint8_t() ) ) );
+        case Op::Asr:    return new this_type( EvalSHR( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
         case Op::Add:    return new this_type( value + GetValue( args[1] ) );
         case Op::Sub:    return new this_type( value - GetValue( args[1] ) );
         case Op::Mul:    return new this_type( EvalMul( value, GetValue( args[1] ) ) );
@@ -470,8 +460,8 @@ namespace symbolic {
         case Op::Tge:    return new ConstNode   <bool>   ( value >= GetValue( args[1] ) );
         case Op::Tgtu:
         case Op::Tgt:    return new ConstNode   <bool>   ( value >  GetValue( args[1] ) );
-        case Op::Ror:    return new this_type( EvalRotateRight( value, args[1]->Get( uint8_t() ) ) );
-        case Op::Rol:    return new this_type( EvalRotateLeft( value, args[1]->Get( uint8_t() ) ) );
+        case Op::Ror:    return new this_type( EvalRotateRight( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
+        case Op::Rol:    return new this_type( EvalRotateLeft( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
 
         case Op::FSQB:   break;
         case Op::FFZ:    break;
@@ -497,20 +487,26 @@ namespace symbolic {
       warn() << "Unhandled unary operation: " << op.c_str() << "\n";
       return 0;
     }
-    float Get( float ) const override { return value; }
-    double Get( double ) const override { return value; }
-    long double Get( long double ) const override { return value; }
-    bool Get( bool ) const override { return value; }
-    uint8_t Get( uint8_t ) const override { return value; }
-    uint16_t Get( uint16_t ) const override { return value; }
-    uint32_t Get( uint32_t ) const override { return value; }
-    uint64_t Get( uint64_t ) const override { return value; }
-    int8_t Get( int8_t ) const override { return value; }
-    int16_t Get( int16_t ) const override { return value; }
-    int32_t Get( int32_t ) const override { return value; }
-    int64_t Get( int64_t ) const override { return value; }
-    int128_t Get( int128_t ) const override
-    { return unisim::util::arithmetic::I128(value); }
+    float GetFloat( float ) const override { return value; }
+    double GetFloat( double ) const override { return value; }
+    long double GetFloat( long double ) const override { return value; }
+    uint64_t GetBits(unsigned idx) const override
+    {
+      if (std::is_floating_point<VALUE_TYPE>::value)
+        {
+          return 0;
+        }
+      else if (idx == 0)
+        {
+          return value;
+        }
+      else if (std::is_signed<VALUE_TYPE>::value)
+        {
+          return int64_t(value) >> 63;
+        }
+      else
+        return 0;
+    }
     ValueType const* GetType() const override { return CValueType(VALUE_TYPE()); }
     virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<this_type const&>( rhs ) ); }
     int compare( this_type const& rhs ) const { return (value < rhs.value) ? -1 : (value > rhs.value) ? +1 : 0; }
@@ -564,7 +560,10 @@ namespace symbolic {
     virtual this_type* Mutate() const override { return new this_type( *this ); }
     virtual ValueType const* GetSrcType() const { return CValueType(SRC_VALUE_TYPE()); }
     virtual ValueType const* GetType() const override { return CValueType(DST_VALUE_TYPE()); }
-    virtual ConstNodeBase const* Eval( EvalSpace const&, ConstNodeBase const** cnbs ) const override { return new ConstNode<DST_VALUE_TYPE>( cnbs[0]->Get( DST_VALUE_TYPE() ) ); }
+    virtual ConstNodeBase const* Eval( EvalSpace const&, ConstNodeBase const** cnbs ) const override
+    {
+      return new ConstNode<DST_VALUE_TYPE>( DST_VALUE_TYPE(dynamic_cast<ConstNode<SRC_VALUE_TYPE> const&>(**cnbs).value) );
+    }
   };
 
   /* 1 operand operation */
@@ -618,18 +617,18 @@ namespace symbolic {
     this_type& operator = ( this_type const& other ) { expr = other.expr; return *this; }
 
     template <typename SHT>
-    this_type operator << ( SHT sh ) const { return this_type( make_operation( "Lsl", expr, make_const<uint8_t>(sh) ) ); }
+    this_type operator << ( SHT sh ) const { return this_type( make_operation( "Lsl", expr, make_const<shift_type>(sh) ) ); }
     template <typename SHT>
-    this_type operator >> ( SHT sh ) const { return this_type( make_operation( is_signed ? "Asr" : "Lsr", expr, make_const<uint8_t>(sh) ) ); }
+    this_type operator >> ( SHT sh ) const { return this_type( make_operation( is_signed ? "Asr" : "Lsr", expr, make_const<shift_type>(sh) ) ); }
     template <typename SHT>
-    this_type& operator <<= ( SHT sh ) { expr = make_operation( "Lsl", expr, make_const<uint8_t>(sh) ); return *this; }
+    this_type& operator <<= ( SHT sh ) { expr = make_operation( "Lsl", expr, make_const<shift_type>(sh) ); return *this; }
     template <typename SHT>
-    this_type& operator >>= ( SHT sh ) { expr = make_operation( is_signed?"Asr":"Lsr", expr, make_const<uint8_t>(sh) ); return *this; }
+    this_type& operator >>= ( SHT sh ) { expr = make_operation( is_signed?"Asr":"Lsr", expr, make_const<shift_type>(sh) ); return *this; }
 
     template <typename SHT>
-    this_type operator << ( SmartValue<SHT> const& sh ) const { return this_type( make_operation( "Lsl", expr, SmartValue<uint8_t>(sh).expr ) ); }
+    this_type operator << ( SmartValue<SHT> const& sh ) const { return this_type( make_operation( "Lsl", expr, SmartValue<shift_type>(sh).expr ) ); }
     template <typename SHT>
-    this_type operator >> ( SmartValue<SHT> const& sh ) const {return this_type( make_operation( is_signed?"Asr":"Lsr", expr, SmartValue<uint8_t>(sh).expr ) ); }
+    this_type operator >> ( SmartValue<SHT> const& sh ) const {return this_type( make_operation( is_signed?"Asr":"Lsr", expr, SmartValue<shift_type>(sh).expr ) ); }
 
     this_type operator - () const { return this_type( make_operation( "Neg", expr ) ); }
     this_type operator ~ () const { return this_type( make_operation( "Not", expr ) ); }
@@ -676,14 +675,14 @@ namespace symbolic {
   UTP ByteSwap( UTP const& value ) { return UTP( make_operation( "BSwp", value.expr ) ); }
 
   template <typename UTP>
-  UTP RotateRight( UTP const& value, uint8_t sh ) { return UTP( make_operation( "Ror", value.expr, make_const<uint8_t>(sh) ) ); }
+  UTP RotateRight( UTP const& value, shift_type sh ) { return UTP( make_operation( "Ror", value.expr, make_const<shift_type>(sh) ) ); }
   template <typename UTP, typename STP>
-  UTP RotateRight( UTP const& value, STP const& sh ) { return UTP( make_operation( "Ror", value.expr, SmartValue<uint8_t>(sh).expr ) ); }
+  UTP RotateRight( UTP const& value, STP const& sh ) { return UTP( make_operation( "Ror", value.expr, SmartValue<shift_type>(sh).expr ) ); }
 
   template <typename UTP>
-  UTP RotateLeft( UTP const& value, uint8_t sh ) { return UTP( make_operation( "Rol", value.expr, make_const<uint8_t>(sh) ) ); }
+  UTP RotateLeft( UTP const& value, shift_type sh ) { return UTP( make_operation( "Rol", value.expr, make_const<shift_type>(sh) ) ); }
   template <typename UTP, typename STP>
-  UTP RotateLeft( UTP const& value, STP const& sh ) { return UTP( make_operation( "Rol", value.expr, SmartValue<uint8_t>(sh).expr ) ); }
+  UTP RotateLeft( UTP const& value, STP const& sh ) { return UTP( make_operation( "Rol", value.expr, SmartValue<shift_type>(sh).expr ) ); }
 
   template <typename UTP>
   UTP BitScanReverse( UTP const& value ) { return UTP( make_operation( "BSR", value.expr ) ); }

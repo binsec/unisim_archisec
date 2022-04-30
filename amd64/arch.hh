@@ -35,7 +35,6 @@
 #ifndef ARMD64DBA_ARCH_HH
 #define ARMD64DBA_ARCH_HH
 
-#include <unisim/util/arithmetic/i128.hh>
 #include <unisim/component/cxx/processor/intel/isa/intel.hh>
 #include <unisim/component/cxx/processor/intel/modrm.hh>
 #include <unisim/component/cxx/processor/intel/disasm.hh>
@@ -80,12 +79,12 @@ struct ProcessorBase
   typedef SmartValue<uint16_t>    u16_t;
   typedef SmartValue<uint32_t>    u32_t;
   typedef SmartValue<uint64_t>    u64_t;
-  typedef SmartValue<uint128_t>   u128_t;
+  typedef void                    u128_t;
   typedef SmartValue<int8_t>      s8_t;
   typedef SmartValue<int16_t>     s16_t;
   typedef SmartValue<int32_t>     s32_t;
   typedef SmartValue<int64_t>     s64_t;
-  typedef SmartValue<int128_t>    s128_t;
+  typedef void                    s128_t;
   typedef SmartValue<bool>        bit_t;
 
   typedef SmartValue<float>       f32_t;
@@ -187,7 +186,7 @@ struct ProcessorBase
     virtual int cmp( ExprNode const& rhs ) const override { return 0; }
     virtual int GenCode(unisim::util::symbolic::binsec::Label&, unisim::util::symbolic::binsec::Variables&, std::ostream& sink) const;
   };
-  
+
   // VRegRead should never be a binsec::node (no dba available for it)
   // struct VRegRead : public unisim::util::symbolic::ExprNode
   // {
@@ -323,7 +322,7 @@ struct Processor : public ProcessorBase
     SegBaseID( Code _code ) : SegmentID(_code) {}
     SegBaseID( char const* _code ) : SegmentID(_code) {}
   };
-  
+
   Expr                        segment_bases[6];
   Expr GetSegBase( unsigned idx )
   {
@@ -386,7 +385,7 @@ struct Processor : public ProcessorBase
   Expr                        regvalues[GREGCOUNT][GREGSIZE];
 
   void                        eregsinks( Processor<MODE> const& ref, unsigned reg ) const;
-  
+
   template <class GOP>
   typename TypeFor<Processor,GOP::SIZE>::u regread( GOP const&, unsigned idx )
   {
@@ -402,7 +401,7 @@ struct Processor : public ProcessorBase
 
   void regwrite( GObLH const&, unsigned idx, u8_t val )  { eregwrite( idx%4, 1, (idx>>2) & 1, gr_type(val).expr ); }
   void regwrite( GOd const&,   unsigned idx, u32_t val ) { eregwrite( idx,   GREGSIZE,     0, gr_type(val).expr ); }
-  
+
   addr_t                      getnip() { return next_insn_addr; }
   void                        setnip( addr_t nip, ipproc_t ipproc = ipjmp )
   {
@@ -437,7 +436,7 @@ struct Processor : public ProcessorBase
   typename TypeFor<Processor,GOP::SIZE>::u
   rmread( GOP const& g, RMOp const& rmop )
   {
-    if (not rmop.is_memory_operand())
+    if (not rmop.ismem())
       return regread( g, rmop.ereg() );
 
     return memread<GOP::SIZE>( rmop->segment, rmop->effective_address( *this ) );
@@ -447,7 +446,7 @@ struct Processor : public ProcessorBase
   void
   rmwrite( GOP const& g, RMOp const& rmop, typename TypeFor<Processor,GOP::SIZE>::u const& value )
   {
-    if (not rmop.is_memory_operand())
+    if (not rmop.ismem())
       return regwrite( g, rmop.ereg(), value );
 
     return memwrite<GOP::SIZE>( rmop->segment, rmop->effective_address( *this ), value );
@@ -466,7 +465,7 @@ struct Processor : public ProcessorBase
   frmread( RMOp const& rmop )
   {
     typedef typename TypeFor<Processor,OPSIZE>::f f_type;
-    if (not rmop.is_memory_operand()) return f_type( fread( rmop.ereg() ) );
+    if (not rmop.ismem()) return f_type( fread( rmop.ereg() ) );
     return this->fpmemread<OPSIZE>( rmop->segment, rmop->effective_address( *this ) );
   }
 
@@ -481,7 +480,7 @@ struct Processor : public ProcessorBase
   void
   frmwrite( RMOp const& rmop, typename TypeFor<Processor,OPSIZE>::f const& value )
   {
-    if (not rmop.is_memory_operand()) return fwrite( rmop.ereg(), f64_t( value ) );
+    if (not rmop.ismem()) return fwrite( rmop.ereg(), f64_t( value ) );
     fpmemwrite<OPSIZE>( rmop->segment, rmop->effective_address( *this ), value );
   }
 
@@ -491,13 +490,12 @@ struct Processor : public ProcessorBase
   struct VUConfig : public unisim::util::symbolic::vector::VUConfig
   {
     static unsigned const BYTECOUNT = VmmValue::BYTECOUNT;
-    static unsigned const REGCOUNT = VREGCOUNT;
   };
 
   struct VmmBrick { char _[sizeof(u8_t)]; };
   typedef unisim::component::cxx::vector::VUnion<VUConfig> VUnion;
-  VUnion umms[VUConfig::REGCOUNT];
-  VmmBrick vmm_storage[VUConfig::REGCOUNT][VUConfig::BYTECOUNT];
+  VUnion umms[VREGCOUNT];
+  VmmBrick vmm_storage[VREGCOUNT][VUConfig::BYTECOUNT];
 
   template <class VR> static unsigned vmm_wsize( VR const& vr ) { return VR::size() / 8; }
   static unsigned vmm_wsize( unisim::component::cxx::processor::intel::SSE const& ) { return VUConfig::BYTECOUNT; }
@@ -507,7 +505,7 @@ struct Processor : public ProcessorBase
   {
     typedef unisim::util::symbolic::TypeInfo<typename ELEM::value_type> traits;
     enum { elemcount = VR::SIZE / traits::BITSIZE };
-    
+
     VmmIndirectRead( ELEM const* elems, u8_t const& _index)
       : VmmIndirectReadBase(_index.expr)
     {
@@ -528,7 +526,7 @@ struct Processor : public ProcessorBase
     virtual ValueType const* GetType() const override { return ELEM::GetType(); }
     virtual int cmp( ExprNode const& brhs ) const override { return compare( dynamic_cast<this_type const&>(brhs) ); }
     int compare( this_type const& rhs ) const { return 0; }
-    
+
     Expr sources[elemcount];
   };
 
@@ -558,14 +556,14 @@ struct Processor : public ProcessorBase
   template <class VR, class ELEM>
   ELEM vmm_read( VR const& vr, RMOp const& rmop, unsigned sub, ELEM const& e )
   {
-    if (not rmop.is_memory_operand()) return vmm_read( vr, rmop.ereg(), sub, e );
+    if (not rmop.ismem()) return vmm_read( vr, rmop.ereg(), sub, e );
     return vmm_memread( rmop->segment, rmop->effective_address( *this ) + addr_t(sub*VUConfig::template TypeInfo<ELEM>::bytecount), e );
   }
 
   template <class VR, class ELEM>
   void vmm_write( VR const& vr, RMOp const& rmop, unsigned sub, ELEM const& e )
   {
-    if (not rmop.is_memory_operand()) return vmm_write( vr, rmop.ereg(), sub, e );
+    if (not rmop.ismem()) return vmm_write( vr, rmop.ereg(), sub, e );
     return vmm_memwrite( rmop->segment, rmop->effective_address( *this ) + addr_t(sub*VUConfig::template TypeInfo<ELEM>::bytecount), e );
   }
 
@@ -604,7 +602,7 @@ public:
   Processor();
   ~Processor()
   {
-    for (unsigned reg = 0; reg < VUConfig::REGCOUNT; ++reg)
+    for (unsigned reg = 0; reg < VREGCOUNT; ++reg)
       umms[reg].Clear(&vmm_storage[reg][0]);
   }
 
@@ -635,7 +633,7 @@ public:
   bool concretize( Expr cexp )
   {
     if (unisim::util::symbolic::ConstNodeBase const* cnode = cexp.ConstSimplify())
-      return cnode->Get( bool() );
+      return dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value;
 
     bool predicate = path->proceed( cexp );
     path = path->next( predicate );
@@ -650,7 +648,7 @@ public:
 
     return concretize( bit_t(cond).expr );
   }
-  
+
   static Operation* Decode(nat_addr_t address, uint8_t const* bytes);
 
   nat_addr_t       return_address;
@@ -744,13 +742,13 @@ Processor<MODE>::vregsinks( Processor<MODE> const& ref, unsigned reg ) const
   struct VCorruption {};
 
   unsigned const vector_size = umms[reg].size;
-  
+
   if (unsigned psize = 8*(VUConfig::BYTECOUNT - vector_size))
     path->add_sink( newPartialRegWrite( VRegID(reg), 8*vector_size, psize, new VClear(psize) ) );
-  
+
   if (vector_size == 0)
     return;
-  
+
   typename VUConfig::Byte bytes[VUConfig::BYTECOUNT];
   umms[reg].transfer( &bytes[0], const_cast<VmmBrick*>(&vmm_storage[reg][0]), vector_size, false );
 
@@ -809,7 +807,7 @@ Processor<MODE>::eregsinks( Processor<MODE> const& ref, unsigned reg ) const
         {
           Process( pos, half );
           Process( mid, half );
-        }      
+        }
     }
   } concat( *this, ref, reg );
 }
@@ -863,7 +861,7 @@ struct Intel64
   enum {GREGSIZE = 8, GREGCOUNT = 16, VREGCOUNT = 16};
 
   typedef unisim::component::cxx::processor::intel::GOq GR;
-  
+
   struct IRegID
     : public unisim::util::identifier::Identifier<IRegID>
     , public unisim::util::symbolic::WithValueType<IRegID>
@@ -915,13 +913,13 @@ struct Compat32
   enum {GREGSIZE = 4, GREGCOUNT = 8, VREGCOUNT = 8};
 
   typedef unisim::component::cxx::processor::intel::GOd GR;
-  
+
   struct IRegID
     : public unisim::util::identifier::Identifier<IRegID>
     , unisim::util::symbolic::WithValueType<IRegID>
   {
     typedef uint32_t value_type;
-    
+
     enum Code { eax = 0, ecx = 1, edx = 2, ebx = 3, esp = 4, ebp = 5, esi = 6, edi = 7, end } code;
 
     char const* c_str() const

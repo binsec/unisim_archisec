@@ -36,14 +36,6 @@
 // reference should, most probably, all go through the ModRM mechanism
 // (to hide address size management).
 
-// struct StrOp
-// {
-//   SrtOp( uint8_t _segment, uint8_t _reg ) : segment( _segment ), reg( _reg ) {} uint8_t segment; uint8_t reg;
-//   virtual ~MOp() {}
-//   virtual void  disasm_memory_operand( std::ostream& _sink ) const { throw 0; };
-//   virtual u32_t effective_address( ARCH& _arch ) const { throw 0; return u32_t( 0 ); };
-// };
-
 template <class ARCH>
 struct StringEngine
 {
@@ -106,7 +98,7 @@ namespace {
       case 2: return &se32;
       case 3: return &se64;
       }
-    throw 0;
+    struct Bad {}; throw Bad ();
     return 0;
   }
 }
@@ -117,7 +109,7 @@ struct Movs : public Operation<ARCH>
   Movs( OpBase<ARCH> const& opbase, uint8_t _segment, StringEngine<ARCH>* _str ) : Operation<ARCH>( opbase ), segment( _segment ), str( _str ) {} uint8_t segment; StringEngine<ARCH>* str;
   
   void disasm( std::ostream& _sink ) const {
-    _sink << (REP?"rep ":"") << DisasmMnemonic<OP::SIZE>( "movs" ) << str->getsrc(segment) << ',' << str->getdst();
+    _sink << (REP?"rep ":"") << DisasmMnemonic( "movs", OP::SIZE ) << ' ' << str->getsrc(segment) << ',' << str->getdst();
                                                                                                 
   }
   
@@ -243,9 +235,9 @@ template <class ARCH> struct DC<ARCH,CMPS> { Operation<ARCH>* get( InputCode<ARC
   if (auto _ = match( ic, opcode( "\xa6" ) ))
   
     {
-      if (ic.rep==0) return new Cmps<ARCH,GOb,3>( _.opbase(), ic.segment, mkse( ic ) );
+      if (ic.rep==0) return new Cmps<ARCH,GOb,0>( _.opbase(), ic.segment, mkse( ic ) );
       if (ic.rep==2) return new Cmps<ARCH,GOb,2>( _.opbase(), ic.segment, mkse( ic ) );
-      else           return new Cmps<ARCH,GOb,0>( _.opbase(), ic.segment, mkse( ic ) );
+      else           return new Cmps<ARCH,GOb,3>( _.opbase(), ic.segment, mkse( ic ) );
     }
 
   
@@ -390,7 +382,7 @@ template <class ARCH, unsigned OPSIZE, bool REP>
 struct Outs : public Operation<ARCH>
 {
   Outs( OpBase<ARCH> const& opbase, uint8_t _segment, StringEngine<ARCH>* _str ) : Operation<ARCH>( opbase ), segment( _segment ), str( _str ) {} uint8_t segment; StringEngine<ARCH>* str;
-  void disasm( std::ostream& _sink ) const { _sink << (REP?"rep ":"") << DisasmMnemonic<OPSIZE>( "outs" ) << str->getsrc(segment) << ",(" << DisasmG( GOw(), 2 ) << ")"; }
+  void disasm( std::ostream& _sink ) const { _sink << (REP?"rep ":"") << DisasmMnemonic( "outs", OPSIZE ) << ' ' << str->getsrc(segment) << ",(" << DisasmG( GOw(), 2 ) << ")"; }
 };
 
 template <class ARCH> struct DC<ARCH,OUTS> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
@@ -420,7 +412,7 @@ template <class ARCH, unsigned OPSIZE, bool REP>
 struct Ins : public Operation<ARCH>
 {
   Ins( OpBase<ARCH> const& opbase, StringEngine<ARCH>* _str ) : Operation<ARCH>( opbase ), str(_str) {}; StringEngine<ARCH>* str;
-  void disasm( std::ostream& _sink ) const { _sink << (REP?"rep ":"") << DisasmMnemonic<OPSIZE>( "ins" ) << "(" << DisasmG( GOw(), 2 ) << ")," << str->getdst(); }
+  void disasm( std::ostream& _sink ) const { _sink << (REP?"rep ":"") << DisasmMnemonic( "ins", OPSIZE ) << ' ' << "(" << DisasmG( GOw(), 2 ) << ")," << str->getdst(); }
 };
 
 template <class ARCH> struct DC<ARCH,INS> { Operation<ARCH>* get( InputCode<ARCH> const& ic )

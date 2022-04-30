@@ -56,14 +56,14 @@ namespace truth_table {
     LUT<TT,TT(~tt)> operator ! () const { return LUT<TT,TT(~tt)>(); }
   };
 
-  template <typename TT, unsigned Tbit, unsigned Tbits = 8*sizeof(TT)>
+  template <typename TT, unsigned INBIT, unsigned Tbits = 8*sizeof(TT)>
   struct InBit
   {
-    typedef InBit<TT, Tbit, Tbits> this_type;
+    typedef InBit<TT, INBIT, Tbits> this_type;
     typedef TT tt_type;
 
     static unsigned const msb = (Tbits-1);
-    static tt_type const tt = (((msb >> Tbit) & 1) ? (tt_type(1) << msb) : tt_type(0)) | InBit<tt_type,Tbit,msb>::tt;
+    static tt_type const tt = (((msb >> INBIT) & 1) ? (tt_type(1) << msb) : tt_type(0)) | InBit<tt_type,INBIT,msb>::tt;
 
     template <typename RT> LUT<TT,TT(tt&RT::tt)> operator and ( RT const& ) const { return LUT<TT,TT(tt&RT::tt)>(); }
     template <typename RT> LUT<TT,TT(tt|RT::tt)> operator  or ( RT const& ) const { return LUT<TT,TT(tt|RT::tt)>(); }
@@ -71,7 +71,7 @@ namespace truth_table {
     LUT<TT,TT(~tt)> operator ! () const { return LUT<TT,TT(~tt)>(); }
   };
 
-  template <typename TT, unsigned Tbit> struct InBit<TT, Tbit, 1> { static TT const tt = 0; };
+  template <typename TT, unsigned INBIT> struct InBit<TT, INBIT, 1> { static TT const tt = 0; };
 
   template <typename TT, bool CONST>
   struct Always

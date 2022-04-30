@@ -56,8 +56,16 @@ namespace intel {
     
     Mode() : cs_l( 0 ), cs_d( 0 ), ss_b( 0 ), pad( 0 ) {}
     Mode( uint8_t _csl, uint8_t _csd, uint8_t _ssb ) : cs_l( _csl ), cs_d( _csd ), ss_b( _ssb ), pad(0) {}
+
+    int cmp( Mode const& rhs ) const
+    {
+      if (int delta = int(cs_l) - int(rhs.cs_l)) return delta;
+      if (int delta = int(cs_d) - int(rhs.cs_d)) return delta;
+      return int(ss_b) - int(rhs.ss_b);
+    }
     
-    bool operator == ( Mode const& m ) const { return (cs_l == m.cs_l) and (cs_d == m.cs_d) and (ss_b == m.ss_b); }
+    bool operator == ( Mode const& m ) const { return cmp(m) == 0; }
+    bool operator != ( Mode const& m ) const { return cmp(m) != 0; }
   };
   
   template <class ARCH>

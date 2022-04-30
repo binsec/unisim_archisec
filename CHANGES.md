@@ -1,3 +1,8 @@
+## 0.0.3 (2022-07-24)
+
+- handling some new VEX encoded instructions (x86)
+- various bug fixes and refactoring
+
 ## 0.0.2 (2022-04-15)
 
 - handling of SSE instructions for AMD64

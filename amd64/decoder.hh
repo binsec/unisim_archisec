@@ -40,11 +40,11 @@
 #include <inttypes.h>
 
 namespace intel {
-  
+
   struct Decoder
   {
     Decoder() : mode64(false) {}
-    
+
     void process( std::ostream& sink, uint64_t addr, std::vector<uint8_t>&& code );
 
     bool mode64;

@@ -53,8 +53,9 @@ namespace intel {
     typedef typename ARCH::addr_t addr_t;
     MOp( uint8_t _segment ) : segment( _segment ) {} uint8_t segment;
     virtual ~MOp() {}
-    virtual void  disasm_memory_operand( std::ostream& _sink ) const { throw 0; };
-    virtual addr_t effective_address( ARCH& _arch ) const { throw 0; return addr_t( 0 ); };
+    struct Bad {};
+    virtual void  disasm_memory_operand( std::ostream& _sink ) const { throw Bad(); };
+    virtual addr_t effective_address( ARCH& _arch ) const { throw Bad(); return addr_t( 0 ); };
   };
   
   template <class ARCH>
@@ -63,10 +64,10 @@ namespace intel {
     RMOp( MOp<ARCH> const* _mop ) : mop(_mop) {} MOp<ARCH> const* mop;
     RMOp() = delete;
     RMOp( RMOp const& ) = delete;
-    ~RMOp() { if (is_memory_operand()) delete mop; }
+    ~RMOp() { if (ismem()) delete mop; }
     
-    bool is_memory_operand() const { return (uintptr_t( mop ) > 0x1000); }
-    bool isreg() const { return not is_memory_operand(); }
+    bool ismem() const { return (uintptr_t( mop ) > 0x1000); }
+    bool isreg() const { return not ismem(); }
     
     MOp<ARCH> const* operator -> () const { return mop; }
     // operator MOp<ARCH> const* () const { return mop; }

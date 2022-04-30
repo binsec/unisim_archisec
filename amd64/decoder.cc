@@ -150,7 +150,7 @@ void
 Decoder::process( std::ostream& sink, uint64_t addr, std::vector<uint8_t>&& code )
 {
   Translator actset( addr, std::move(code) );
-  
+
   actset.translate( mode64, sink );
 }
 

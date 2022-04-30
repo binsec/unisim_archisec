@@ -1,10 +1,14 @@
+(env
+ (_
+  (c_flags :standard -g0)
+  (cxx_flags :standard -g0)))
+
 (subdir
  unisim/util
  (include_subdirs unqualified)
  (library
   (package unisim_archisec)
   (name util)
-  (c_library_flags :standard -lgmp)
   (foreign_stubs
    (language cxx)
    (names :standard)
@@ -97,7 +101,6 @@
     debug/breakpoint_registry.tcc
     backtrace/backtrace.hh
     symbolic/symbolic.hh
-    arithmetic/i128.hh
     arithmetic/arithmetic.hh
     inlining/inlining.hh
     identifier/identifier.hh
@@ -105,13 +108,11 @@
     symbolic/binsec/binsec.hh
     symbolic/vector/vector.hh
     symbolic/symbolic.hh
-    arithmetic/i128.hh
     arithmetic/arithmetic.hh
     inlining/inlining.hh
     identifier/identifier.hh
     symbolic/vector/vector.hh
     symbolic/symbolic.hh
-    arithmetic/i128.hh
     arithmetic/arithmetic.hh
     inlining/inlining.hh
     identifier/identifier.hh
@@ -119,14 +120,7 @@
     json/json.hh
     dictionary/dictionary.hh
     dictionary/dictionary.tcc
-    arithmetic/i128.hh
-    ieee754/ieee754.hh
-    simfloat/floating.hh
-    endian/endian.hh
-    inlining/inlining.hh
-    simfloat/integer.hh
-    simfloat/floating.tcc
-    simfloat/integer.tcc))))
+    arithmetic/i128.hh))))
 
 (subdir
  unisim/component/cxx/processor/arm
@@ -180,7 +174,6 @@
    ../unisim/util/symbolic/binsec/binsec.hh
    ../unisim/util/symbolic/vector/vector.hh
    ../unisim/util/symbolic/symbolic.hh
-   ../unisim/util/arithmetic/i128.hh
    ../unisim/util/arithmetic/arithmetic.hh
    ../unisim/util/inlining/inlining.hh
    top_arm32.tcc
@@ -227,7 +220,6 @@
    ../unisim/util/symbolic/binsec/binsec.hh
    ../unisim/util/symbolic/vector/vector.hh
    ../unisim/util/symbolic/symbolic.hh
-   ../unisim/util/arithmetic/i128.hh
    ../unisim/util/arithmetic/arithmetic.hh
    ../unisim/util/inlining/inlining.hh
    ../unisim/util/identifier/identifier.hh
@@ -269,33 +261,6 @@
    tmp.hh
    types.hh
    modrm.hh
-   arch.hh
-   ../../memory/sparse/memory.hh
-   segments.hh
-   modrm.hh
-   types.hh
-   disasm.hh
-   tmp.hh
-   vectorbank.hh
-   ../../vector/vector.hh
-   ../../../../util/endian/endian.hh
-   ../../../../util/inlining/inlining.hh
-   ../../../../util/arithmetic/i128.hh
-   ../../../../service/interfaces/registers.hh
-   ../../../../service/interfaces/interface.hh
-   ../../../../service/interfaces/register.hh
-   ../../../../util/arithmetic/arithmetic.hh
-   isa/intel.tcc
-   isa/intel.hh
-   execute.hh
-   math.hh
-   isa/branch.hh
-   isa/integer.hh
-   isa/floatingpoint.hh
-   isa/move.hh
-   isa/string.hh
-   isa/special.hh
-   isa/simd.hh
    math.hh
    types.hh)))
 
@@ -308,7 +273,6 @@
   (flags :standard -I. -I..)
   (extra_deps
    arch.hh
-   ../unisim/util/arithmetic/i128.hh
    ../unisim/component/cxx/processor/intel/isa/intel.hh
    ../unisim/component/cxx/processor/intel/modrm.hh
    ../unisim/component/cxx/processor/intel/types.hh
@@ -334,7 +298,6 @@
    ../unisim/component/cxx/processor/intel/isa/special.hh
    ../unisim/component/cxx/processor/intel/isa/simd.hh
    arch.hh
-   ../unisim/util/arithmetic/i128.hh
    ../unisim/component/cxx/processor/intel/isa/intel.hh
    ../unisim/component/cxx/processor/intel/modrm.hh
    ../unisim/component/cxx/processor/intel/types.hh
@@ -351,7 +314,6 @@
    ../unisim/util/symbolic/binsec/binsec.hh
    decoder.hh
    arch.hh
-   ../unisim/util/arithmetic/i128.hh
    ../unisim/component/cxx/processor/intel/isa/intel.hh
    ../unisim/component/cxx/processor/intel/modrm.hh
    ../unisim/component/cxx/processor/intel/types.hh

@@ -1848,7 +1848,7 @@ Simulator::Simulator(int argc, char **argv, void (*LoadBuiltInConfig)(Simulator 
 	
 		// create on the fly parameters cmd-args[*] that are the remaining parameters
 		int cmd_args_dim = argv + argc - arg_end;
-			cmd_args.resize(cmd_args_dim);
+		cmd_args.resize(cmd_args_dim);
 		param_cmd_args = new variable::ParameterArray<std::string>("cmd-args", 0, &cmd_args[0], cmd_args_dim, "command line arguments");
 		for(int i = 0; i < cmd_args_dim; i++)
 		{

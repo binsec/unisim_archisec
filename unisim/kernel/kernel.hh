@@ -83,19 +83,19 @@ template <class SERVICE_IF>
 ServiceExport<SERVICE_IF>& operator >> (ServiceImport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
 
 template <class SERVICE_IF>
-ServiceImport<SERVICE_IF>& operator << (ServiceExport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
-
-template <class SERVICE_IF>
 ServiceImport<SERVICE_IF>& operator >> (ServiceImport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
-
-template <class SERVICE_IF>
-ServiceImport<SERVICE_IF>& operator << (ServiceImport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
 
 template <class SERVICE_IF>
 ServiceExport<SERVICE_IF>& operator >> (ServiceExport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
 
-template <class SERVICE_IF>
-ServiceExport<SERVICE_IF>& operator << (ServiceExport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
+// template <class SERVICE_IF>
+// ServiceImport<SERVICE_IF>& operator << (ServiceExport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
+
+// template <class SERVICE_IF>
+// ServiceImport<SERVICE_IF>& operator << (ServiceImport<SERVICE_IF>& lhs, ServiceImport<SERVICE_IF>& rhs);
+
+// template <class SERVICE_IF>
+// ServiceExport<SERVICE_IF>& operator << (ServiceExport<SERVICE_IF>& lhs, ServiceExport<SERVICE_IF>& rhs);
 
 //=============================================================================
 //=                          VariableBaseListener                             =
@@ -632,13 +632,16 @@ public:
 	SERVICE_IF *operator -> () const;
 
 	void Bind(ServicePort<SERVICE_IF>& fwd);
+	void Bind(Service<SERVICE_IF>& service);
 
 	void RequireSetup() const;
+
+private:
+	void SpreadServiceBwd(Service<SERVICE_IF>* service);
 
 protected:
 	Service<SERVICE_IF> *service;
 	Client<SERVICE_IF> *client;
-
 };
 
 template <class SERVICE_IF>
@@ -725,6 +728,20 @@ void ServicePort<SERVICE_IF>::RequireSetup() const
 }
 
 template <class SERVICE_IF>
+void ServicePort<SERVICE_IF>::Bind(Service<SERVICE_IF>& service)
+{
+	if (fwd_port)
+	{
+		std::cerr << "WARNING! Can't connect " << GetName() << " to "
+		          << service.GetName() << " because it is already connected to "
+		          << fwd_port->GetName() << std::endl;
+		return;
+	}
+
+	SpreadServiceBwd(&service);
+}
+
+template <class SERVICE_IF>
 void ServicePort<SERVICE_IF>::Bind(ServicePort<SERVICE_IF>& fwd)
 {
 	Connect(&fwd);
@@ -732,6 +749,12 @@ void ServicePort<SERVICE_IF>::Bind(ServicePort<SERVICE_IF>& fwd)
 	if (not fwd.service)
 		return;
 
+	SpreadServiceBwd(fwd.service);
+}
+
+template <class SERVICE_IF>
+void ServicePort<SERVICE_IF>::SpreadServiceBwd(Service<SERVICE_IF>* service)
+{
 	// Now service is known, it needs to be propagated upstream.
 	struct ServiceAssignment : public Visitor
 	{
@@ -740,7 +763,7 @@ void ServicePort<SERVICE_IF>::Bind(ServicePort<SERVICE_IF>& fwd)
 		{
 			static_cast<ServicePort<SERVICE_IF>&>(port).service = service;
 		}
-	} visitor( fwd.service );
+	} visitor( service );
 	
 	SpreadBwd( visitor );
 }

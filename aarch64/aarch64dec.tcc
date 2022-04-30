@@ -1729,6 +1729,8 @@ public:
 	char const* format; virtual
 	void disasm( ARCH & cpu,
 	std::ostream& sink );
+	virtual
+	void execute( ARCH & cpu );
 private:
 };
 
@@ -4901,28 +4903,6 @@ public:
 	std::ostream& sink );
 	virtual
 	void execute( ARCH & cpu );
-private:
-};
-
-template <	typename	ARCH>
-class OpSev : public Operation<	ARCH>
-{
-public:
-	OpSev(CodeType code, uint64_t addr);
-	char const* format; virtual
-	void disasm( ARCH & cpu,
-	std::ostream& sink );
-private:
-};
-
-template <	typename	ARCH>
-class OpSevl : public Operation<	ARCH>
-{
-public:
-	OpSevl(CodeType code, uint64_t addr);
-	char const* format; virtual
-	void disasm( ARCH & cpu,
-	std::ostream& sink );
 private:
 };
 
@@ -10184,6 +10164,12 @@ std::ostream& sink)
 	{
 		sink << "brk\t" << DisasmI(imm,16);
 }}
+template <	typename	ARCH>
+void OpBrk<	ARCH>::execute( ARCH & cpu)
+{
+	{
+		cpu.SoftwareBreakpoint( imm );
+}}
 
 template <	typename	ARCH>
 static Operation<	ARCH> *DecodeOpBrk(CodeType code, uint64_t addr)
@@ -15071,34 +15057,6 @@ template <	typename	ARCH>
 static Operation<	ARCH> *DecodeOpSdiv_xxx(CodeType code, uint64_t addr)
 {
 	return new OpSdiv_xxx<	ARCH>(code, addr);
-}
-
-template <	typename	ARCH>
-void OpSev<	ARCH>::disasm( ARCH & cpu,
-std::ostream& sink)
-{
-	{
-		sink << "sev";
-}}
-
-template <	typename	ARCH>
-static Operation<	ARCH> *DecodeOpSev(CodeType code, uint64_t addr)
-{
-	return new OpSev<	ARCH>(code, addr);
-}
-
-template <	typename	ARCH>
-void OpSevl<	ARCH>::disasm( ARCH & cpu,
-std::ostream& sink)
-{
-	{
-		sink << "sevl";
-}}
-
-template <	typename	ARCH>
-static Operation<	ARCH> *DecodeOpSevl(CodeType code, uint64_t addr)
-{
-	return new OpSevl<	ARCH>(code, addr);
 }
 
 template <	typename	ARCH>
@@ -22382,18 +22340,6 @@ OpSdiv_xxx<	ARCH>::OpSdiv_xxx(CodeType code, uint64_t addr) : Operation<	ARCH>(c
 }
 
 template <	typename	ARCH>
-OpSev<	ARCH>::OpSev(CodeType code, uint64_t addr) : Operation<	ARCH>(code, addr, "sev")
-{
-	format = "base,2949";
-}
-
-template <	typename	ARCH>
-OpSevl<	ARCH>::OpSevl(CodeType code, uint64_t addr) : Operation<	ARCH>(code, addr, "sevl")
-{
-	format = "base,2950";
-}
-
-template <	typename	ARCH>
 OpSmaddl_xw<	ARCH>::OpSmaddl_xw(CodeType code, uint64_t addr) : Operation<	ARCH>(code, addr, "smaddl_xw")
 {
 	rd = uint8_t(code & 0x1f);
@@ -24157,8 +24103,6 @@ Decoder<	ARCH>::Decoder()
 	decode_table.push_back(DecodeTableEntry<	ARCH>(0x9b208000UL, 0xffe08000UL, DecodeOpSmsubl_xw<	ARCH>));
 	decode_table.push_back(DecodeTableEntry<	ARCH>(0xd4000003UL, 0xffe0001fUL, DecodeOpSmc<	ARCH>));
 	decode_table.push_back(DecodeTableEntry<	ARCH>(0x9b200000UL, 0xffe08000UL, DecodeOpSmaddl_xw<	ARCH>));
-	decode_table.push_back(DecodeTableEntry<	ARCH>(0xd50320bfUL, 0xffffffffUL, DecodeOpSevl<	ARCH>));
-	decode_table.push_back(DecodeTableEntry<	ARCH>(0xd503209fUL, 0xffffffffUL, DecodeOpSev<	ARCH>));
 	decode_table.push_back(DecodeTableEntry<	ARCH>(0x9ac00c00UL, 0xffe0fc00UL, DecodeOpSdiv_xxx<	ARCH>));
 	decode_table.push_back(DecodeTableEntry<	ARCH>(0x1ac00c00UL, 0xffe0fc00UL, DecodeOpSdiv_www<	ARCH>));
 	decode_table.push_back(DecodeTableEntry<	ARCH>(0x93400000UL, 0xffc00000UL, DecodeOpSbfm_x<	ARCH>));

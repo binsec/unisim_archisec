@@ -61,12 +61,13 @@ namespace intel {
                      FINCDECSTP, FDIV, FDIVR, FFREE, FICOM, FILD, FINIT, FIST, FISTTP,
                      FLD, FLDCONST, FLSCW, FLSENV, FMUL, FNOP, FPREM, FRNDINT, FSCALE, FMATH,
                      FLSSTATE, FST, FSTSW, FSUB, FSUBR, FTST, FUCOM, FXAM, FXCH, FOBSOLETE,
-                     PUSH, PUSHA, PUSHF, POP, POPA, POPF, MOV, MOVZX, MOVSX, STD, ARPL, CMPXCHG,
+                     PUSH, POP, MOV, MOVZX, MOVSX, STD, ARPL, CMPXCHG,
                      CMPXCHG8B, XCHG, XADD, HINT, NOP, CMOVCC, BT, BTC, BTR, BTS, BSWAP, MOVNTI, LFP,
                      MOVS, STOS, CMPS, SCAS, LODS, OUTS, INS, CPUID, RDTSC, XBV, CVT, HLT, FENCE,
-                     PUNPCK, PBM, MOVGV, MOVDQ, MOVFP, MOVFPC, PCMPEQ, PALIGNR, VFP,
-                     PMOVMSKB, VMOVSD, MXCSR, UCOMIS, PREFETCH, VFPCVT, PMINMAX, VINTBIN, MOVQ,
-                     PSHUFD, PSHUFB, PSHDQ, PTEST, PINSR, PCMPSTR,
+                     PUNPCK, PBM, MOVGV, MOVDQ, MOVFP, MOVFPC, PCMPEQ, PALIGNR, VBINARY, VFPUNARY,
+                     PMOVMSKB, VMOVSD, VMOVZX, MXCSR, UCOMIS, PREFETCH, VFPCVT, PMINMAX, PMULUDQ,
+                     VSHIMM, MOVQ, BROADCAST, EXTRACT, INSERT, PACK_S, PSHUFD, PSHUFB, PSHIFT,
+                     PSHDQ, PTEST, PINSR, PCMPSTR, VFPCMP, SHUFP, VZEROUPPER,
                      operation_count };
 
   template <class ARCH>
@@ -145,7 +146,7 @@ namespace intel {
   template <typename intT, unsigned BYTECOUNT>
   intT getimm( uint8_t const* _bytes )
   {
-    if (sizeof(intT) < BYTECOUNT) throw 0;
+    if (sizeof(intT) < BYTECOUNT) { struct Bad {}; throw Bad (); }
     intT tmp = 0;
     for (unsigned byte = 0; byte < BYTECOUNT; ++byte)
       tmp |= (intT( _bytes[byte] ) << (8*byte));
@@ -189,14 +190,15 @@ namespace intel {
     }
     
     virtual ~RMOpFabric() {}
-    virtual void newM    (                               uint8_t base ) { throw 0; }
-    virtual void newSIB  ( uint8_t scale, uint8_t index, uint8_t base ) { throw 0; }
-    virtual void newSID  ( uint8_t scale, uint8_t index,               int32_t disp ) { throw 0; }
-    virtual void newD    (                                             int64_t disp ) { throw 0; }
-    virtual void newRR   (                                             int32_t disp ) { throw 0; }
-    virtual void newBD   (                               uint8_t base, int32_t disp ) { throw 0; }
-    virtual void newSIBD ( uint8_t scale, uint8_t index, uint8_t base, int32_t disp ) { throw 0; }
-    virtual void makeROp ( unsigned reg ) { throw 0; }
+    struct Bad {};
+    virtual void newM    (                               uint8_t base ) { throw Bad(); }
+    virtual void newSIB  ( uint8_t scale, uint8_t index, uint8_t base ) { throw Bad(); }
+    virtual void newSID  ( uint8_t scale, uint8_t index,               int32_t disp ) { throw Bad(); }
+    virtual void newD    (                                             int64_t disp ) { throw Bad(); }
+    virtual void newRR   (                                             int32_t disp ) { throw Bad(); }
+    virtual void newBD   (                               uint8_t base, int32_t disp ) { throw Bad(); }
+    virtual void newSIBD ( uint8_t scale, uint8_t index, uint8_t base, int32_t disp ) { throw Bad(); }
+    virtual void makeROp ( unsigned reg ) { throw Bad(); }
 
     uint8_t addrclass    : 2;
     uint8_t segment      : 3;
@@ -298,6 +300,10 @@ namespace intel {
     typedef Vex<LENGTH> this_type;
     template <typename RHS>
     AndSeq<this_type, RHS> operator & ( RHS const& rhs ) { return AndSeq<this_type, RHS>( *this, rhs ); }
+
+    typedef Vex<LENGTH-1> Head;
+    template <typename RHS>
+    AndSeq<Head, typename RHS::B> operator + ( RHS const& rhs ) { return AndSeq<Head, typename RHS::B>( &ref[0], ref[LENGTH-1] ); }
 
     typedef AndSeq<this_type, MRMOpCode> WithMRMOpCode;
     WithMRMOpCode operator / ( int code ) { return WithMRMOpCode( *this, MRMOpCode( code ) ); }
@@ -456,33 +462,34 @@ namespace intel {
   struct RMOpFabricT : RMOpFabric
   {
     RMOpFabricT( CodeBase const& cb ) : RMOpFabric( cb ), mop() {} MOp<ARCH>* mop;
+    struct Bad {};
     void newM( uint8_t base ) override
     {
       if      (address_size() == 16) mop = new ModM<ARCH,16>( segment, base );
       else if (address_size() == 32) mop = new ModM<ARCH,32>( segment, base );
       else if (address_size() == 64) mop = new ModM<ARCH,64>( segment, base );
-      else throw 0;
+      else throw Bad();
     }
     void newSIB( uint8_t scale, uint8_t index, uint8_t base ) override
     {
       if      (address_size() == 16) mop = new ModSIB<ARCH,16>( segment, scale, index, base );
       else if (address_size() == 32) mop = new ModSIB<ARCH,32>( segment, scale, index, base );
       else if (address_size() == 64) mop = new ModSIB<ARCH,64>( segment, scale, index, base );
-      else throw 0;
+      else throw Bad();
     }
     void newSID( uint8_t scale, uint8_t index, int32_t disp ) override
     {
       if      (address_size() == 16) mop = new ModSID<ARCH,16>( segment, scale, index, disp );
       else if (address_size() == 32) mop = new ModSID<ARCH,32>( segment, scale, index, disp );
       else if (address_size() == 64) mop = new ModSID<ARCH,64>( segment, scale, index, disp );
-      else throw 0;
+      else throw Bad();
     }
     void newD( int64_t disp ) override
     {
       if      (address_size() == 16) mop = new ModD<ARCH,int16_t>( segment, disp );
       else if (address_size() == 32) mop = new ModD<ARCH,int32_t>( segment, disp );
       else if (address_size() == 64) mop = new ModD<ARCH,int64_t>( segment, disp );
-      else throw 0;
+      else throw Bad();
     }
     void newRR( int32_t disp ) override { mop = new ModRR<ARCH>( segment, disp ); }
     void newBD( uint8_t base, int32_t disp ) override
@@ -490,14 +497,14 @@ namespace intel {
       if      (address_size() == 16) mop = new ModBD<ARCH,16>( segment, base, disp );
       else if (address_size() == 32) mop = new ModBD<ARCH,32>( segment, base, disp );
       else if (address_size() == 64) mop = new ModBD<ARCH,64>( segment, base, disp );
-      else throw 0;
+      else throw Bad();
     }
     void newSIBD( uint8_t scale, uint8_t index, uint8_t base, int32_t disp ) override
     {
       if      (address_size() == 16) mop = new ModSIBD<ARCH,16>( segment, scale, index, base, disp );
       else if (address_size() == 32) mop = new ModSIBD<ARCH,32>( segment, scale, index, base, disp );
       else if (address_size() == 64) mop = new ModSIBD<ARCH,64>( segment, scale, index, base, disp );
-      else throw 0;
+      else throw Bad();
     }
     void makeROp( unsigned reg ) override { mop = (MOp<ARCH>*)( uintptr_t( reg ) ); }
   };
@@ -508,8 +515,8 @@ namespace intel {
     auto _ = (uint8_t const*)"";
     Lockable l;
     if ((pattern.get( l, _ ) - _) != 5)
-      throw 0;
-    return PATTERN( pattern );
+      { struct Bad {}; throw Bad(); }
+    return PATTERN( std::move(pattern) );
   }
   
   struct RM
@@ -698,7 +705,7 @@ namespace intel {
           break;
         }
 
-      throw 0;
+      struct Bad {}; throw Bad();
       return 0;
     }
 
@@ -716,7 +723,7 @@ namespace intel {
       switch (accept)
         {
         default: break;
-        case regonly: throw 0;
+        case regonly: { struct Bad {}; throw Bad(); }
         case standard: accept = lockable; break;
         }
       return bytes + 3;
@@ -812,7 +819,7 @@ namespace intel {
 
     template <typename PROPERTY> void find( PROPERTY& out, uint8_t const* bytes )
     {
-      if (pattern.get( out, bytes )) throw 0;
+      if (pattern.get( out, bytes )) { struct Bad {}; throw Bad(); }
     }
     
     // template <typename INT>
