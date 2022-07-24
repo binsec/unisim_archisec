@@ -119,8 +119,7 @@
     json/json.tcc
     json/json.hh
     dictionary/dictionary.hh
-    dictionary/dictionary.tcc
-    arithmetic/i128.hh))))
+    dictionary/dictionary.tcc))))
 
 (subdir
  unisim/component/cxx/processor/arm
