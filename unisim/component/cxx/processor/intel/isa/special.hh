@@ -421,17 +421,81 @@ template <class ARCH> struct DC<ARCH,HLT> { Operation<ARCH>* get( InputCode<ARCH
 // 
 // verw.disasm = { _sink << "verw " << DisasmEw( modrm, segment ); };
 // 
-// op xsave( 0x0f[8]:> <:0xae[8]:> <:?[2]:0b100[3]:?[3]:> rewind <:*modrm[ModRM] );
-// 
-// xsave.disasm = { _sink << "xsave " << DisasmM( modrm, segment ); };
-// 
+
+template <class ARCH>
+struct XSave : public Operation<ARCH>
+{
+  XSave( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, XSaveMode _mode, bool _is64 ) : Operation<ARCH>( opbase ), rmop(_rmop), mode(_mode), is64(_is64) {}
+  
+  void disasm( std::ostream& sink ) const
+  {
+    sink << "xsave";
+    if      (mode.code == mode.BASE) sink << "";
+    else if (mode.code == mode.OPT)  sink << "opt";
+    else if (mode.code == mode.C)    sink << "c";
+    else if (mode.code == mode.S)    sink << "s";
+    else throw 0;
+    if (is64) sink << "64";
+  }
+  
+  void execute( ARCH& arch ) const
+  {
+    typedef typename ARCH::u64_t u64_t;
+    arch.xsave( mode, is64, (u64_t(arch.regread( GOd(), 2 )) << 32) | (u64_t(arch.regread( GOd(), 0 )) << 0), rmop );
+  }
+
+  RMOp<ARCH> rmop;
+  XSaveMode mode;
+  bool is64;
+};
+
+template <class ARCH>
+struct XRstor : public Operation<ARCH>
+{
+  XRstor( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, XSaveMode _mode, bool _is64 ) : Operation<ARCH>( opbase ), rmop(_rmop), mode(_mode), is64(_is64) {}
+  
+  void disasm( std::ostream& sink ) const
+  {
+    sink << "xrstor";
+    if      (mode.code == mode.BASE) sink << "";
+    else if (mode.code == mode.S)    sink << "s";
+    else throw 0;
+    if (is64) sink << "64";
+  }
+  
+  void execute( ARCH& arch ) const
+  {
+    typedef typename ARCH::u64_t u64_t;
+    arch.xrstor( mode, is64, (u64_t(arch.regread( GOd(), 2 )) << 32) | (u64_t(arch.regread( GOd(), 0 )) << 0), rmop );
+  }
+
+  RMOp<ARCH> rmop;
+  XSaveMode mode;
+  bool is64;
+};
+
+template <class ARCH> struct DC<ARCH,XSAVE>
+{ Operation<ARCH>* get( InputCode<ARCH> const& ic ) {
+  if (ic.lock_f0) return 0;
+
+  if (auto _ = match( ic, opcode( "\x0f\xae" ) /4 & RM_mem() )) return new XSave<ARCH>( _.opbase(), _.rmop(), XSaveMode::BASE, ic.rex_w );
+
+  if (auto _ = match( ic, opcode( "\x0f\xae" ) /5 & RM_mem() )) return new XRstor<ARCH>( _.opbase(), _.rmop(), XSaveMode::BASE, ic.rex_w );
+
+  if (auto _ = match( ic, opcode( "\x0f\xae" ) /6 & RM_mem() )) return new XSave<ARCH>( _.opbase(), _.rmop(), XSaveMode::OPT, ic.rex_w );
+
+  if (auto _ = match( ic, opcode( "\x0f\xc7" ) /4 & RM_mem() )) return new XSave<ARCH>( _.opbase(), _.rmop(), XSaveMode::C, ic.rex_w );
+
+  if (auto _ = match( ic, opcode( "\x0f\xc7" ) /5 & RM_mem() )) return new XSave<ARCH>( _.opbase(), _.rmop(), XSaveMode::S, ic.rex_w );
+
+  if (auto _ = match( ic, opcode( "\x0f\xc7" ) /3 & RM_mem() )) return new XRstor<ARCH>( _.opbase(), _.rmop(), XSaveMode::S, ic.rex_w );
+
+  return 0;
+}};
+
 // op xrstor( 0x0f[8]:> <:0xae[8]:> <:?[2]:0b101[3]:?[3]:> rewind <:*modrm[ModRM] );
 // 
 // xrstor.disasm = { _sink << "xrstor " << DisasmM( modrm, segment ); };
-// 
-// op xsaveopt( 0x0f[8]:> <:0xae[8]:> <:?[2]:0b110[3]:?[3]:> rewind <:*modrm[ModRM] );
-// 
-// xsaveopt.disasm = { _sink << "xsaveopt " << DisasmM( modrm, segment ); };
 // 
 // op clflush( 0x0f[8]:> <:0xae[8]:> <:?[2]:0b111[3]:?[3]:> rewind <:*modrm[ModRM] );
 // 

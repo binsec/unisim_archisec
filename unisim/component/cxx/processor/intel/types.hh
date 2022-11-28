@@ -35,6 +35,7 @@
 #ifndef __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_TYPES_HH__
 #define __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_TYPES_HH__
 
+#include <unisim/util/identifier/identifier.hh>
 #include <cstdint>
 
 namespace unisim {
@@ -110,6 +111,28 @@ namespace intel {
 
   enum x87frnd_mode_t { x87frnd_error = -1, x87frnd_nearest = 0, x87frnd_down = 1, x87frnd_up = 2, x87frnd_toward0 = 3 };
   
+  struct XSaveMode : public unisim::util::identifier::Identifier<XSaveMode>
+  {
+    enum Code { BASE = 0, OPT, C, S, end } code;
+
+    char const* c_str() const
+    {
+      switch (code)
+        {
+        default: break;
+        case BASE: return "base";
+        case  OPT: return "opt";
+        case    C: return "c";
+        case    S: return "s";
+        }
+      return "NA";
+    }
+
+    XSaveMode() : code(end) {}
+    XSaveMode( Code _code ) : code(_code) {}
+    XSaveMode( char const* _code ) : code(end) { init( _code ); }
+  };
+
 } // end of namespace intel
 } // end of namespace processor
 } // end of namespace cxx

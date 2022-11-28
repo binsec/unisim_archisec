@@ -1,3 +1,8 @@
+## 0.0.4 (2023-02-15)
+
+- better handling of x86 flags
+- various bug fixes and refactoring
+
 ## 0.0.3 (2022-07-24)
 
 - handling some new VEX encoded instructions (x86)

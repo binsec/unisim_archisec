@@ -64,6 +64,7 @@ namespace intel {
     RMOp( MOp<ARCH> const* _mop ) : mop(_mop) {} MOp<ARCH> const* mop;
     RMOp() = delete;
     RMOp( RMOp const& ) = delete;
+    RMOp(RMOp&& _rmop) : mop(_rmop.mop) { _rmop.mop = 0; }
     ~RMOp() { if (ismem()) delete mop; }
     
     bool ismem() const { return (uintptr_t( mop ) > 0x1000); }
@@ -72,7 +73,7 @@ namespace intel {
     MOp<ARCH> const* operator -> () const { return mop; }
     // operator MOp<ARCH> const* () const { return mop; }
     MOp<ARCH> const* memop() const { return mop; }
-    MOp<ARCH> const* release() { MOp<ARCH> const* res = mop; mop = 0; return res; }
+    //    MOp<ARCH> const* release() { MOp<ARCH> const* res = mop; mop = 0; return res; }
     unsigned ereg() const { return unsigned( uintptr_t( mop ) ); }
   };
   

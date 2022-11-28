@@ -676,7 +676,7 @@ struct Fild : public Operation<ARCH>
   typedef typename ARCH::f64_t f64_t;
   Fild( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
   
-  void disasm( std::ostream& sink ) const { sink << "fild" << (&"ll "[2-SB<OP::SIZE/16>::begin]) << DisasmM( rmop ); }
+  void disasm( std::ostream& sink ) const { sink << "fild" << (&"ll "[2-meta::BitScan<OP::SIZE/16>::forward]) << DisasmM( rmop ); }
   void execute( ARCH& arch ) const { arch.fpush( f64_t( typename TypeFor<ARCH,OP::SIZE>::s( arch.rmread( OP(), rmop ) ) ) ); }
 };
 
@@ -724,7 +724,7 @@ struct Fist : public Operation<ARCH>
 {
   typedef typename ARCH::f64_t f64_t;
   Fist( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  void disasm( std::ostream& sink ) const { sink << "fist" << (&"ll "[2-SB<OPSIZE/16>::begin]) << DisasmM( rmop ); }
+  void disasm( std::ostream& sink ) const { sink << "fist" << (&"ll "[2-meta::BitScan<OPSIZE/16>::forward]) << DisasmM( rmop ); }
   typedef typename TypeFor<ARCH,OPSIZE>::s s_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   // void execute( ARCH& arch ) const { rmop->write_e<OPSIZE>( arch, u_type( s_type( firound( arch.fread( 0 ), arch.fcwreadRC() ) ) ) ); if (P) arch.fpop(); }
@@ -762,7 +762,7 @@ struct Fisttp : public Operation<ARCH>
 {
   typedef typename ARCH::f64_t f64_t;
   Fisttp( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  void disasm( std::ostream& sink ) const { sink << "fisttp" << (&"ll "[2-SB<OPSIZE/16>::begin]) << DisasmM( rmop ); }
+  void disasm( std::ostream& sink ) const { sink << "fisttp" << (&"ll "[2-meta::BitScan<OPSIZE/16>::forward]) << DisasmM( rmop ); }
 };
 
 template <class ARCH> struct DC<ARCH,FISTTP> { Operation<ARCH>* get( InputCode<ARCH> const& ic )

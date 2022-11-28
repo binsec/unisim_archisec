@@ -40,10 +40,11 @@ namespace component {
 namespace cxx {
 namespace processor {
 namespace intel {
+namespace meta {
 
   template <unsigned _Value>
-  struct SB { enum { begin = SB<((_Value-1) & ~_Value)>::end, end = (1 + SB<(_Value >> 1)>::end) }; };
-  template <> struct SB<0u>{ enum { end = 0 }; };
+  struct BitScan { enum { forward = BitScan<((_Value-1) & ~_Value)>::end, reverse = BitScan<(_Value >> 1)>::end, begin = forward, end = reverse+1 }; };
+  template <> struct BitScan<0u>{ enum { end = 0 }; };
   
   template <unsigned VAL>
   struct UI {};
@@ -60,7 +61,8 @@ namespace intel {
   template <> struct __unsigned<unsigned int> { typedef unsigned int type; };
   template <> struct __unsigned<unsigned long> { typedef unsigned long type; };
   template <> struct __unsigned<unsigned long long> { typedef unsigned long long type; };
-  
+
+} // end of namespace meta
 } // end of namespace intel
 } // end of namespace processor
 } // end of namespace cxx

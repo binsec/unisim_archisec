@@ -1009,6 +1009,21 @@ namespace binsec {
     ctx.GenCode( action_tree, beglabel, endlabel );
   }
 
+  void
+  UndefinedValueBase::Repr( std::ostream& sink ) const
+  {
+    sink << "UndefinedValue<";
+    GetType()->GetName(sink);
+    sink << ">()";
+  }
+
+  int
+  UndefinedValueBase::GenCode(Label&, Variables&, std::ostream& sink) const
+  {
+    sink << "\\undef";
+    return GetType()->GetBitSize();
+  }
+
 } /* end of namespace binsec */
 } /* end of namespace symbolic */
 } /* end of namespace util */

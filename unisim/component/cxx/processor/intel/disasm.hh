@@ -197,7 +197,7 @@ namespace intel {
     
     void operator () ( std::ostream& sink ) const
     {
-      typename __unsigned<T>::type uv = value;
+      typename meta::__unsigned<T>::type uv = value;
       if (std::numeric_limits<T>::is_signed and value < T(0))
         { PutChar(sink, '-'); uv = -value; }
       PutHex( sink, uv );

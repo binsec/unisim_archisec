@@ -33,10 +33,23 @@
  */
  
 #include <inttypes.h>
+#include <iostream>
 
 namespace unisim {
 namespace util {
 namespace arithmetic {
+
+  void print_integer( std::ostream& sink, bool is_signed, unsigned cellcount, uint32_t const* cells )
+  {
+    sink << "Integer<CELLCOUNT,SIGNED>([" << std::hex;
+    
+    for (char const* sep = ""; cellcount-- > 0; sep = ":")
+      {
+        sink << sep << "0x" << cells[cellcount];
+      }
+    while (cellcount-->0)
+      sink << std::dec << "])";
+  }
 
 } // end of namespace arithmetic
 } // end of namespace util

@@ -200,7 +200,7 @@ struct ProcessorBase
   //   unsigned reg;
   // };
 
-  struct VmmIndirectReadBase : public ExprNode
+  struct VmmIndirectReadBase : public unisim::util::symbolic::binsec::ASExprNode
   {// Parent of VmmIndirectRead
     VmmIndirectReadBase(Expr const& _index) : index(_index) {}
     virtual void Repr( std::ostream& sink ) const override;
@@ -250,6 +250,7 @@ struct ProcessorBase
 
   bit_t                       flagread( FLAG flag ) { return bit_t(flagvalues[flag.idx()]); }
   void                        flagwrite( FLAG flag, bit_t fval ) { flagvalues[flag.idx()] = fval.expr; }
+  void                        flagwrite( FLAG flag, bit_t fval, bit_t def );
 
   /*** SEGMENTS ***/
   struct SegmentID : public unisim::util::identifier::Identifier<SegmentID>
@@ -284,6 +285,25 @@ struct ProcessorBase
   ActionNode*      path;
   ipproc_t         next_insn_mode;
   bool             abort;
+
+  bool concretize( Expr cexp )
+  {
+    if (unisim::util::symbolic::ConstNodeBase const* cnode = cexp.ConstSimplify())
+      return dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value;
+
+    bool predicate = path->proceed( cexp );
+    path = path->next( predicate );
+    return predicate;
+  }
+
+  template <typename T>
+  bool Test( unisim::util::symbolic::SmartValue<T> const& cond )
+  {
+    if (not cond.expr.good())
+      throw std::logic_error( "Not a valid condition" );
+
+    return concretize( bit_t(cond).expr );
+  }
 };
 
 template <class MODE>
@@ -396,7 +416,9 @@ struct Processor : public ProcessorBase
 
   template <class GOP> void regwrite( GOP const&, unsigned idx, typename TypeFor<Processor,GOP::SIZE>::u const& val )
   {
-    eregwrite( idx, GOP::SIZE / 8, 0, gr_type(val).expr );
+    unsigned const size = GOP::SIZE / 8;
+    if(size > MODE::GREGSIZE) throw Undefined();
+    eregwrite( idx, size, 0, gr_type(val).expr );
   }
 
   void regwrite( GObLH const&, unsigned idx, u8_t val )  { eregwrite( idx%4, 1, (idx>>2) & 1, gr_type(val).expr ); }
@@ -524,6 +546,33 @@ struct Processor : public ProcessorBase
       return ExprNode::GetSub(idx);
     }
     virtual ValueType const* GetType() const override { return ELEM::GetType(); }
+    virtual int GenCode(unisim::util::symbolic::binsec::Label& label, unisim::util::symbolic::binsec::Variables& vars, std::ostream& sink) const override {
+      for (int i = 0; i < elemcount - 1; i += 1) {
+	sink << "(if";
+	ASExprNode::GenerateCode( GetSub(elemcount), vars, label, sink );
+	sink << " = "
+	     << unisim::util::symbolic::binsec::dbx(traits::BITSIZE/8, i)
+	     << " then ";
+	ASExprNode::GenerateCode( GetSub(i), vars, label, sink );
+	sink << " else ";
+      }
+      ASExprNode::GenerateCode( GetSub(elemcount - 1), vars, label, sink );
+      for (int i = 0; i < elemcount - 1; i += 1) {
+	sink << ')';
+      }
+      // sink << "((";
+      // for (int i = elemcount - 1; 0 < i; i -= 1) {
+      // 	ASExprNode::GenerateCode( GetSub(i), vars, label, sink );
+      // 	sink << " :: ";
+      // }
+      // ASExprNode::GenerateCode( GetSub(0), vars, label, sink );
+      // sink << ") >>u (" << traits::BITSIZE
+      // 	   << '<' << GetVSize() << "> * (extu ";
+      // ASExprNode::GenerateCode( GetSub(elemcount), vars, label, sink );
+      // sink << ' ' << GetVSize() << "))){0," << traits::BITSIZE - 1 << '}';
+      return traits::BITSIZE;
+    }
+
     virtual int cmp( ExprNode const& brhs ) const override { return compare( dynamic_cast<this_type const&>(brhs) ); }
     int compare( this_type const& rhs ) const { return 0; }
 
@@ -626,28 +675,31 @@ public:
 
   void _DE()  { abort = true; }
 
+  void xsave(unisim::component::cxx::processor::intel::XSaveMode mode, bool is64, u64_t bv, RMOp const& rmop) { throw Unimplemented(); /*hardware*/ }
+  void xrstor(unisim::component::cxx::processor::intel::XSaveMode mode, bool is64, u64_t bv, RMOp const& rmop) { throw Unimplemented(); /*hardware*/ }
+
   //   =====================================================================
   //   =                 Internal Instruction Control Flow                 =
   //   =====================================================================
 
-  bool concretize( Expr cexp )
-  {
-    if (unisim::util::symbolic::ConstNodeBase const* cnode = cexp.ConstSimplify())
-      return dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value;
+  // bool concretize( Expr cexp )
+  // {
+  //   if (unisim::util::symbolic::ConstNodeBase const* cnode = cexp.ConstSimplify())
+  //     return dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value;
 
-    bool predicate = path->proceed( cexp );
-    path = path->next( predicate );
-    return predicate;
-  }
+  //   bool predicate = path->proceed( cexp );
+  //   path = path->next( predicate );
+  //   return predicate;
+  // }
 
-  template <typename T>
-  bool Test( unisim::util::symbolic::SmartValue<T> const& cond )
-  {
-    if (not cond.expr.good())
-      throw std::logic_error( "Not a valid condition" );
+  // template <typename T>
+  // bool Test( unisim::util::symbolic::SmartValue<T> const& cond )
+  // {
+  //   if (not cond.expr.good())
+  //     throw std::logic_error( "Not a valid condition" );
 
-    return concretize( bit_t(cond).expr );
-  }
+  //   return concretize( bit_t(cond).expr );
+  // }
 
   static Operation* Decode(nat_addr_t address, uint8_t const* bytes);
 

@@ -133,6 +133,19 @@ ProcessorBase::VmmIndirectReadBase::Repr( std::ostream& sink ) const
   sink << index << ")";
 }
 
+void
+ProcessorBase::flagwrite( FLAG flag, bit_t fval, bit_t def )
+{
+  if (unisim::util::symbolic::ConstNodeBase const* cnode = def.expr.ConstSimplify())
+    {
+      flagvalues[flag.idx()] = dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value ? fval.expr : new unisim::util::symbolic::binsec::UndefinedValue<bool>();
+    }
+  else
+    {
+      flagvalues[flag.idx()] = ((def and fval) or ((not def) and bit_t(new unisim::util::symbolic::binsec::UndefinedValue<bool>()))).expr;
+    }
+}
+
 namespace
 {
   template <class OP>
@@ -156,3 +169,4 @@ void show(unsigned idx, unisim::util::symbolic::ExprNode const* node)
     node->Repr(std::cerr);
   std::cerr << "\n";
 }
+

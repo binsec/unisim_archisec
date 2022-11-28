@@ -487,9 +487,9 @@ namespace symbolic {
       warn() << "Unhandled unary operation: " << op.c_str() << "\n";
       return 0;
     }
-    float GetFloat( float ) const override { return value; }
-    double GetFloat( double ) const override { return value; }
-    long double GetFloat( long double ) const override { return value; }
+    float GetFloat( float ) const override { return float(value); }
+    double GetFloat( double ) const override { return double(value); }
+    long double GetFloat( long double ) const override { typedef long double long_double; return long_double(value); }
     uint64_t GetBits(unsigned idx) const override
     {
       if (std::is_floating_point<VALUE_TYPE>::value)
@@ -498,7 +498,7 @@ namespace symbolic {
         }
       else if (idx == 0)
         {
-          return value;
+          return uint64_t(value);
         }
       else if (std::is_signed<VALUE_TYPE>::value)
         {

@@ -337,7 +337,7 @@ struct MovImm : public Operation<ARCH>
 template <class ARCH, class OP, bool STOE>
 struct MovSeg : public Operation<ARCH>
 {
-  MovSeg( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _seg ) : Operation<ARCH>( opbase ), seg( _seg ), rm( _rm ) {} uint8_t seg; RMOp<ARCH> rm;
+  MovSeg( OpBase<ARCH> const& opbase, RMOp<ARCH>&& _rm, uint8_t _seg ) : Operation<ARCH>( opbase ), seg( _seg ), rm( std::move(_rm) ) {} uint8_t seg; RMOp<ARCH> rm;
   void disasm( std::ostream& sink ) const {
     if (STOE) sink << "mov " << DisasmS( seg ) << ',' << DisasmE( OP(), rm );
     else      sink << "mov " << DisasmE( OP(), rm ) << ',' << DisasmS( seg );
@@ -464,12 +464,12 @@ template <class ARCH> struct DC<ARCH,MOV> { Operation<ARCH>* get( InputCode<ARCH
 
   return 0;
 }
-template <bool DIR> Operation<ARCH>* newMovSeg( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, MOp<ARCH> const* rm, unsigned gn )
+template <bool DIR> Operation<ARCH>* newMovSeg( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, unsigned gn )
 {
   if (gn >= 6) return 0; /* Intel manual only says encoding reserved, do not use... */
-  if (ic.opsize()==16) return new MovSeg<ARCH,GOw,DIR>( opbase, rm, gn );
-  if (ic.opsize()==32) return new MovSeg<ARCH,GOd,DIR>( opbase, rm, gn );
-  if (ic.opsize()==64) return new MovSeg<ARCH,GOq,DIR>( opbase, rm, gn );
+  if (ic.opsize()==16) return new MovSeg<ARCH,GOw,DIR>( opbase, std::move(rm), gn );
+  if (ic.opsize()==32) return new MovSeg<ARCH,GOd,DIR>( opbase, std::move(rm), gn );
+  if (ic.opsize()==64) return new MovSeg<ARCH,GOq,DIR>( opbase, std::move(rm), gn );
   return 0;
 }
 };
@@ -606,11 +606,22 @@ struct CmpXchg : public Operation<ARCH>
 
   void execute( ARCH& arch ) const
   {
-    auto mem_operand = arch.rmread( OP(), rm );
-    typename ARCH::bit_t equal = (arch.regread( OP(), 0 ) == mem_operand);
-    arch.flagwrite( ARCH::FLAG::ZF, equal );
-    if (arch.Test( equal )) arch.rmwrite( OP(), rm, arch.regread( OP(), gn ) );
-    else                 arch.regwrite( OP(), 0, mem_operand );
+    auto dst_operand = arch.rmread( OP(), rm );
+
+    eval_sub( arch, arch.regread( OP(), 0 ), dst_operand );
+
+    if (arch.Test(arch.flagread(ARCH::FLAG::ZF)))
+      arch.rmwrite( OP(), rm, arch.regread( OP(), gn ) );
+    else
+      arch.regwrite( OP(), 0, dst_operand );
+    // """To simplify the interface to the processor’s bus, the
+    // destination operand receives a write cycle without regard to
+    // the result of the comparison.  The destination operand is
+    // written back if the comparison fails; otherwise, the source
+    // operand is written into the destination.  (The processor never
+    // produces a locked read without also producing a locked
+    // write.)"""  TODO: should we add `arch.rmwrite( OP(), rm,
+    // dst_operand );` to the else clause ?
   }
 };
 
@@ -774,7 +785,8 @@ struct XAddEG : public Operation<ARCH>
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     u_type a = arch.rmread( OP(), rm ), b = arch.regread( OP(), gn );
-    arch.rmwrite( OP(), rm, a + b  );
+    u_type sum = eval_add( arch, a, b );
+    arch.rmwrite( OP(), rm, sum  );
     arch.regwrite( OP(), gn, a );
   }
 };
@@ -854,13 +866,13 @@ struct BtRM : public Operation<ARCH>
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     typedef typename ARCH::addr_t addr_t;
 
-    enum { BITSHIFT = SB<OP::SIZE>::begin, LOGOPBYTES = SB<OP::SIZE/8>::begin };
+    enum { BITSHIFT = meta::BitScan<OP::SIZE>::forward, LOGOPBYTES = meta::BitScan<OP::SIZE/8>::forward };
 
     typename TypeFor<ARCH,OP::SIZE>::s str_bit( arch.regread( OP(), gn ) );
 
     addr_t offset = addr_t((str_bit >> BITSHIFT) << LOGOPBYTES);
     u_type opr_bit = u_type(str_bit) % u_type(OP::SIZE);
-    u_type str_opr = rm.ismem() ? arch.vmm_memread( rm->segment, rm->effective_address( arch ) + offset, u_type() ) : arch.regread( OP(), rm.ereg() );
+    u_type str_opr = rm.ismem() ? arch.template memread<OP::SIZE>( rm->segment, rm->effective_address( arch ) + offset ) : arch.regread( OP(), rm.ereg() );
 
     arch.flagwrite( ARCH::FLAG::CF, typename ARCH::bit_t( (str_opr >> opr_bit) & u_type( 1 ) ) );
   }
@@ -901,13 +913,13 @@ struct BtcImm : public Operation<ARCH>
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
 
     u_type opr_bit = u_type(imm) % u_type(OP::SIZE);
-    u_type str_opr = rm.ismem() ? arch.vmm_memread( rm->segment, rm->effective_address( arch ), u_type() ) : arch.regread( OP(), rm.ereg() );
+    u_type str_opr = rm.ismem() ? arch.template memread<OP::SIZE>( rm->segment, rm->effective_address( arch ) ) : arch.regread( OP(), rm.ereg() );
 
     arch.flagwrite( ARCH::FLAG::CF, typename ARCH::bit_t( (str_opr >> opr_bit) & u_type( 1 ) ) );
 
     u_type next_str_opr = str_opr ^ (u_type( 1 ) << opr_bit);
     if (rm.ismem()) {
-      arch.vmm_memwrite( rm->segment, rm->effective_address( arch ), next_str_opr );
+      arch.template memwrite<OP::SIZE>( rm->segment, rm->effective_address( arch ), next_str_opr );
     } else {
       arch.regwrite( OP(), rm.ereg(), next_str_opr );
     }
@@ -928,19 +940,19 @@ struct BtcRM : public Operation<ARCH>
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     typedef typename ARCH::addr_t addr_t;
 
-    enum { BITSHIFT = SB<OP::SIZE>::begin, LOGOPBYTES = SB<OP::SIZE/8>::begin };
+    enum { BITSHIFT = meta::BitScan<OP::SIZE>::forward, LOGOPBYTES = meta::BitScan<OP::SIZE/8>::forward };
 
     typename TypeFor<ARCH,OP::SIZE>::s str_bit( arch.regread( OP(), gn ) );
 
     addr_t offset = addr_t((str_bit >> BITSHIFT) << LOGOPBYTES);
     u_type opr_bit = u_type(str_bit) % u_type(OP::SIZE);
-    u_type str_opr = rm.ismem() ? arch.vmm_memread( rm->segment, rm->effective_address( arch ) + offset, u_type() ) : arch.regread( OP(), rm.ereg() );
+    u_type str_opr = rm.ismem() ? arch.template memread<OP::SIZE>( rm->segment, rm->effective_address( arch ) + offset ) : arch.regread( OP(), rm.ereg() );
 
     arch.flagwrite( ARCH::FLAG::CF, typename ARCH::bit_t( (str_opr >> opr_bit) & u_type( 1 ) ) );
 
     u_type next_str_opr = str_opr ^ (u_type( 1 ) << opr_bit);
     if (rm.ismem()) {
-      arch.vmm_memwrite( rm->segment, rm->effective_address( arch ) + offset, next_str_opr );
+      arch.template memwrite<OP::SIZE>( rm->segment, rm->effective_address( arch ) + offset, next_str_opr );
     } else {
       arch.regwrite( OP(), rm.ereg(), next_str_opr );
     }
@@ -986,13 +998,13 @@ struct BtrImm : public Operation<ARCH>
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
 
     u_type opr_bit = u_type(imm) % u_type(OP::SIZE);
-    u_type str_opr = rm.ismem() ? arch.vmm_memread( rm->segment, rm->effective_address( arch ), u_type() ) : arch.regread( OP(), rm.ereg() );
+    u_type str_opr = rm.ismem() ? arch.template memread<OP::SIZE>( rm->segment, rm->effective_address( arch ) ) : arch.regread( OP(), rm.ereg() );
 
     arch.flagwrite( ARCH::FLAG::CF, typename ARCH::bit_t( (str_opr >> opr_bit) & u_type( 1 ) ) );
 
     u_type next_str_opr = str_opr & (~(u_type( 1 ) << opr_bit));
     if (rm.ismem()) {
-      arch.vmm_memwrite( rm->segment, rm->effective_address( arch ), next_str_opr );
+      arch.template memwrite<OP::SIZE>( rm->segment, rm->effective_address( arch ), next_str_opr );
     } else {
       arch.regwrite( OP(), rm.ereg(), next_str_opr );
     }
@@ -1014,19 +1026,19 @@ struct BtrRM : public Operation<ARCH>
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     typedef typename ARCH::addr_t addr_t;
 
-    enum { BITSHIFT = SB<OP::SIZE>::begin, LOGOPBYTES = SB<OP::SIZE/8>::begin };
+    enum { BITSHIFT = meta::BitScan<OP::SIZE>::forward, LOGOPBYTES = meta::BitScan<OP::SIZE/8>::forward };
 
     typename TypeFor<ARCH,OP::SIZE>::s str_bit( arch.regread( OP(), gn ) );
 
     addr_t offset = addr_t((str_bit >> BITSHIFT) << LOGOPBYTES);
     u_type opr_bit = u_type(str_bit) % u_type(OP::SIZE);
-    u_type str_opr = rm.ismem() ? arch.vmm_memread( rm->segment, rm->effective_address( arch ) + offset, u_type() ) : arch.regread( OP(), rm.ereg() );
+    u_type str_opr = rm.ismem() ? arch.template memread<OP::SIZE>( rm->segment, rm->effective_address( arch ) + offset ) : arch.regread( OP(), rm.ereg() );
 
     arch.flagwrite( ARCH::FLAG::CF, typename ARCH::bit_t( (str_opr >> opr_bit) & u_type( 1 ) ) );
 
     u_type next_str_opr = str_opr & (~(u_type( 1 ) << opr_bit));
     if (rm.ismem()) {
-      arch.vmm_memwrite( rm->segment, rm->effective_address( arch ) + offset, next_str_opr );
+      arch.template memwrite<OP::SIZE>( rm->segment, rm->effective_address( arch ) + offset, next_str_opr );
     } else {
       arch.regwrite( OP(), rm.ereg(), next_str_opr );
     }
@@ -1088,19 +1100,19 @@ struct BtsRM : public Operation<ARCH>
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     typedef typename ARCH::addr_t addr_t;
 
-    enum { BITSHIFT = SB<OP::SIZE>::begin, LOGOPBYTES = SB<OP::SIZE/8>::begin };
+    enum { BITSHIFT = meta::BitScan<OP::SIZE>::forward, LOGOPBYTES = meta::BitScan<OP::SIZE/8>::forward };
 
     typename TypeFor<ARCH,OP::SIZE>::s str_bit( arch.regread( OP(), gn ) );
 
     addr_t offset = addr_t((str_bit >> BITSHIFT) << LOGOPBYTES);
     u_type opr_bit = u_type(str_bit) % u_type(OP::SIZE);
-    u_type str_opr = rm.ismem() ? arch.vmm_memread( rm->segment, rm->effective_address( arch ) + offset, u_type() ) : arch.regread( OP(), rm.ereg() );
+    u_type str_opr = rm.ismem() ? arch.template memread<OP::SIZE>( rm->segment, rm->effective_address( arch ) + offset ) : arch.regread( OP(), rm.ereg() );
 
     arch.flagwrite( ARCH::FLAG::CF, typename ARCH::bit_t( (str_opr >> opr_bit) & u_type( 1 ) ) );
 
     u_type next_str_opr = str_opr | (u_type( 1 ) << opr_bit);
     if (rm.ismem()) {
-      arch.vmm_memwrite( rm->segment, rm->effective_address( arch ) + offset, next_str_opr );
+      arch.template memwrite<OP::SIZE>( rm->segment, rm->effective_address( arch ) + offset, next_str_opr );
     } else {
       arch.regwrite( OP(), rm.ereg(), next_str_opr );
     }

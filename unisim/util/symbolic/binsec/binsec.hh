@@ -441,6 +441,24 @@ namespace binsec {
     Expr value;
   };
     
+  struct UndefinedValueBase : public unisim::util::symbolic::binsec::ASExprNode
+  {
+    UndefinedValueBase() {}
+    virtual unsigned SubCount() const override { return 0; };
+    virtual void Repr( std::ostream& sink ) const override;
+    virtual int cmp( ExprNode const& rhs ) const override { return 0; }
+    virtual int GenCode(Label&, Variables&, std::ostream& sink) const;
+  };
+
+  template <typename T>
+  struct UndefinedValue : public UndefinedValueBase
+  {
+    typedef UndefinedValue<T> this_type;
+
+    virtual this_type* Mutate() const override { return new this_type( *this ); }
+    virtual ValueType const* GetType() const override { return unisim::util::symbolic::CValueType(T()); }
+  };
+
 } /* end of namespace binsec */
 } /* end of namespace symbolic */
 } /* end of namespace util */

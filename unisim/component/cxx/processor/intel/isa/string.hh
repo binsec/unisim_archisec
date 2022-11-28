@@ -63,6 +63,30 @@ struct StringEngine
   virtual ~StringEngine() {};
 };
 
+/*  According to the specification and the actual hardware, in the
+ * repeated string instruction, the null counter termination test is
+ * performed twice: before and after the execution of the inner linked
+ * string instruction. doing the test only once (like a while loop)
+ * provides the same result at the expense of sometimes having an
+ * extra final step. By default, the extra counter test is skipped.
+ * Declaring a StrictCounterTest type in the ARCH class sticks to the
+ * specification.
+ */
+template < class T >
+struct HasStrictCounterTest
+{
+  using Yes = char[2];
+  using  No = char[1];
+
+  struct Fallback { struct StrictCounterTest { }; };
+  struct Derived : T, Fallback { };
+
+  template < typename U > static No& test ( typename U::StrictCounterTest* );
+  template < typename U > static Yes& test ( U* );
+
+  enum { value = sizeof(test<Derived>(0)) == sizeof(Yes) };
+};
+
 template <class ARCH, class OP>
 struct _StringEngine : public StringEngine<ARCH>
 {
@@ -127,6 +151,7 @@ struct Movs : public Operation<ARCH>
     
     if (REP) {
       str->deccounter( arch );
+      if (HasStrictCounterTest<ARCH>::value and not str->tstcounter( arch )) return;
       arch.setnip( arch.getnip() - addr_t( Operation<ARCH>::length ) );
     }
   }
@@ -173,7 +198,7 @@ struct Stos : public Operation<ARCH>
     
     if (REP) {
       str->deccounter( arch );
-      if (not str->tstcounter( arch )) return;
+      if (HasStrictCounterTest<ARCH>::value and not str->tstcounter( arch )) return;
       arch.setnip( arch.getnip() - addr_t( Operation<ARCH>::length ) );
     }
   }
@@ -224,6 +249,7 @@ struct Cmps : public Operation<ARCH>
     
     if (REP) {
       str->deccounter( arch );
+      if (HasStrictCounterTest<ARCH>::value and not str->tstcounter( arch )) return;
       if (arch.Test( bit_t( REP&1 ) ^ arch.flagread( ARCH::FLAG::ZF ) )) return;
       arch.setnip( arch.getnip() - addr_t( Operation<ARCH>::length ) );
     }
@@ -289,6 +315,7 @@ struct Scas : public Operation<ARCH>
     
     if (REP) {
       str->deccounter( arch );
+      if (HasStrictCounterTest<ARCH>::value and not str->tstcounter( arch )) return;
       if (arch.Test( bit_t( REP&1 ) ^ arch.flagread( ARCH::FLAG::ZF ) )) return;
       arch.setnip( arch.getnip() - addr_t( Operation<ARCH>::length ) );
     }
@@ -350,6 +377,7 @@ struct Lods : public Operation<ARCH>
     
     if (REP) {
       str->deccounter( arch );
+      if (HasStrictCounterTest<ARCH>::value and not str->tstcounter( arch )) return;
       arch.setnip( arch.getnip() - addr_t( Operation<ARCH>::length ) );
     }
   }

@@ -40,15 +40,15 @@ struct AddRM : public Operation<ARCH>
   AddRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn )
     : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {}
   RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const
   {
     if (GTOE) sink << "add " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "add " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) {
@@ -68,7 +68,7 @@ struct AddRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   AddRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "add", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_add( arch, arch.rmread( OP(), rmop ), u_type( imm ) ) ); }
@@ -95,7 +95,7 @@ template <class ARCH> struct DC<ARCH,ADD> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new AddRM<ARCH,GOb,  false>( _.opbase(), _.rmop(), _.greg() );
       else          return new AddRM<ARCH,GObLH,false>( _.opbase(), _.rmop(), _.greg() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\003" ) & RM() ))
     {
       if      (ic.opsize() == 16) return new AddRM<ARCH,GOw,false>( _.opbase(), _.rmop(), _.greg() );
@@ -109,13 +109,13 @@ template <class ARCH> struct DC<ARCH,ADD> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new AddRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new AddRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\005" ) & Imm<16>() ))
     return new AddRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\005" ) & Imm<32>() ))
     return new AddRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\005" ) & Imm<32>() ))
     return new AddRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -124,7 +124,7 @@ template <class ARCH> struct DC<ARCH,ADD> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new AddRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new AddRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & lockable( opcode( "\x81" ) /0 & RM() ) & Imm<16>() ))
     return new AddRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int16_t() ) );
 
@@ -149,14 +149,14 @@ template <class ARCH, class OP, bool GTOE>
 struct OrRM : public Operation<ARCH>
 {
   OrRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const {
     if (GTOE) sink << "or " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "or " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) {
@@ -176,7 +176,7 @@ struct OrRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   OrRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "or", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_or( arch, arch.rmread( OP(), rmop ), u_type( imm ) ) ); }
@@ -217,13 +217,13 @@ template <class ARCH> struct DC<ARCH,OR> { Operation<ARCH>* get( InputCode<ARCH>
       if (ic.rex_p) return new OrRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new OrRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\015" ) & Imm<16>() ))
     return new OrRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\015" ) & Imm<32>() ))
     return new OrRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\015" ) & Imm<32>() ))
     return new OrRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -257,14 +257,14 @@ template <class ARCH, class OP, bool GTOE>
 struct AdcRM : public Operation<ARCH>
 {
   AdcRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const {
     if (GTOE) sink << "adc " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "adc " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) {
@@ -284,7 +284,7 @@ struct AdcRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   AdcRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "adc", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_adc( arch, arch.rmread( OP(), rmop ), u_type(imm) ) ); }
@@ -325,13 +325,13 @@ template <class ARCH> struct DC<ARCH,ADC> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new AdcRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new AdcRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\025" ) & Imm<16>() ))
     return new AdcRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\025" ) & Imm<32>() ))
     return new AdcRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\025" ) & Imm<32>() ))
     return new AdcRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -365,14 +365,14 @@ template <class ARCH, class OP, bool GTOE>
 struct SbbRM : public Operation<ARCH>
 {
   SbbRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const {
     if (GTOE) sink << "sbb " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "sbb " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) {
@@ -392,7 +392,7 @@ struct SbbRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   SbbRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "sbb", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_sbb( arch, arch.rmread( OP(), rmop ), u_type(imm) ) ); }
@@ -433,13 +433,13 @@ template <class ARCH> struct DC<ARCH,SBB> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new SbbRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new SbbRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\035" ) & Imm<16>() ))
     return new SbbRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\035" ) & Imm<32>() ))
     return new SbbRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\035" ) & Imm<32>() ))
     return new SbbRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -473,14 +473,14 @@ template <class ARCH, class OP, bool GTOE>
 struct AndRM : public Operation<ARCH>
 {
   AndRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const {
     if (GTOE) sink << "and " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "and " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) {
@@ -500,9 +500,9 @@ struct AndRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   AndRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "and", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_and( arch, arch.rmread( OP(), rmop ), u_type(imm) ) ); }
 };
 
@@ -560,13 +560,13 @@ template <class ARCH> struct DC<ARCH,AND> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new AndRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new AndRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\045" ) & Imm<16>() ))
     return new AndRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\045" ) & Imm<32>() ))
     return new AndRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\045" ) & Imm<32>() ))
     return new AndRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -608,14 +608,14 @@ template <class ARCH, class OP, bool GTOE>
 struct SubRM : public Operation<ARCH>
 {
   SubRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const {
     if (GTOE) sink << "sub " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "sub " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) {
@@ -635,9 +635,9 @@ struct SubRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   SubRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "sub", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_sub( arch, arch.rmread( OP(), rmop ), u_type(imm) ) ); }
 };
 
@@ -676,13 +676,13 @@ template <class ARCH> struct DC<ARCH,SUB> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new SubRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new SubRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\055" ) & Imm<16>() ))
     return new SubRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\055" ) & Imm<32>() ))
     return new SubRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\055" ) & Imm<32>() ))
     return new SubRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -716,14 +716,14 @@ template <class ARCH, class OP, bool GTOE>
 struct XorRM : public Operation<ARCH>
 {
   XorRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const {
     if (GTOE) sink << "xor " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "xor " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) {
@@ -743,9 +743,9 @@ struct XorRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   XorRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "xor", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_xor( arch, arch.rmread( OP(), rmop ), u_type(imm) ) ); }
 };
 
@@ -784,13 +784,13 @@ template <class ARCH> struct DC<ARCH,XOR> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new XorRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new XorRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\065" ) & Imm<16>() ))
     return new XorRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\065" ) & Imm<32>() ))
     return new XorRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\065" ) & Imm<32>() ))
     return new XorRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -824,14 +824,14 @@ template <class ARCH, class OP, bool GTOE>
 struct CmpRM : public Operation<ARCH>
 {
   CmpRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const {
     if (GTOE) sink << "cmp " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop );
     else      sink << "cmp " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn );
   }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
-  
+
   void execute( ARCH& arch ) const
   {
     if (GTOE) eval_sub( arch, arch.rmread( OP(), rmop ), arch.regread( OP(), gn ) );
@@ -846,7 +846,7 @@ struct CmpRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   CmpRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "cmp", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const { eval_sub( arch, arch.rmread( OP(), rmop ), u_type(imm) ); }
@@ -887,13 +887,13 @@ template <class ARCH> struct DC<ARCH,CMP> { Operation<ARCH>* get( InputCode<ARCH
       if (ic.rex_p) return new CmpRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new CmpRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\075" ) & Imm<16>() ))
     return new CmpRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\075" ) & Imm<32>() ))
     return new CmpRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\075" ) & Imm<32>() ))
     return new CmpRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
 
@@ -930,72 +930,72 @@ struct RolRMI : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   RolRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; uint8_t imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "rol", rmop.ismem()*OP::SIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rol( arch, arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate( arch, LSHIFT(), arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
 };
 
 template <class ARCH, class OP>
 struct RolRMCL : public Operation<ARCH>
 {
   RolRMCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "rol", rmop.ismem()*OP::SIZE ) << ' ' << "%cl," << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rol( arch, arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate( arch, LSHIFT(), arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
 };
 
 template <class ARCH> struct DC<ARCH,ROL> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xc0" ) /0 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new RolRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new RolRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xc1" ) /0 & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RolRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 32) return new RolRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 64) return new RolRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd0" ) /0 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RolRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), 1 );
       else          return new RolRMI<ARCH,GObLH>( _.opbase(), _.rmop(), 1 );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd1" ) /0 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RolRMI<ARCH,GOw>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 32) return new RolRMI<ARCH,GOd>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 64) return new RolRMI<ARCH,GOq>( _.opbase(), _.rmop(), 1 );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd2" ) /0 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RolRMCL<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new RolRMCL<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd3" ) /0 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RolRMCL<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new RolRMCL<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new RolRMCL<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1006,20 +1006,20 @@ struct RorRMI : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   RorRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; uint8_t imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "ror", rmop.ismem()*OP::SIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_ror( arch, arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate( arch, RSHIFT(), arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
 };
 
 template <class ARCH, class OP>
 struct RorRMCL : public Operation<ARCH>
 {
   RorRMCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "ror", rmop.ismem()*OP::SIZE ) << ' ' << "%cl," << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_ror( arch, arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate( arch, RSHIFT(), arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
 };
 
 template <class ARCH, class OP>
@@ -1050,46 +1050,46 @@ struct Rorx : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,ROR> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xc0" ) /1 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new RorRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new RorRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xc1" ) /1 & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RorRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 32) return new RorRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 64) return new RorRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd0" ) /1 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RorRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), 1 );
       else          return new RorRMI<ARCH,GObLH>( _.opbase(), _.rmop(), 1 );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd1" ) /1 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RorRMI<ARCH,GOw>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 32) return new RorRMI<ARCH,GOd>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 64) return new RorRMI<ARCH,GOq>( _.opbase(), _.rmop(), 1 );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd2" ) /1 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RorRMCL<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new RorRMCL<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd3" ) /1 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RorRMCL<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new RorRMCL<ARCH,GOd>( _.opbase(), _.rmop() );
@@ -1104,7 +1104,7 @@ template <class ARCH> struct DC<ARCH,ROR> { Operation<ARCH>* get( InputCode<ARCH
     else
       return new Rorx<ARCH,GOd>( _.opbase(), _.i( int8_t() ), _.rmop(), _.greg() );
   }
-  
+
   return 0;
 }};
 
@@ -1115,72 +1115,72 @@ struct RclRMI : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   RclRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; uint8_t imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "rcl", rmop.ismem()*OP::SIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rcl( arch, arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate_carry( arch, LSHIFT(), arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
 };
 
 template <class ARCH, class OP>
 struct RclRMCL : public Operation<ARCH>
 {
   RclRMCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "rcl", rmop.ismem()*OP::SIZE ) << ' ' << "%cl," << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rcl( arch, arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate_carry( arch, LSHIFT(), arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
 };
 
 template <class ARCH> struct DC<ARCH,RCL> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xc0" ) /2 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new RclRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new RclRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xc1" ) /2 & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RclRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 32) return new RclRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 64) return new RclRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd0" ) /2 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RclRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), 1 );
       else          return new RclRMI<ARCH,GObLH>( _.opbase(), _.rmop(), 1 );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd1" ) /2 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RclRMI<ARCH,GOw>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 32) return new RclRMI<ARCH,GOd>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 64) return new RclRMI<ARCH,GOq>( _.opbase(), _.rmop(), 1 );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd2" ) /2 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RclRMCL<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new RclRMCL<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd3" ) /2 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RclRMCL<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new RclRMCL<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new RclRMCL<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1191,72 +1191,72 @@ struct RcrRMI : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   RcrRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; uint8_t imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "rcr", rmop.ismem()*OP::SIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rcr( arch, arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate_carry( arch, RSHIFT(), arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
 };
 
 template <class ARCH, class OP>
 struct RcrRMCL : public Operation<ARCH>
 {
   RcrRMCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "rcr", rmop.ismem()*OP::SIZE ) << ' ' << "%cl," << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rcr( arch, arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_rotate_carry( arch, RSHIFT(), arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
 };
 
 template <class ARCH> struct DC<ARCH,RCR> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xc0" ) /3 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new RcrRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new RcrRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xc1" ) /3 & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RcrRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 32) return new RcrRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 64) return new RcrRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd0" ) /3 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RcrRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), 1 );
       else          return new RcrRMI<ARCH,GObLH>( _.opbase(), _.rmop(), 1 );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd1" ) /3 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RcrRMI<ARCH,GOw>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 32) return new RcrRMI<ARCH,GOd>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 64) return new RcrRMI<ARCH,GOq>( _.opbase(), _.rmop(), 1 );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd2" ) /3 & RM() ))
-  
+
     {
       if (ic.rex_p) return new RcrRMCL<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new RcrRMCL<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd3" ) /3 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new RcrRMCL<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new RcrRMCL<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new RcrRMCL<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1267,20 +1267,20 @@ struct ShlRMI : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   ShlRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; uint8_t imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "shl", rmop.ismem()*OP::SIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shl( arch, arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shift( arch, LSHIFT(), arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
 };
 
 template <class ARCH, class OP>
 struct ShlRMCL : public Operation<ARCH>
 {
   ShlRMCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "shl", rmop.ismem()*OP::SIZE ) << ' ' << "%cl," << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shl( arch, arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shift( arch, LSHIFT(), arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
 };
 
 template <class ARCH, class OP>
@@ -1301,46 +1301,46 @@ struct Shlx : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,SHL> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xc0" ) /4 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new ShlRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new ShlRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xc1" ) /4 & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShlRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 32) return new ShlRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 64) return new ShlRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd0" ) /4 & RM() ))
-  
+
     {
       if (ic.rex_p) return new ShlRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), 1 );
       else          return new ShlRMI<ARCH,GObLH>( _.opbase(), _.rmop(), 1 );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd1" ) /4 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShlRMI<ARCH,GOw>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 32) return new ShlRMI<ARCH,GOd>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 64) return new ShlRMI<ARCH,GOq>( _.opbase(), _.rmop(), 1 );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd2" ) /4 & RM() ))
-  
+
     {
       if (ic.rex_p) return new ShlRMCL<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new ShlRMCL<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd3" ) /4 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShlRMCL<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new ShlRMCL<ARCH,GOd>( _.opbase(), _.rmop() );
@@ -1357,7 +1357,7 @@ template <class ARCH> struct DC<ARCH,SHL> { Operation<ARCH>* get( InputCode<ARCH
       else
 	return new Shlx<ARCH,GOd>( _.opbase(), _.greg(), _.rmop(), ic.vreg() );
     }
-  
+
   return 0;
 }};
 
@@ -1368,20 +1368,20 @@ struct ShrRMI : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   ShrRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; uint8_t imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "shr", rmop.ismem()*OP::SIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shr( arch, arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shift( arch, RSHIFT(), arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
 };
 
 template <class ARCH, class OP>
 struct ShrRMCL : public Operation<ARCH>
 {
   ShrRMCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "shr", rmop.ismem()*OP::SIZE ) << ' ' << "%cl," << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shr( arch, arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
+
+  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_shift( arch, RSHIFT(), arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
 };
 
 template <class ARCH, class OP>
@@ -1402,46 +1402,46 @@ struct Shrx : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,SHR> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xc0" ) /5 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new ShrRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new ShrRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xc1" ) /5 & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShrRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 32) return new ShrRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 64) return new ShrRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd0" ) /5 & RM() ))
-  
+
     {
       if (ic.rex_p) return new ShrRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), 1 );
       else          return new ShrRMI<ARCH,GObLH>( _.opbase(), _.rmop(), 1 );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd1" ) /5 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShrRMI<ARCH,GOw>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 32) return new ShrRMI<ARCH,GOd>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 64) return new ShrRMI<ARCH,GOq>( _.opbase(), _.rmop(), 1 );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd2" ) /5 & RM() ))
-  
+
     {
       if (ic.rex_p) return new ShrRMCL<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new ShrRMCL<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd3" ) /5 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShrRMCL<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new ShrRMCL<ARCH,GOd>( _.opbase(), _.rmop() );
@@ -1469,20 +1469,31 @@ struct SarRMI : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   SarRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; uint8_t imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "sar", rmop.ismem()*OP::SIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_sar( arch, arch.rmread( OP(), rmop ), u8_t( imm ) ) ); }
+
+  void execute( ARCH& arch ) const
+  {
+    typedef typename TypeFor<ARCH,OP::SIZE>::u uval_t;
+    typedef typename TypeFor<ARCH,OP::SIZE>::s sval_t;
+
+    arch.rmwrite( OP(), rmop, uval_t(eval_shift( arch, RSHIFT(), sval_t(arch.rmread( OP(), rmop )), u8_t( imm ) )) );
+  }
 };
 
 template <class ARCH, class OP>
 struct SarRMCL : public Operation<ARCH>
 {
   SarRMCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "sar", rmop.ismem()*OP::SIZE ) << ' ' << "%cl," << DisasmE( OP(), rmop ); }
-  
-  void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_sar( arch, arch.rmread( OP(), rmop ), arch.regread( GOb(), 1 ) ) ); }
+
+  void execute( ARCH& arch ) const
+  {
+    typedef typename TypeFor<ARCH,OP::SIZE>::u uval_t;
+    typedef typename TypeFor<ARCH,OP::SIZE>::s sval_t;
+    arch.rmwrite( OP(), rmop, uval_t(eval_shift( arch, RSHIFT(), sval_t(arch.rmread( OP(), rmop )), arch.regread( GOb(), 1 ) )) );
+  }
 };
 
 template <class ARCH, class OP>
@@ -1504,46 +1515,46 @@ struct Sarx : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,SAR> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xc0" ) /7 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new SarRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new SarRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xc1" ) /7 & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new SarRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 32) return new SarRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else if (ic.opsize() == 64) return new SarRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd0" ) /7 & RM() ))
-  
+
     {
       if (ic.rex_p) return new SarRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), 1 );
       else          return new SarRMI<ARCH,GObLH>( _.opbase(), _.rmop(), 1 );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd1" ) /7 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new SarRMI<ARCH,GOw>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 32) return new SarRMI<ARCH,GOd>( _.opbase(), _.rmop(), 1 );
       else if (ic.opsize() == 64) return new SarRMI<ARCH,GOq>( _.opbase(), _.rmop(), 1 );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd2" ) /7 & RM() ))
-  
+
     {
       if (ic.rex_p) return new SarRMCL<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new SarRMCL<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xd3" ) /7 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new SarRMCL<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new SarRMCL<ARCH,GOd>( _.opbase(), _.rmop() );
@@ -1560,7 +1571,7 @@ template <class ARCH> struct DC<ARCH,SAR> { Operation<ARCH>* get( InputCode<ARCH
       else
 	return new Sarx<ARCH,GOd>( _.opbase(), _.greg(), _.rmop(), ic.vreg() );
     }
-  
+
   return 0;
 }};
 
@@ -1568,9 +1579,9 @@ template <class ARCH, class OP>
 struct TestRMG : public Operation<ARCH>
 {
   TestRMG( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << "test " << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { eval_and( arch, arch.rmread( OP(), rmop ), arch.regread( OP(), gn ) ); }
 };
 
@@ -1581,68 +1592,68 @@ struct TestRMI : public Operation<ARCH>
   typedef typename CTypeFor<OPSIZE>::s imm_type;
   typedef typename TypeFor<ARCH,OPSIZE>::u u_type;
   TestRMI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, imm_type _imm ) : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm) {} RMOp<ARCH> rmop; imm_type imm;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "test", rmop.ismem()*OPSIZE ) << ' ' << DisasmI( imm ) << ',' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { eval_and( arch, arch.rmread( OP(), rmop ), u_type(imm) ); }
 };
 
 template <class ARCH> struct DC<ARCH,TEST> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\x84" ) & RM() ))
-  
+
     {
       if (ic.rex_p) return new TestRMG<ARCH,GOb>  ( _.opbase(), _.rmop(), _.greg() );
       else          return new TestRMG<ARCH,GObLH>( _.opbase(), _.rmop(), _.greg() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\x85" ) & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new TestRMG<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 32) return new TestRMG<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 64) return new TestRMG<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\xf6" ) /0 & RM() & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new TestRMI<ARCH,GOb>  ( _.opbase(), _.rmop(), _.i( int8_t() ) );
       else          return new TestRMI<ARCH,GObLH>( _.opbase(), _.rmop(), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\xf7" ) /0 & RM() & Imm<16>() ))
-  
+
     return new TestRMI<ARCH,GOw>( _.opbase(), _.rmop(), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\xf7" ) /0 & RM() & Imm<32>() ))
-  
+
     return new TestRMI<ARCH,GOd>( _.opbase(), _.rmop(), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\xf7" ) /0 & RM() & Imm<32>() ))
-  
+
     return new TestRMI<ARCH,GOq>( _.opbase(), _.rmop(), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, opcode( "\xa8" ) & Imm<8>() ))
-  
+
     {
       if (ic.rex_p) return new TestRMI<ARCH,GOb>  ( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
       else          return new TestRMI<ARCH,GObLH>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int8_t() ) );
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\xa9" ) & Imm<16>() ))
-  
+
     return new TestRMI<ARCH,GOw>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\xa9" ) & Imm<32>() ))
-  
+
     return new TestRMI<ARCH,GOd>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\xa9" ) & Imm<32>() ))
-  
+
     return new TestRMI<ARCH,GOq>( _.opbase(), make_rop<ARCH>( 0 ), _.i( int32_t() ) );
-  
+
   return 0;
 }};
 
@@ -1650,30 +1661,30 @@ template <class ARCH, class OP>
 struct NotRM : public Operation<ARCH>
 {
   NotRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "not", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, ~(arch.rmread( OP(), rmop )) ); }
 };
 
 template <class ARCH> struct DC<ARCH,NOT> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, lockable( opcode( "\xf6" ) /2 & RM() ) ))
-  
+
     {
       if (ic.rex_p) return new NotRM<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new NotRM<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, lockable( opcode( "\xf7" ) /2 & RM() ) ))
-  
+
     {
       if      (ic.opsize() == 16) return new NotRM<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new NotRM<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new NotRM<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1681,30 +1692,30 @@ template <class ARCH, class OP>
 struct NegRM : public Operation<ARCH>
 {
   NegRM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "neg", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, eval_sub( arch, typename TypeFor<ARCH,OP::SIZE>::u( 0 ), arch.rmread( OP(), rmop ) ) ); }
 };
 
 template <class ARCH> struct DC<ARCH,NEG> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, lockable( opcode( "\xf6" ) /3 & RM() ) ))
-  
+
     {
       if (ic.rex_p) return new NegRM<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new NegRM<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, lockable( opcode( "\xf7" ) /3 & RM() ) ))
-  
+
     {
       if      (ic.opsize() == 16) return new NegRM<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new NegRM<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new NegRM<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1712,9 +1723,9 @@ template <class ARCH, class OP>
 struct DivE : public Operation<ARCH>
 {
   DivE( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "div", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
@@ -1729,9 +1740,9 @@ template <class ARCH, class OP>
 struct DivE8 : public Operation<ARCH>
 {
   DivE8( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "div", rmop.ismem()*8 ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typename ARCH::u8_t hi = arch.regread( GObLH(), 4 ), lo = arch.regread( GObLH(), 0 );
@@ -1739,26 +1750,26 @@ struct DivE8 : public Operation<ARCH>
     arch.regwrite( GObLH(), 4, hi );
     arch.regwrite( GObLH(), 0, lo );
   }
-};  
+};
 
 template <class ARCH> struct DC<ARCH,DIV> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xf6" ) /6 & RM() ))
-  
+
     {
       if (ic.rex_p) return new DivE8<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new DivE8<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xf7" ) /6 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new DivE<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new DivE<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new DivE<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1766,9 +1777,9 @@ template <class ARCH, class OP>
 struct IDivE : public Operation<ARCH>
 {
   IDivE( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "idiv", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::s s_type;
@@ -1784,9 +1795,9 @@ template <class ARCH, class OP>
 struct IDivE8 : public Operation<ARCH>
 {
   IDivE8( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "idiv", rmop.ismem()*8 ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::s8_t s_type;
@@ -1801,21 +1812,21 @@ struct IDivE8 : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,IDIV> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xf6" ) /7 & RM() ))
-  
+
     {
       if (ic.rex_p) return new IDivE8<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new IDivE8<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xf7" ) /7 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new IDivE<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new IDivE<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new IDivE<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1823,9 +1834,9 @@ template <class ARCH, class OP>
 struct MulE : public Operation<ARCH>
 {
   MulE( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "mul", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typename TypeFor<ARCH,OP::SIZE>::u hi, lo = arch.regread( OP(), 0 );
@@ -1839,9 +1850,9 @@ template <class ARCH, class OP>
 struct MulE8 : public Operation<ARCH>
 {
   MulE8( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "mul", rmop.ismem()*8 ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typename ARCH::u8_t hi, lo = arch.regread( GObLH(), 0 );
@@ -1854,21 +1865,21 @@ struct MulE8 : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,MUL> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xf6" ) /4 & RM() ))
-  
+
     {
       if (ic.rex_p) return new MulE8<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new MulE8<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xf7" ) /4 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new MulE<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new MulE<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new MulE<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -1876,9 +1887,9 @@ template <class ARCH, class OP>
 struct IMulE : public Operation<ARCH>
 {
   IMulE( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "imul", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::s s_type;
@@ -1894,9 +1905,9 @@ template <class ARCH, class OP>
 struct IMulE8 : public Operation<ARCH>
 {
   IMulE8( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "imul", rmop.ismem()*8 ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::s8_t s_type;
@@ -1912,9 +1923,9 @@ template <class ARCH, class OP>
 struct IMulGE : public Operation<ARCH>
 {
   IMulGE( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << "imul " << DisasmE( OP(), rmop )  << ',' << DisasmG( OP(), gn ); }
-  
+
   void execute( ARCH& arch ) const { arch.regwrite( OP(), gn, arch.regread( OP(), gn ) * arch.rmread( OP(), rmop ) ); }
 };
 
@@ -1922,12 +1933,12 @@ template <class ARCH, class OP>
 struct IMulGEI : public Operation<ARCH>
 {
   typedef typename CTypeFor<OP::SIZE>::s imm_type;
-  
+
   IMulGEI( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn, imm_type _imm )
     : Operation<ARCH>( opbase ), rmop( _rmop ), imm(_imm), gn( _gn ) {} RMOp<ARCH> rmop; imm_type imm; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << "imul " << DisasmI( imm ) << ',' << DisasmE( OP(), rmop )  << ',' << DisasmG( OP(), gn ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::s s_type;
@@ -1946,51 +1957,51 @@ struct IMulGEI : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,IMUL> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xf6" ) /5 & RM() ))
-  
+
     {
       if (ic.rex_p) return new IMulE8<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new IMulE8<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
-  
+
   if (auto _ = match( ic, opcode( "\xf7" ) /5 & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new IMulE<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new IMulE<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new IMulE<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\x0f\xaf" ) & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new IMulGE<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 32) return new IMulGE<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 64) return new IMulGE<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\x6b" ) & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new IMulGEI<ARCH,GOw>( _.opbase(), _.rmop(), _.greg(), _.i( int16_t() ) );
       else if (ic.opsize() == 32) return new IMulGEI<ARCH,GOd>( _.opbase(), _.rmop(), _.greg(), _.i( int32_t() ) );
       else if (ic.opsize() == 64) return new IMulGEI<ARCH,GOq>( _.opbase(), _.rmop(), _.greg(), _.i( int64_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, OpSize<16>() & opcode( "\x69" ) & RM() & Imm<16>() ))
-  
+
     return new IMulGEI<ARCH,GOw>( _.opbase(), _.rmop(), _.greg(), _.i( int16_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<32>() & opcode( "\x69" ) & RM() & Imm<32>() ))
-  
+
     return new IMulGEI<ARCH,GOd>( _.opbase(), _.rmop(), _.greg(), _.i( int32_t() ) );
-  
+
   if (auto _ = match( ic, OpSize<64>() & opcode( "\x69" ) & RM() & Imm<32>() ))
-  
+
     return new IMulGEI<ARCH,GOq>( _.opbase(), _.rmop(), _.greg(), _.i( int64_t() ) );
-  
+
   return 0;
 }};
 
@@ -1998,23 +2009,23 @@ template <class ARCH, class OP>
 struct Lea : public Operation<ARCH>
 {
   Lea( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << "lea " << DisasmM( rmop ) << ',' << DisasmG( OP(), gn ); }
-  
+
   void execute( ARCH& arch ) const { arch.regwrite( OP(), gn, typename TypeFor<ARCH,OP::SIZE>::u( rmop->effective_address( arch ) ) ); }
 };
 
 template <class ARCH> struct DC<ARCH,LEA> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\x8d" ) & RM_mem() ))
-  
+
     {
       if      (ic.opsize() == 16) return new Lea<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 32) return new Lea<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 64) return new Lea<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -2022,9 +2033,9 @@ template <class ARCH, class OP>
 struct Inc : public Operation<ARCH>
 {
   Inc( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "inc", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
   void execute( ARCH& arch ) const
   {
@@ -2040,9 +2051,9 @@ template <class ARCH, class OP>
 struct Dec : public Operation<ARCH>
 {
   Dec( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop ) : Operation<ARCH>( opbase ), rmop( _rmop ) {} RMOp<ARCH> rmop;
-  
+
   void disasm( std::ostream& sink ) const { sink << DisasmMnemonic( "dec", rmop.ismem()*OP::SIZE ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
   void execute( ARCH& arch ) const
   {
@@ -2066,21 +2077,21 @@ template <class ARCH> struct DC<ARCH,INCDEC> { Operation<ARCH>* get( InputCode<A
     }
 
   if (auto _ = match( ic, lockable( opcode( "\xfe" ) /0 & RM() ) ))
-  
+
     {
       if (ic.rex_p) return new Inc<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new Inc<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
 
   if (auto _ = match( ic, lockable( opcode( "\xff" ) /0 & RM() ) ))
-  
+
     {
       if      (ic.opsize() == 16) return new Inc<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new Inc<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new Inc<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\x48" ) + Reg() ))
 
     {
@@ -2091,21 +2102,21 @@ template <class ARCH> struct DC<ARCH,INCDEC> { Operation<ARCH>* get( InputCode<A
     }
 
   if (auto _ = match( ic, lockable( opcode( "\xfe" ) /1 & RM() ) ))
-  
+
     {
       if (ic.rex_p) return new Dec<ARCH,GOb>  ( _.opbase(), _.rmop() );
       else          return new Dec<ARCH,GObLH>( _.opbase(), _.rmop() );
     }
 
   if (auto _ = match( ic, lockable( opcode( "\xff" ) /1 & RM() ) ))
-  
+
     {
       if      (ic.opsize() == 16) return new Dec<ARCH,GOw>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 32) return new Dec<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new Dec<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -2114,9 +2125,9 @@ struct SetCC : public Operation<ARCH>
 {
   typedef typename ARCH::u8_t u8_t;
   SetCC( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _cc ) : Operation<ARCH>( opbase ), rmop( _rmop ), cc( _cc ) {} RMOp<ARCH> rmop; uint8_t cc;
-  
+
   void disasm( std::ostream& sink ) const { sink << "set" << DisasmCond( cc ) << ' ' << DisasmE( OP(), rmop ); }
-  
+
   void execute( ARCH& arch ) const { arch.rmwrite( OP(), rmop, u8_t( eval_cond( arch, cc ) ) ); }
 };
 
@@ -2127,7 +2138,7 @@ template <class ARCH> struct DC<ARCH,SETCC> { Operation<ARCH>* get( InputCode<AR
       if (ic.rex_p) return new SetCC<ARCH,GOb>  ( _.opbase(), _.rmop(), _.var() );
       else          return new SetCC<ARCH,GObLH>( _.opbase(), _.rmop(), _.var() );
     }
-  
+
   return 0;
 }};
 
@@ -2136,15 +2147,39 @@ struct ShldIM : public Operation<ARCH>
 {
   ShldIM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn, uint8_t _sh )
     : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ), shift( _sh & c_shift_counter<OP::SIZE>::mask() ) {} RMOp<ARCH> rmop; uint8_t gn; uint8_t shift;
-  
+
   void disasm( std::ostream& sink ) const { sink << "shld " << DisasmI( shift ) << ',' << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const
   {
-    typename TypeFor<ARCH,OP::SIZE>::u result = eval_shl( arch, arch.rmread( OP(), rmop ), typename ARCH::u8_t( shift ) );
-    if (shift)
-      result |= arch.regread( OP(), gn ) >> (OP::SIZE - shift);
-    arch.rmwrite( OP(), rmop, result );
+    typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
+    typedef typename ARCH::bit_t bit_t;
+
+    if (not shift)
+      return;
+
+    if (shift >= OP::SIZE)
+      {
+        // TODO: should set destination operand undefined
+        // typename ARCH::FLAG::Code flags[] = {ARCH::FLAG::AF, ARCH::FLAG::CF, ARCH::FLAG::OF, ARCH::FLAG::PF, ARCH::FLAG::SF, ARCH::FLAG::ZF};
+        // for (auto flag: flags)
+        //   arch.flagwrite(flag, bit_t(false), bit_t(false));
+        arch.unimplemented();
+      }
+
+    // TODO: should merge with the eval_shift architecture
+    u_type const msb = u_type( 1 ) << (OP::SIZE-1);
+    unsigned const rshift = OP::SIZE - shift;
+
+    u_type acc = arch.rmread( OP(), rmop );
+    u_type res = (acc << shift) | (arch.regread( OP(), gn ) >> rshift);
+
+    arch.rmwrite( OP(), rmop, res );
+
+    arch.flagwrite( ARCH::FLAG::AF, bit_t(false), bit_t(false) );
+    arch.flagwrite( ARCH::FLAG::CF, bit_t((acc << (shift - 1)) & msb) );
+    arch.flagwrite( ARCH::FLAG::OF, bit_t( (acc ^ res) & msb ), bit_t(shift == 1) );
+    eval_PSZ( arch, res );
   }
 };
 
@@ -2153,7 +2188,7 @@ struct ShldCL : public Operation<ARCH>
 {
   ShldCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn )
     : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << "shld %cl," << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const
@@ -2161,7 +2196,7 @@ struct ShldCL : public Operation<ARCH>
     typedef typename ARCH::u8_t u8_t;
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     u8_t shift = arch.regread( GOb(), 1 );
-    u_type result = eval_shl( arch, arch.rmread( OP(), rmop ), shift );
+    u_type result = eval_shift( arch, LSHIFT(), arch.rmread( OP(), rmop ), shift );
     shift &= shift_counter<ARCH,u_type>::mask();
     if (arch.Test(shift != u8_t(0)))
       result |= arch.regread( OP(), gn ) >> (u8_t(OP::SIZE) - shift);
@@ -2174,12 +2209,12 @@ struct ShrdIM : public Operation<ARCH>
 {
   ShrdIM( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn, uint8_t _sh )
     : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ), shift( _sh & c_shift_counter<OP::SIZE>::mask() ) {} RMOp<ARCH> rmop; uint8_t gn; uint8_t shift;
-  
+
   void disasm( std::ostream& sink ) const { sink << "shrd " << DisasmI( shift ) << ',' << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const
   {
-    typename TypeFor<ARCH,OP::SIZE>::u result = eval_shr( arch, arch.rmread( OP(), rmop ), typename ARCH::u8_t(shift) );
+    typename TypeFor<ARCH,OP::SIZE>::u result = eval_shift( arch, RSHIFT(), arch.rmread( OP(), rmop ), typename ARCH::u8_t(shift) );
     if (shift)
       result |= arch.regread( OP(), gn ) << (OP::SIZE - shift);
     arch.rmwrite( OP(), rmop, result );
@@ -2191,7 +2226,7 @@ struct ShrdCL : public Operation<ARCH>
 {
   ShrdCL( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn )
     : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << "shrd %cl," << DisasmG( OP(), gn ) << ',' << DisasmE( OP(), rmop ); }
 
   void execute( ARCH& arch ) const
@@ -2199,7 +2234,7 @@ struct ShrdCL : public Operation<ARCH>
     typedef typename ARCH::u8_t u8_t;
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     u8_t shift = arch.regread( GOb(), 1 );
-    u_type result = eval_shr( arch, arch.rmread( OP(), rmop ), shift );
+    u_type result = eval_shift( arch, RSHIFT(), arch.rmread( OP(), rmop ), shift );
     shift &= shift_counter<ARCH,u_type>::mask();
     if (arch.Test(shift != u8_t(0)))
       result |= arch.regread( OP(), gn ) << (u8_t(OP::SIZE) - shift);
@@ -2210,41 +2245,41 @@ struct ShrdCL : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,SHD> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\x0f\xa4" ) & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShldIM<ARCH,GOw>( _.opbase(), _.rmop(), _.greg(), _.i( uint8_t() ) );
       else if (ic.opsize() == 32) return new ShldIM<ARCH,GOd>( _.opbase(), _.rmop(), _.greg(), _.i( uint8_t() ) );
       else if (ic.opsize() == 64) return new ShldIM<ARCH,GOq>( _.opbase(), _.rmop(), _.greg(), _.i( uint8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\x0f\xa5" ) & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShldCL<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 32) return new ShldCL<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 64) return new ShldCL<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\x0f\xac" ) & RM() & Imm<8>() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShrdIM<ARCH,GOw>( _.opbase(), _.rmop(), _.greg(), _.i( uint8_t() ) );
       else if (ic.opsize() == 32) return new ShrdIM<ARCH,GOd>( _.opbase(), _.rmop(), _.greg(), _.i( uint8_t() ) );
       else if (ic.opsize() == 64) return new ShrdIM<ARCH,GOq>( _.opbase(), _.rmop(), _.greg(), _.i( uint8_t() ) );
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\x0f\xad" ) & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new ShrdCL<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 32) return new ShrdCL<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 64) return new ShrdCL<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -2252,21 +2287,26 @@ template <class ARCH, class OP, bool LEAD>
 struct BitScan : public Operation<ARCH>
 {
   BitScan( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << (LEAD ? "bsr " : "bsf ") << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     typedef typename ARCH::bit_t bit_t;
     u_type src = arch.rmread( OP(), rmop );
-    
+
     bit_t src_is_zero = (src == u_type( 0 ));
     arch.flagwrite( ARCH::FLAG::ZF, src_is_zero );
+    arch.flagwrite( ARCH::FLAG::CF, bit_t(false), bit_t(false) );
+    arch.flagwrite( ARCH::FLAG::OF, bit_t(false), bit_t(false) );
+    arch.flagwrite( ARCH::FLAG::SF, bit_t(false), bit_t(false) );
+    arch.flagwrite( ARCH::FLAG::AF, bit_t(false), bit_t(false) );
+    arch.flagwrite( ARCH::FLAG::PF, bit_t(false), bit_t(false) );
     if (arch.Test( src_is_zero )) return;
-    
+
     u_type res = LEAD ? (BitScanReverse( src )) : BitScanForward( src );
-    
+
     arch.regwrite( OP(), gn, res );
   }
 };
@@ -2275,18 +2315,18 @@ template <class ARCH, class OP, bool LEAD>
 struct CountZeros : public Operation<ARCH>
 {
   CountZeros( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << (LEAD ? "lzcnt " : "tzcnt ") << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
     typedef typename ARCH::bit_t bit_t;
     u_type src = arch.rmread( OP(), rmop ), res;
-    
+
     bit_t src_is_zero = (src == u_type( 0 ));
     arch.flagwrite( ARCH::FLAG::CF, src_is_zero );
-    
+
     if (arch.Test( src_is_zero )) {
       res = u_type( OP::SIZE );
       arch.flagwrite( ARCH::FLAG::ZF, bit_t(0) );
@@ -2295,7 +2335,10 @@ struct CountZeros : public Operation<ARCH>
       res = LEAD ? (u_type(OP::SIZE-1) - BitScanReverse( src )) : BitScanForward( src );
       arch.flagwrite( ARCH::FLAG::ZF, res == u_type(0) );
     }
-    
+
+    for (typename ARCH::FLAG::Code flag : {ARCH::FLAG::PF, ARCH::FLAG::SF, ARCH::FLAG::AF, ARCH::FLAG::OF, })
+      arch.flagwrite( flag, bit_t(false), bit_t(false) );
+
     arch.regwrite( OP(), gn, res );
   }
 };
@@ -2303,7 +2346,7 @@ struct CountZeros : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,ZCNT> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\x0f\xbc" ) & RM() ))
-  
+
     {
       if (not ic.f3()) {
         if      (ic.opsize() == 16) return new BitScan<ARCH,GOw,false>( _.opbase(), _.rmop(), _.greg() );
@@ -2316,9 +2359,9 @@ template <class ARCH> struct DC<ARCH,ZCNT> { Operation<ARCH>* get( InputCode<ARC
       }
       return 0;
     }
-  
+
   if (auto _ = match( ic, opcode( "\x0f\xbd" ) & RM() ))
-  
+
     {
       if (not ic.f3()) {
         if      (ic.opsize() == 16) return new BitScan<ARCH,GOw,true>( _.opbase(), _.rmop(), _.greg() );
@@ -2331,7 +2374,7 @@ template <class ARCH> struct DC<ARCH,ZCNT> { Operation<ARCH>* get( InputCode<ARC
       }
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -2339,9 +2382,9 @@ template <class ARCH, class OP>
 struct Popcnt : public Operation<ARCH>
 {
   Popcnt( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn )  : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << "popcnt " << DisasmE( OP(), rmop ) << DisasmG( OP(), gn ); }
-  
+
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::u op_type;
@@ -2351,7 +2394,7 @@ struct Popcnt : public Operation<ARCH>
 
     for (unsigned idx = 0; idx < OP::SIZE; ++idx)
       cnt += ((src >> idx) & lsb);
-    
+
     arch.regwrite( OP(), gn, cnt );
   }
 };
@@ -2359,16 +2402,16 @@ struct Popcnt : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,POPCNT> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (ic.f0()) return 0;
-  
+
   if (auto _ = match( ic, simdF3() & opcode( "\x0f\xb8" ) & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new Popcnt<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 32) return new Popcnt<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 64) return new Popcnt<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -2431,7 +2474,7 @@ struct Lahf : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,AHF> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (ic.f0()) return 0;
-  
+
   if (auto _ = match( ic, opcode( "\x9e" ) ))
 
     return new Sahf<ARCH>( _.opbase() );
@@ -2474,23 +2517,23 @@ struct Csx : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,CSX> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\x98" ) ))
-  
+
     {
       if (ic.opsize() == 16) return new Csxe<ARCH,GOw>( _.opbase() );
       if (ic.opsize() == 32) return new Csxe<ARCH,GOd>( _.opbase() );
       if (ic.opsize() == 64) return new Csxe<ARCH,GOq>( _.opbase() );
       return 0;
     }
-  
+
   if (auto _ = match( ic,  opcode( "\x99" ) ))
-  
+
     {
       if (ic.opsize() == 16) return new Csx<ARCH,GOw>( _.opbase() );
       if (ic.opsize() == 32) return new Csx<ARCH,GOd>( _.opbase() );
       if (ic.opsize() == 64) return new Csx<ARCH,GOq>( _.opbase() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -2555,7 +2598,7 @@ struct AAD : public Operation<ARCH>
   AAD( OpBase<ARCH> const& opbase, uint8_t _imm ) : Operation<ARCH>( opbase ), imm(_imm) {} uint8_t imm;
   void disasm( std::ostream& sink ) const { sink << "aad" << DisasmI( imm ); }
 };
-  
+
 template <class ARCH>
 struct AAM : public Operation<ARCH>
 {
@@ -2566,9 +2609,9 @@ struct AAM : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,ADJUST> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (ic.mode64()) return 0;
-  
+
   if (auto _ = match( ic, opcode( "\xd5" ) & Imm<8>() ))
-  
+
     return new AAD<ARCH>( _.opbase(), _.i( uint8_t() ) );
 
   if (auto _ = match( ic, opcode( "\xd4" ) & Imm<8>() ))
@@ -2590,7 +2633,7 @@ template <class ARCH> struct DC<ARCH,ADJUST> { Operation<ARCH>* get( InputCode<A
   if (auto _ = match( ic, opcode( "\x3f" ) ))
 
     return new AAS<ARCH>( _.opbase() );
-  
+
   return 0;
 }};
 
@@ -2604,15 +2647,15 @@ struct Bound : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,BOUND> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (ic.mode64()) return 0;
-  
+
   if (auto _ = match( ic, opcode( "\x62" ) & RM() ))
-  
+
     {
       if      (ic.opsize() == 16) return new Bound<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
       else if (ic.opsize() == 32) return new Bound<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
-  
+
   return 0;
 }};
 
@@ -2633,22 +2676,57 @@ struct Adox : public Operation<ARCH>
 template <class ARCH> struct DC<ARCH,ADF> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (ic.f0()) return 0;
-  
+
   /* ADCX -- Unsigned Integer Addition of Two Operands with Carry Flag */
   if (auto _ = match( ic, simd66() & opcode( "\x0f\x38\xf6" ) & RM() ))
-  
+
     {
       if (ic.opsize() == 64) return new Adcx<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       else                   return new Adcx<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
     }
-  
+
   if (auto _ = match( ic, simdF3() & opcode( "\x0f\x38\xf6" ) & RM() ))
-  
+
     {
       if (ic.opsize() == 64) return new Adox<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
       else                   return new Adox<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
     }
-  
+
   return 0;
 }};
 
+template <class ARCH, class OP>
+struct Bzhi : public Operation<ARCH>
+{
+  Bzhi( OpBase<ARCH> const& opbase, uint8_t _gn, MOp<ARCH> const* _rmop, uint8_t _vn ) : Operation<ARCH>( opbase ), rmop( _rmop ), vn( _vn ), gn( _gn ) {}
+  RMOp<ARCH> rmop;
+  uint8_t vn, gn;
+
+  void disasm( std::ostream& sink ) const { sink << "bzhi " << DisasmG( OP(), vn ) << ',' << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
+
+  void execute( ARCH& arch ) const {
+    typedef typename TypeFor<ARCH,OP::SIZE>::u val_t;
+    typedef typename ARCH::bit_t bit_t;
+    val_t index = val_t(arch.regread( GOb(), vn ));
+    bit_t carry = index >= val_t(OP::SIZE);
+    val_t mask =
+      ((val_t(carry) - val_t(1)) & (val_t(1) << index)) - val_t(1);
+    arch.regwrite( OP(), gn, arch.rmread( OP(), rmop ) & mask );
+    arch.flagwrite( ARCH::FLAG::CF, carry );
+  }
+};
+
+template <class ARCH> struct DC<ARCH,BZHI> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
+{
+  if (auto _ = match( ic, vex( "\x0f\x38\xf5" ) & RM() ))
+
+    {
+      if ((not ic.vex()) || (ic.vlen() != 128)) return 0;
+      if (ic.mode64() && ic.w())
+	return new Bzhi<ARCH,GOq>( _.opbase(), _.greg(), _.rmop(), ic.vreg() );
+      else
+	return new Bzhi<ARCH,GOd>( _.opbase(), _.greg(), _.rmop(), ic.vreg() );
+    }
+
+  return 0;
+}};
