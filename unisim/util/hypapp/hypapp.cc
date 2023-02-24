@@ -266,9 +266,8 @@ HttpRequest::HttpRequest(const Request& _req, std::ostream& _log, std::ostream& 
   , log(_log)
   , warn_log(_warn_log)
   , err_log(_err_log)
+  , std::istream(&content_stream_buffer)
 {
-  rdbuf(&content_stream_buffer);
-  
   unsigned int part_count = req.GetPartCount();
   parts.reserve(part_count);
   for(unsigned int part_num = 0; part_num < part_count; part_num++)
@@ -343,9 +342,8 @@ HttpRequest::HttpRequest(const std::string& _server_root, const std::string& _pa
   , log(http_request.log)
   , warn_log(http_request.warn_log)
   , err_log(http_request.err_log)
+  , std::istream(&content_stream_buffer)
 {
-  rdbuf(&content_stream_buffer);
-  
   unsigned int part_count = req.GetPartCount();
   for(unsigned int part_num = 0; part_num < part_count; part_num++)
   {

@@ -1,7 +1,7 @@
 (env
  (_
-  (c_flags :standard -g0)
-  (cxx_flags :standard -g0)))
+  (c_flags :standard -std=gnu11 -g0)
+  (cxx_flags :standard -std=gnu++11 -g0)))
 
 (subdir
  unisim/util
@@ -343,6 +343,7 @@
 
 (test
  (name unittest)
- (modes (best exe))
+ (modes
+  (best exe))
  (modules unittest)
  (libraries arm32dba aarch64dba amd64dba))

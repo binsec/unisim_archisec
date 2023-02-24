@@ -1,3 +1,7 @@
+## 0.0.5 (2023-02-24)
+
+- enable macOS Homebrew distribution
+
 ## 0.0.4 (2023-02-15)
 
 - better handling of x86 flags

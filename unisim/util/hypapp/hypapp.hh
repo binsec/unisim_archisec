@@ -252,8 +252,8 @@ public:
   HttpRequestPart(const RequestPart& _part)
     : part(_part)
     , content_stream_buffer(part.GetContent(), part.GetContentLength(), 0)
+    , std::istream(&content_stream_buffer)
   {
-    rdbuf(&content_stream_buffer);
   }
 
   unsigned int GetContentLength() const { return part.GetContentLength(); }
