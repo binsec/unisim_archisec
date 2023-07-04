@@ -1,5 +1,5 @@
 /******************************************************************************/
-/*  Copyright (c) 2007-2023,                                                  */
+/*  Copyright (c) 2007-2021,                                                  */
 /*  Commissariat a l'Énergie Atomique et aux Énergies Alternatives (CEA)      */
 /*  All rights reserved.                                                      */
 /*                                                                            */
@@ -32,8 +32,7 @@
 /*  POSSIBILITY OF SUCH DAMAGE.                                               */
 /******************************************************************************/
 
-#include <unisim/component/cxx/processor/arm/isa/constants.hh>
-#include <aarch32/decoder.hh>
+#include <ppc64/decoder.hh>
 
 #include <vector>
 #include <iostream>
@@ -44,17 +43,11 @@
 #include <caml/alloc.h>
 #include <caml/fail.h>
 
-extern "C" value arm32dba_decode(value vmode, value vendian,
-				 value vitstate, value vaddr, value vopcode) {
+extern "C" value ppc64dba_decode(value vaddr, value vopcode) {
   std::stringstream s;
-  aarch32::Decoder decoder;
+  ppc64::Decoder decoder;
 
-  decoder.iset = Long_val(vmode) ? decoder.Thumb : decoder.Arm;
-  decoder.bigendian = Long_val(vendian);
-  decoder.mode = unisim::component::cxx::processor::arm::USER_MODE;
-  decoder.itstate = Long_val(vitstate);
-
-  decoder.process( s, Int32_val(vaddr), Int32_val(vopcode) );
+  decoder.process(s, Int64_val(vaddr), Int32_val(vopcode));
 
   return caml_copy_string(s.str().c_str());
 }

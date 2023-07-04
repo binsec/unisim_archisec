@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2009-2023,
+ *  Copyright (c) 2007-2018,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -32,32 +32,49 @@
  * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
  */
 
-#ifndef __AARCH32_DECODER_HH__
-#define __AARCH32_DECODER_HH__
+/***************************************/
+/*** Convenience disassembly methods ***/
+/***************************************/
 
-#include <iosfwd>
-#include <inttypes.h>
+#include <unisim/component/cxx/processor/powerpc/isa/disasm.hh>
+#include <iostream>
 
-namespace aarch32
-{
-  struct StatusRegister
-  {
-    enum InstructionSet { Arm, Thumb, Jazelle, ThumbEE };
+namespace unisim {
+namespace component {
+namespace cxx {
+namespace processor {
+namespace powerpc {
 
-    StatusRegister();
+	std::ostream& operator << (std::ostream& sink, DASMPrint const& dap)
+	{
+		dap.Print(sink);
+		return sink;
+	}
 
-    bool IsThumb() const { return iset == Thumb; }
+	void GPRPrint::Print( std::ostream& sink ) const { sink << "r" << std::dec << reg; }
+	void FPRPrint::Print( std::ostream& sink ) const { sink << "f" << std::dec << reg; }
+	void HexPrint::Print( std::ostream& sink ) const { sink << "0x" << std::hex << num; }
+	void CRPrint::Print( std::ostream& sink ) const { sink << "cr" << std::dec << reg; }
+	void CondPrint::Print( std::ostream& sink ) const
+	{
+		char const* condnames[] = {"ge","le","ne","ns","lt","gt","eq","so"};
+		char const* condname = condnames[(crb&3)|(expect?4:0)];
+		if (crb >= 4)
+			sink << "4*" << CRPrint(crb>>2) << '+';
+		sink << condname;
+	}
+	void EAPrint::Print( std::ostream& sink ) const
+	{
+		sink << std::dec << idx << '(';
+		if (reg)
+			sink << GPRPrint(reg);
+		else
+			sink << '0';
+		sink << ')';
+	}
 
-    InstructionSet iset;
-    int            itstate;
-    bool           bigendian;
-    uint8_t        mode;
-  };
-
-  struct Decoder : StatusRegister
-  {
-    void process( std::ostream& sink, uint32_t addr, uint32_t code );
-  };
-}
-
-#endif /* __AARCH32_DECODER_HH__ */
+} /* end of namespace powerpc */
+} /* end of namespace processor */
+} /* end of namespace cxx */
+} /* end of namespace component */
+} /* end of namespace unisim */

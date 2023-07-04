@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017-2020,
+ *  Copyright (c) 2017-2023,
  *  Commissariat a l'Energie Atomique (CEA),
  *  All rights reserved.
  *
@@ -50,7 +50,7 @@ namespace vector {
     virtual void Repr( std::ostream& sink ) const override;
     virtual int cmp( ExprNode const& brhs ) const override { return 0; }
     virtual VMix* Mutate() const override { return new VMix( *this ); }
-    virtual ValueType const* GetType() const override { return l->GetType(); }
+    virtual ValueType GetType() const override { return l->GetType(); }
     Expr l, r;
   };
 
@@ -77,7 +77,7 @@ namespace vector {
     VTrans( Expr const& src, unsigned srcsize, int srcpos ) : VTransBase( src, srcsize, srcpos ) {}
     typedef VTrans<T> this_type;
     virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual ValueType const* GetType() const override { return T::GetType(); }
+    virtual ValueType GetType() const override { return T::GetType(); }
   };
 
   struct VUConfig
@@ -86,7 +86,7 @@ namespace vector {
     {
       Byte() : sexp(), span() {}
       Byte( Expr const& _sexp, int _span ) : sexp(_sexp), span(_span) {}
-      Byte(unsigned value) : sexp(unisim::util::symbolic::make_const(uint8_t(value))), span(1) {}
+      Byte(unsigned value) : sexp(make_const(uint8_t(value))), span(1) {}
 
       void source( Expr const& _sexp, unsigned _span ) { sexp = _sexp; span = _span; }
       void repeat( unsigned dist ) { sexp = Expr(); span = dist; }

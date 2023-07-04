@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2019-2020,
+ *  Copyright (c) 2019-2023,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -62,7 +62,8 @@ struct VmmValue
   VmmValue() = default;
   VmmValue(unisim::util::symbolic::Expr const& _expr) : expr(_expr) {}
   unisim::util::symbolic::Expr expr;
-  static unisim::util::symbolic::ValueType const* GetType();
+  using ValueType = unisim::util::symbolic::ValueType;
+  static ValueType GetType() { return ValueType(ValueType::NA, 8*BYTECOUNT); }
   //{ return unisim::util::symbolic::NoValueType(); }
 };
 
@@ -79,12 +80,12 @@ struct ProcessorBase
   typedef SmartValue<uint16_t>    u16_t;
   typedef SmartValue<uint32_t>    u32_t;
   typedef SmartValue<uint64_t>    u64_t;
-  typedef void                    u128_t;
+  typedef SmartValue<unisim::util::arithmetic::Integer<4,false>> u128_t;
   typedef SmartValue<int8_t>      s8_t;
   typedef SmartValue<int16_t>     s16_t;
   typedef SmartValue<int32_t>     s32_t;
   typedef SmartValue<int64_t>     s64_t;
-  typedef void                    s128_t;
+  typedef SmartValue<unisim::util::arithmetic::Integer<4,true>> s128_t;
   typedef SmartValue<bool>        bit_t;
 
   typedef SmartValue<float>       f32_t;
@@ -159,7 +160,7 @@ struct ProcessorBase
 
   struct FRegID : public unisim::util::identifier::Identifier<FRegID>
   {
-    static unisim::util::symbolic::ValueType const* GetType() { return unisim::util::symbolic::CValueType(double()); }
+    static unisim::util::symbolic::ValueType GetType() { return unisim::util::symbolic::CValueType(double()); }
     enum Code { st0=0, st1, st2, st3, st4, st5, st6, st7, end } code;
     char const* c_str() const { return &"st0\0st1\0st2\0st3\0st4\0st5\0st6\0st7"[(unsigned(code) % 8)*4]; }
     FRegID() : code(end) {}
@@ -171,20 +172,9 @@ struct ProcessorBase
   struct VRegID
   {
     VRegID(unsigned _reg) : reg(_reg) {} unsigned reg;
-    static unisim::util::symbolic::ValueType const* GetType() { return VmmValue::GetType(); }
+    static unisim::util::symbolic::ValueType GetType() { return VmmValue::GetType(); }
     void Repr( std::ostream& ) const;
     int cmp(VRegID const& rhs) const { return int(reg) - int(rhs.reg); }
-  };
-
-  struct VClear : public unisim::util::symbolic::binsec::ASExprNode
-  {
-    VClear(unsigned _size) : size(_size) {} unsigned size;
-    virtual VClear* Mutate() const override { return new VClear( *this ); };
-    virtual unsigned SubCount() const override { return 0; };
-    virtual void Repr( std::ostream& sink ) const override;
-    ValueType const* GetType() const override;
-    virtual int cmp( ExprNode const& rhs ) const override { return 0; }
-    virtual int GenCode(unisim::util::symbolic::binsec::Label&, unisim::util::symbolic::binsec::Variables&, std::ostream& sink) const;
   };
 
   // VRegRead should never be a binsec::node (no dba available for it)
@@ -192,7 +182,7 @@ struct ProcessorBase
   // {
   //   VRegRead( unsigned _reg ) : reg(_reg) {}
   //   virtual VRegRead* Mutate() const override { return new VRegRead( *this ); }
-  //   virtual ValueType const* GetType() const { return ValueType::VOID; }
+  //   virtual ValueType GetType() const { return ValueType::VOID; }
   //   virtual unsigned SubCount() const override { return 0; }
   //   virtual void Repr( std::ostream& sink ) const override;
   //   virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<VRegRead const&>( rhs ) ); }
@@ -336,7 +326,7 @@ struct Processor : public ProcessorBase
   /*** SEGMENTS ***/
   struct SegBaseID : public SegmentID
   {
-    static unisim::util::symbolic::ValueType const* GetType() { return unisim::util::symbolic::CValueType(nat_addr_t()); }
+    static unisim::util::symbolic::ValueType GetType() { return unisim::util::symbolic::CValueType(nat_addr_t()); }
     void Repr(std::ostream& sink) const { sink << c_str() << "_base"; }
     SegBaseID() = default;
     SegBaseID( Code _code ) : SegmentID(_code) {}
@@ -409,20 +399,19 @@ struct Processor : public ProcessorBase
   template <class GOP>
   typename TypeFor<Processor,GOP::SIZE>::u regread( GOP const&, unsigned idx )
   {
-    return typename TypeFor<Processor,GOP::SIZE>::u( gr_type(eregread( idx, GOP::SIZE / 8, 0 )) );
+    return typename TypeFor<Processor,GOP::SIZE>::u( gr_type( eregread(idx, GOP::SIZE / 8, 0) ) );
   }
 
-  u8_t regread( GObLH const&, unsigned idx ) { return u8_t( gr_type(eregread( idx%4, 1, (idx >> 2) & 1 )) ); }
+  u8_t regread( GObLH const&, unsigned idx ) { return u8_t( gr_type( eregread(idx%4, 1, (idx >> 2) & 1)) ); }
 
-  template <class GOP> void regwrite( GOP const&, unsigned idx, typename TypeFor<Processor,GOP::SIZE>::u const& val )
+  template <class GOP>
+  void regwrite( GOP const&, unsigned idx, typename TypeFor<Processor,GOP::SIZE>::u const& val )
   {
-    unsigned const size = GOP::SIZE / 8;
-    if(size > MODE::GREGSIZE) throw Undefined();
-    eregwrite( idx, size, 0, gr_type(val).expr );
+    eregwrite( idx, GOP::SIZE / 8, 0, gr_type(val).expr );
   }
 
-  void regwrite( GObLH const&, unsigned idx, u8_t val )  { eregwrite( idx%4, 1, (idx>>2) & 1, gr_type(val).expr ); }
-  void regwrite( GOd const&,   unsigned idx, u32_t val ) { eregwrite( idx,   GREGSIZE,     0, gr_type(val).expr ); }
+  void regwrite( GObLH const&, unsigned idx, u8_t val ) { eregwrite( idx%4, 1, (idx>>2) & 1, gr_type(val).expr ); }
+  void regwrite( GOd const&, unsigned idx, u32_t val ) { eregwrite( idx, GREGSIZE, 0, gr_type(val).expr ); }
 
   addr_t                      getnip() { return next_insn_addr; }
   void                        setnip( addr_t nip, ipproc_t ipproc = ipjmp )
@@ -537,7 +526,7 @@ struct Processor : public ProcessorBase
     typedef VmmIndirectRead<VR,ELEM> this_type;
     virtual this_type* Mutate() const override { return new this_type( *this ); }
     virtual unsigned GetVSize() const override { return VR::SIZE; }
-    virtual void GetVName(std::ostream& sink) const override { return GetType()->GetName(sink); }
+    virtual void GetVName(std::ostream& sink) const override { return GetType().Repr(sink); }
     virtual unsigned SubCount() const { return elemcount+1; }
     virtual Expr const& GetSub(unsigned idx) const
     {
@@ -545,7 +534,9 @@ struct Processor : public ProcessorBase
       if (idx == elemcount) return index;
       return ExprNode::GetSub(idx);
     }
-    virtual ValueType const* GetType() const override { return ELEM::GetType(); }
+
+    virtual ValueType GetType() const override { return ELEM::GetType(); }
+
     virtual int GenCode(unisim::util::symbolic::binsec::Label& label, unisim::util::symbolic::binsec::Variables& vars, std::ostream& sink) const override {
       for (int i = 0; i < elemcount - 1; i += 1) {
 	sink << "(if";
@@ -675,8 +666,90 @@ public:
 
   void _DE()  { abort = true; }
 
-  void xsave(unisim::component::cxx::processor::intel::XSaveMode mode, bool is64, u64_t bv, RMOp const& rmop) { throw Unimplemented(); /*hardware*/ }
-  void xrstor(unisim::component::cxx::processor::intel::XSaveMode mode, bool is64, u64_t bv, RMOp const& rmop) { throw Unimplemented(); /*hardware*/ }
+  void xsave(unisim::component::cxx::processor::intel::XSaveMode mode,
+	     bool is64, u64_t bv, RMOp const& rmop) {
+    switch (mode.code) {
+    case unisim::component::cxx::processor::intel::XSaveMode::BASE:
+    case unisim::component::cxx::processor::intel::XSaveMode::C:
+      {
+	if (!rmop.ismem())
+	  throw std::logic_error( "xsave requires a memory operand" );
+	unsigned seg = rmop->segment;
+	addr_t area = rmop->effective_address( *this );
+	if (Test( area & addr_t( 0b111111 ) )) abort = true;
+	/* Static XCR0 version */
+	u32_t sse = u32_t( 0b00000010 );
+	u32_t avx = u32_t( MODE::is64() ? 0b00000100 : 0b00000000 );
+	u32_t request = regread( GOd(), 0 );
+	u64_t components = u64_t( request & ( sse | avx ) );
+	memwrite<64>( seg, area + addr_t( 512 ), components );
+	if (mode.code == unisim::component::cxx::processor::intel::XSaveMode::C)
+	  memwrite<64>( seg, area + addr_t( 520 ),
+			components | u64_t( 1L << 63 ) );
+	else
+	  memwrite<64>( seg, area + addr_t(520), u64_t( 0 ) );
+	unsigned sse_size = XMM::size(), avx_size = YMM::size();
+	if (Test( request & sse ) )
+	  for (unsigned r = 0; r < VREGCOUNT; r += 1)
+	    vmm_memwrite( seg,
+			  area + addr_t(160) + addr_t(r * sse_size / 8),
+			    MODE::is64() ?
+			    vmm_read( YMM(), r, 0, u128_t() ) :
+			    vmm_read( XMM(), r, 0, u128_t() ) );
+	if (Test( request & avx ))
+	  for (unsigned r = 0; r < VREGCOUNT; r += 1)
+	    vmm_memwrite( seg,
+			  area + addr_t(576) +
+			  addr_t(r * (avx_size - sse_size) / 8),
+			  vmm_read( YMM(), r, 1, u128_t() ) );
+      }
+      break;
+    case unisim::component::cxx::processor::intel::XSaveMode::OPT:
+    case unisim::component::cxx::processor::intel::XSaveMode::S:
+      throw Unimplemented(); /*hardware*/
+    }
+  }
+  void xrstor(unisim::component::cxx::processor::intel::XSaveMode mode,
+	      bool is64, u64_t bv, RMOp const& rmop) {
+    switch (mode.code) {
+    case unisim::component::cxx::processor::intel::XSaveMode::BASE:
+      {
+	if (!rmop.ismem())
+	  throw std::logic_error( "xrstor requires a memory operand" );
+	unsigned seg = rmop->segment;
+	addr_t area = rmop->effective_address( *this );
+	if (Test( area & addr_t( 0b111111 ) )) abort = true;
+	/* Static XCR0 version */
+	u32_t sse = u32_t( 0b00000010 );
+	u32_t avx = u32_t( MODE::is64() ? 0b00000100 : 0b00000000 );
+	u32_t request = regread( GOd(), 0 );
+	u32_t components = memread<32>( seg, area + addr_t( 512 ) );
+	unsigned sse_size = XMM::size(), avx_size = YMM::size();
+	if (Test( request & components & sse ) )
+	  for (unsigned r = 0; r < VREGCOUNT; r += 1) {
+	    u128_t data = vmm_memread( seg,
+				       area + addr_t(160) +
+				       addr_t(r * sse_size / 8),
+				       u128_t() );
+	    if (MODE::is64()) vmm_write( YMM(), r, 0, data );
+	    else vmm_write( XMM(), r, 0, data );
+	  }
+	if (Test( request & components & avx ))
+	  for (unsigned r = 0; r < VREGCOUNT; r += 1)
+	    vmm_write( YMM(), r, 1,
+		       vmm_memread( seg,
+				    area + addr_t(576) +
+				    addr_t(r * (avx_size - sse_size) / 8),
+				    u128_t()) );
+      }
+      break;
+    case unisim::component::cxx::processor::intel::XSaveMode::S:
+      throw Unimplemented(); /*hardware*/
+    case unisim::component::cxx::processor::intel::XSaveMode::OPT:
+    case unisim::component::cxx::processor::intel::XSaveMode::C:
+      throw std::logic_error( "xrstor has no 'c' or 'opt' variants" );
+    }
+  }
 
   //   =====================================================================
   //   =                 Internal Instruction Control Flow                 =
@@ -726,7 +799,6 @@ template <class MODE>
 ProcessorBase::Expr
 Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos ) const
 {
-  using unisim::util::symbolic::ExprNode;
   using unisim::util::symbolic::make_const;
 
   if (not regvalues[reg][pos].node)
@@ -735,12 +807,12 @@ Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos ) const
       unsigned src = pos;
       do { src = src & (src-1); } while (not regvalues[reg][src].node);
       unsigned shift = 8*(pos - src);
-      return new unisim::util::symbolic::binsec::BitFilter( regvalues[reg][src], 64, shift, 8*size, 64, false );
+      return unisim::util::symbolic::binsec::BitFilter::mksimple( regvalues[reg][src], 8*GREGSIZE, shift, 8*size, 8*GREGSIZE, false );
     }
   else if (not regvalues[reg][(pos|size)&(GREGSIZE-1)].node)
     {
       // requested read is in lower bits of a larger value
-      return new unisim::util::symbolic::binsec::BitFilter( regvalues[reg][pos], 64, 0, 8*size, 64, false );
+      return unisim::util::symbolic::binsec::BitFilter::mksimple( regvalues[reg][pos], 8*GREGSIZE, 0, 8*size, 8*GREGSIZE, false );
     }
   else if ((size > 1) and (regvalues[reg][pos|(size >> 1)].node))
     {
@@ -796,7 +868,7 @@ Processor<MODE>::vregsinks( Processor<MODE> const& ref, unsigned reg ) const
   unsigned const vector_size = umms[reg].size;
 
   if (unsigned psize = 8*(VUConfig::BYTECOUNT - vector_size))
-    path->add_sink( newPartialRegWrite( VRegID(reg), 8*vector_size, psize, new VClear(psize) ) );
+    path->add_sink( newPartialRegWrite( VRegID(reg), 8*vector_size, psize, new unisim::util::symbolic::Zero(unisim::util::symbolic::ValueType::UNSIGNED, psize) ) );
 
   if (vector_size == 0)
     return;
@@ -840,7 +912,7 @@ Processor<MODE>::eregsinks( Processor<MODE> const& ref, unsigned reg ) const
       Expr value = core.eregread(reg,size,pos);
       if (value == ref.eregread(reg,size,pos))
         return;
-      value = unisim::util::symbolic::binsec::ASExprNode::Simplify( value );
+      unisim::util::symbolic::binsec::BitSimplify::Do(value);
       unsigned half = size / 2, mid = pos+half;
       if (value.ConstSimplify() or size <= 1 or not core.regvalues[reg][mid].node)
         {
@@ -848,10 +920,7 @@ Processor<MODE>::eregsinks( Processor<MODE> const& ref, unsigned reg ) const
             core.path->add_sink( newRegWrite( IRegID(reg), value ) );
           else
             {
-              unisim::util::symbolic::binsec::BitFilter bf( value, 64, 0, size*8, size*8, false );
-              bf.Retain(); // Not a heap-allocated object (never delete);
-              value = bf.Simplify();
-              if (value.node == &bf) value = new unisim::util::symbolic::binsec::BitFilter( bf );
+              value = unisim::util::symbolic::binsec::BitFilter::mksimple( value, 8*GREGSIZE, 0, 8*size, 8*size, false );
               core.path->add_sink( newPartialRegWrite( IRegID(reg), 8*pos, 8*size, value ) );
             }
         }
@@ -872,6 +941,8 @@ Processor<MODE>::close( Processor<MODE> const& ref )
 
   if (next_insn_mode == ipcall)
     path->add_sink( new unisim::util::symbolic::binsec::Call<nat_addr_t>( next_insn_addr.expr, return_address ) );
+  else if (next_insn_mode == ipret)
+    path->add_sink( new unisim::util::symbolic::binsec::Ret<nat_addr_t>( next_insn_addr.expr ) );
   else
     path->add_sink( new unisim::util::symbolic::binsec::Branch( next_insn_addr.expr ) );
 
@@ -910,6 +981,8 @@ Processor<MODE>::step( Operation const& op )
 
 struct Intel64
 {
+  static bool is64() { return true; }
+
   enum {GREGSIZE = 8, GREGCOUNT = 16, VREGCOUNT = 16};
 
   typedef unisim::component::cxx::processor::intel::GOq GR;
@@ -962,6 +1035,8 @@ struct Intel64
 
 struct Compat32
 {
+  static bool is64() { return false; }
+
   enum {GREGSIZE = 4, GREGCOUNT = 8, VREGCOUNT = 8};
 
   typedef unisim::component::cxx::processor::intel::GOd GR;

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2007-2022,
+ *  Copyright (c) 2007-2023,
  *  Commissariat a l'Energie Atomique (CEA),
  *  University of Perpignan (UPVD)
  *  All rights reserved.
@@ -38,6 +38,7 @@
 
 #include <inttypes.h>
 #include <unisim/util/inlining/inlining.hh>
+#include <iosfwd>
 #include <limits>
 
 namespace unisim {
@@ -45,6 +46,12 @@ namespace util {
 namespace arithmetic {
 
   void print_integer( std::ostream&, bool, unsigned, uint32_t const* );
+
+  namespace details
+  {
+    template <typename T> T next32bits( T bits ) { return int64_t( bits ) >> 32; }
+    inline uint64_t next32bits( uint64_t bits ) { return bits >> 32; }
+  }
   
   template <unsigned CELLCOUNT, bool SIGNED>
   struct Integer
@@ -59,7 +66,7 @@ namespace arithmetic {
       for (unsigned idx = 0; idx < CELLCOUNT; ++idx)
         {
           cells[idx] = uint32_t(val);
-          val >>= 32;
+          val = details::next32bits(val);
         }
     }
 

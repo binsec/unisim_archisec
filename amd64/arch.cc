@@ -75,52 +75,9 @@ ProcessorBase::FLAG::Repr( std::ostream& sink ) const
 }
 
 void
-ProcessorBase::VClear::Repr( std::ostream& sink ) const
-{
-  sink << "VClear(" << std::dec << size << ")";
-}
-
-int
-ProcessorBase::VClear::GenCode(unisim::util::symbolic::binsec::Label&, unisim::util::symbolic::binsec::Variables&, std::ostream& sink) const
-{
-  if (size % 8) throw 0;
-  sink << unisim::util::symbolic::binsec::dbx(size / 8, 0);
-  return size;
-}
-
-unisim::util::symbolic::ValueType const*
-ProcessorBase::VClear::GetType() const
-{
-  struct VCT : public unisim::util::symbolic::ValueType
-  {
-    VCT(unsigned _bitsize) : unisim::util::symbolic::ValueType(unisim::util::symbolic::ValueType::NA), bitsize(_bitsize) {} unsigned bitsize;
-    virtual unsigned GetBitSize() const override { return bitsize; }
-    virtual void GetName(std::ostream& sink) const override { sink << "VClear" << std::dec << bitsize; }
-    bool operator < (VCT const& rhs) const { return bitsize < rhs.bitsize; }
-  };
-
-  static std::set<VCT> type_descriptors;
-  auto tp = type_descriptors.insert(this->size).first;
-
-  return &*tp;
-}
-
-void
 ProcessorBase::VRegID::Repr(std::ostream& sink) const
 {
   sink << char(VmmValue::VPREFIX) << "mm" << std::dec << reg;
-}
-
-unisim::util::symbolic::ValueType const*
-VmmValue::GetType()
-{
-  static struct Type : unisim::util::symbolic::ValueType
-  {
-    Type() : ValueType(unisim::util::symbolic::ValueType::NA) {}
-    virtual unsigned GetBitSize() const override { return 8*VmmValue::BYTECOUNT; }
-    virtual void GetName(std::ostream& sink) const override { sink << "VmmValue"; }
-  } _;
-  return &_;
 }
 
 void

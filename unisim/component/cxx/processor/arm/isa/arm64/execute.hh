@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016-2022,
+ *  Copyright (c) 2016-2023,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -36,8 +36,8 @@
 #define __UNISIM_COMPONENT_CXX_PROCESSOR_ARM_ISA_ARM64_EXECUTE_HH__
 
 #include <inttypes.h>
-#include <unisim/component/cxx/processor/arm/psr.hh>
-#include <unisim/component/cxx/processor/arm/execute.hh>
+#include <unisim/component/cxx/processor/arm/isa/constants.hh>
+#include <unisim/component/cxx/processor/arm/isa/execute.hh>
 
 namespace unisim {
 namespace component {
@@ -111,9 +111,9 @@ OUT PolyMod2(IN value, uint32_t _poly)
   }
   
   template <class ARCH, unsigned posT>
-  void FPProcessException( ARCH& arch, RegisterField<posT,1> const& rf )
+  void FPProcessException( ARCH& arch, unisim::util::arithmetic::BitField<posT,1> const& rf )
   {
-    RegisterField<posT+8,1> const enable;
+    unisim::util::arithmetic::BitField<posT+8,1> const enable;
     if (arch.Test(arch.GetFPSR( enable )))
       arch.FPTrap( posT );
     else

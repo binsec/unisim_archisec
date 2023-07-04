@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2009-2023,
+ *  Copyright (c) 2009-2021,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -32,32 +32,18 @@
  * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
  */
 
-#ifndef __AARCH32_DECODER_HH__
-#define __AARCH32_DECODER_HH__
+#ifndef __PPC64_DECODER_HH__
+#define __PPC64_DECODER_HH__
 
 #include <iosfwd>
 #include <inttypes.h>
 
-namespace aarch32
-{
-  struct StatusRegister
+namespace ppc64 {
+  
+  struct Decoder
   {
-    enum InstructionSet { Arm, Thumb, Jazelle, ThumbEE };
-
-    StatusRegister();
-
-    bool IsThumb() const { return iset == Thumb; }
-
-    InstructionSet iset;
-    int            itstate;
-    bool           bigendian;
-    uint8_t        mode;
-  };
-
-  struct Decoder : StatusRegister
-  {
-    void process( std::ostream& sink, uint32_t addr, uint32_t code );
+    void process( std::ostream& sink, uint64_t addr, uint32_t code );
   };
 }
 
-#endif /* __AARCH32_DECODER_HH__ */
+#endif /* __PPC64_DECODER_HH__ */

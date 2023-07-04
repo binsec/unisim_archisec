@@ -436,6 +436,7 @@ struct XSave : public Operation<ARCH>
     else if (mode.code == mode.S)    sink << "s";
     else throw 0;
     if (is64) sink << "64";
+    sink << ' ' << DisasmE( GOd(), rmop );
   }
   
   void execute( ARCH& arch ) const
@@ -461,6 +462,7 @@ struct XRstor : public Operation<ARCH>
     else if (mode.code == mode.S)    sink << "s";
     else throw 0;
     if (is64) sink << "64";
+    sink << ' ' << DisasmE( GOd(), rmop );
   }
   
   void execute( ARCH& arch ) const

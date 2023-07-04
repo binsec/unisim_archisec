@@ -90,7 +90,7 @@ struct Translator
     sink << "(opcode . \"";
     char const* sep = "";
     for (auto byte : code) { sink << sep; sep = " "; for (int n = 0; n < 2; n++, byte <<=4) sink << "0123456789abcdef"[byte>>4&15]; }
-    sink << "\")\n(size . " << code.size() << ")\n";
+    sink << "\")\n(size . " << std::dec << code.size() << ")\n";
 
     typename Proc::addr_t insn_addr = unisim::util::symbolic::make_const(addr); //< concrete instruction address
     // Proc::U32      insn_addr = Expr(new InstructionAddress()); //< symbolic instruction address
@@ -127,7 +127,7 @@ struct Translator
         unisim::util::symbolic::binsec::Program program;
         program.Generate( coderoot );
         for (auto stmt : program)
-          sink << "(" << print_dbx(mode64 ? 8 : 4, addr) << ',' << stmt.first << ") " << stmt.second << std::endl;
+          sink << "(" << print_dbx(mode64 ? 8 : 4, addr) << ',' << std::dec << stmt.first << ") " << stmt.second << std::endl;
       }
     catch (ProcessorBase::Undefined const&)
       {

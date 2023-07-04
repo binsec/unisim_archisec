@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2009-2023,
+ *  Copyright (c) 2007,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -29,35 +29,57 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
+ * Authors: Gilles Mouchard (gilles.mouchard@cea.fr)
  */
 
-#ifndef __AARCH32_DECODER_HH__
-#define __AARCH32_DECODER_HH__
+#ifndef __UNISIM_COMPONENT_CXX_PROCESSOR_POWERPC_ISA_BOOK_I_INTEGER_HH__
+#define __UNISIM_COMPONENT_CXX_PROCESSOR_POWERPC_ISA_BOOK_I_INTEGER_HH__
 
-#include <iosfwd>
-#include <inttypes.h>
+#include <unisim/util/arithmetic/arithmetic.hh>
 
-namespace aarch32
+#ifdef BitScanReverse
+#undef BitScanReverse
+#endif
+
+namespace unisim {
+namespace component {
+namespace cxx {
+namespace processor {
+namespace powerpc {
+
+using unisim::util::arithmetic::RotateLeft;
+using unisim::util::arithmetic::RotateRight;
+using unisim::util::arithmetic::BitScanReverse;
+
+inline uint32_t Mask(uint32_t mb, uint32_t me)
 {
-  struct StatusRegister
-  {
-    enum InstructionSet { Arm, Thumb, Jazelle, ThumbEE };
-
-    StatusRegister();
-
-    bool IsThumb() const { return iset == Thumb; }
-
-    InstructionSet iset;
-    int            itstate;
-    bool           bigendian;
-    uint8_t        mode;
-  };
-
-  struct Decoder : StatusRegister
-  {
-    void process( std::ostream& sink, uint32_t addr, uint32_t code );
-  };
+	return (mb > me) ? ~((uint32_t(-1) >> mb) ^ ((me >= 31) ? 0 : uint32_t(-1) >> (me + 1))) : ((uint32_t(-1) >> mb) ^ ((me >= 31) ? 0 : uint32_t(-1) >> (me + 1)));
 }
 
-#endif /* __AARCH32_DECODER_HH__ */
+inline uint32_t Mask(uint32_t n)
+{
+	return (n < 32) ? (n ? (1 << (32 - n)) - 1 : 0xffffffffUL) : 0;
+}
+
+inline uint64_t Mask64(unsigned mb, unsigned me)
+{
+	return RotateRight(uint64_t(-1) << (~(me-mb) & 63), mb);
+}
+
+inline uint64_t RotL32(uint64_t value, uint8_t sh)
+{
+  return 0x100000001ull * RotateLeft(uint32_t(value), sh);
+}
+
+inline uint32_t RotL32(uint32_t value, uint8_t sh)
+{
+  return RotateLeft(value, sh);
+}
+
+} // end of namespace powerpc
+} // end of namespace processor
+} // end of namespace cxx
+} // end of namespace component
+} // end of namespace unisim
+
+#endif // __UNISIM_COMPONENT_CXX_PROCESSOR_POWERPC_ISA_BOOK_I_INTEGER_HH__

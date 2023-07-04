@@ -1,9 +1,8 @@
 #include "aarch32/top_arm32.hh"
 
 #include <unisim/component/cxx/processor/arm/isa/decode.hh>
-#include <unisim/component/cxx/processor/arm/disasm.hh>
-#include <unisim/component/cxx/processor/arm/models.hh>
-#include <unisim/component/cxx/processor/arm/exception.hh>
+#include <unisim/component/cxx/processor/arm/isa/disasm.hh>
+#include <unisim/component/cxx/processor/arm/isa/models.hh>
 #include <unisim/util/arithmetic/arithmetic.hh>
 #include <unisim/util/likely/likely.hh>
 #include <unisim/util/endian/endian.hh>
@@ -21,7 +20,7 @@ using unisim::util::arithmetic::RotateRight;
 // using unisim::util::arithmetic::RotateRight;
 // using unisim::util::arithmetic::UnsignedSub8;
 
-#include <unisim/component/cxx/processor/arm/execute.hh>
+#include <unisim/component/cxx/processor/arm/isa/execute.hh>
 
 namespace unisim { namespace component { namespace cxx { namespace processor { namespace arm { namespace isa { namespace arm32 {
 template <	typename	ARCH>
@@ -18604,12 +18603,12 @@ void OpLdm_usr<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::U32 U32;
 
 		U32 runmode = cpu.CPSR().Get(M);
-		if (unlikely( cpu.Test(runmode == U32(PSR::HYPERVISOR_MODE)) ))
+		if (unlikely( cpu.Test(runmode == U32(HYPERVISOR_MODE)) ))
 		{
 			cpu.UndefinedInstruction( this );
 			return;
 		}
-		if (unlikely( cpu.Test((runmode == U32(PSR::USER_MODE)) or (runmode == U32(PSR::SYSTEM_MODE))) ))
+		if (unlikely( cpu.Test((runmode == U32(USER_MODE)) or (runmode == U32(SYSTEM_MODE))) ))
 		{
 			cpu.UnpredictableInsnBehaviour();
 			return;
@@ -18618,7 +18617,7 @@ void OpLdm_usr<	ARCH>::execute( ARCH & cpu)
 		U32 base = cpu.GetGPR( rn );
 		LSMIter itr(mod, reglist);
 		while (itr.next()) {
-			cpu.SetBankedRegister( PSR::USER_MODE, itr.reg(), cpu.MemRead32( base + U32(itr.offset()) ) );
+			cpu.SetBankedRegister( USER_MODE, itr.reg(), cpu.MemRead32( base + U32(itr.offset()) ) );
 		}
 }}
 
@@ -18643,12 +18642,12 @@ void OpLdm_rfe<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::U32 U32;
 
 		U32 runmode = cpu.CPSR().Get(M);
-		if (unlikely( cpu.Test( runmode == U32(PSR::HYPERVISOR_MODE) ) ))
+		if (unlikely( cpu.Test( runmode == U32(HYPERVISOR_MODE) ) ))
 		{
 			cpu.UndefinedInstruction( this );
 			return;
 		}
-		if (unlikely( cpu.Test((runmode == U32(PSR::USER_MODE)) or (runmode == U32(PSR::SYSTEM_MODE))) ))
+		if (unlikely( cpu.Test((runmode == U32(USER_MODE)) or (runmode == U32(SYSTEM_MODE))) ))
 		{
 			cpu.UnpredictableInsnBehaviour();
 			return;
@@ -18666,7 +18665,7 @@ void OpLdm_rfe<	ARCH>::execute( ARCH & cpu)
 
 		CPSRWriteByInstr( cpu, cpu.CurrentMode().GetSPSR(), 0xffffffff );
 		// Cannot return to Hyp mode and ThumbEE state
-		if (unlikely( cpu.Test((cpu.CPSR().Get(M) == U32(PSR::HYPERVISOR_MODE)) and
+		if (unlikely( cpu.Test((cpu.CPSR().Get(M) == U32(HYPERVISOR_MODE)) and
 		(cpu.CPSR().Get(J) == U32(1)) and (cpu.CPSR().Get(T) == U32(1))) ))
 		cpu.UnpredictableInsnBehaviour();
 
@@ -18694,12 +18693,12 @@ void OpStm_usr<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::U32 U32;
 
 		U32 runmode = cpu.CPSR().Get(M);
-		if (unlikely( cpu.Test(runmode == U32(PSR::HYPERVISOR_MODE)) ))
+		if (unlikely( cpu.Test(runmode == U32(HYPERVISOR_MODE)) ))
 		{
 			cpu.UndefinedInstruction( this );
 			return;
 		}
-		if (unlikely( cpu.Test((runmode == U32(PSR::USER_MODE)) or (runmode == U32(PSR::SYSTEM_MODE))) ))
+		if (unlikely( cpu.Test((runmode == U32(USER_MODE)) or (runmode == U32(SYSTEM_MODE))) ))
 		{
 			cpu.UnpredictableInsnBehaviour();
 			return;
@@ -18708,7 +18707,7 @@ void OpStm_usr<	ARCH>::execute( ARCH & cpu)
 		U32 base = cpu.GetGPR( rn );
 		LSMIter itr(mod, reglist);
 		while (itr.next()) {
-			cpu.MemWrite32( base + U32(itr.offset()), cpu.GetBankedRegister( PSR::USER_MODE, itr.reg() ) );
+			cpu.MemWrite32( base + U32(itr.offset()), cpu.GetBankedRegister( USER_MODE, itr.reg() ) );
 		}
 }}
 
@@ -22902,46 +22901,46 @@ void OpMrs<	ARCH>::execute( ARCH & cpu)
 			case 0b0001111: cpu.SetGPR(rd, cpu.GetCPSR()); break;
 			case 0b1001111: cpu.SetGPR(rd, cpu.CurrentMode().GetSPSR()); break;
 
-			case 0b0100000: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::USER_MODE, 8)); break;
-			case 0b0100001: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::USER_MODE, 9)); break;
-			case 0b0100010: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::USER_MODE, 10)); break;
-			case 0b0100011: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::USER_MODE, 11)); break;
-			case 0b0100100: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::USER_MODE, 12)); break;
-			case 0b0100101: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::USER_MODE, 13)); break;
-			case 0b0100110: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::USER_MODE, 14)); break;
+			case 0b0100000: cpu.SetGPR(rd, cpu.GetBankedRegister(USER_MODE, 8)); break;
+			case 0b0100001: cpu.SetGPR(rd, cpu.GetBankedRegister(USER_MODE, 9)); break;
+			case 0b0100010: cpu.SetGPR(rd, cpu.GetBankedRegister(USER_MODE, 10)); break;
+			case 0b0100011: cpu.SetGPR(rd, cpu.GetBankedRegister(USER_MODE, 11)); break;
+			case 0b0100100: cpu.SetGPR(rd, cpu.GetBankedRegister(USER_MODE, 12)); break;
+			case 0b0100101: cpu.SetGPR(rd, cpu.GetBankedRegister(USER_MODE, 13)); break;
+			case 0b0100110: cpu.SetGPR(rd, cpu.GetBankedRegister(USER_MODE, 14)); break;
 
-			case 0b0101000: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::FIQ_MODE, 8)); break;
-			case 0b0101001: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::FIQ_MODE, 9)); break;
-			case 0b0101010: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::FIQ_MODE, 10)); break;
-			case 0b0101011: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::FIQ_MODE, 11)); break;
-			case 0b0101100: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::FIQ_MODE, 12)); break;
-			case 0b0101101: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::FIQ_MODE, 13)); break;
-			case 0b0101110: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::FIQ_MODE, 14)); break;
-			case 0b0110000: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::IRQ_MODE, 14)); break;
-			case 0b0110001: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::IRQ_MODE, 13)); break;
+			case 0b0101000: cpu.SetGPR(rd, cpu.GetBankedRegister(FIQ_MODE, 8)); break;
+			case 0b0101001: cpu.SetGPR(rd, cpu.GetBankedRegister(FIQ_MODE, 9)); break;
+			case 0b0101010: cpu.SetGPR(rd, cpu.GetBankedRegister(FIQ_MODE, 10)); break;
+			case 0b0101011: cpu.SetGPR(rd, cpu.GetBankedRegister(FIQ_MODE, 11)); break;
+			case 0b0101100: cpu.SetGPR(rd, cpu.GetBankedRegister(FIQ_MODE, 12)); break;
+			case 0b0101101: cpu.SetGPR(rd, cpu.GetBankedRegister(FIQ_MODE, 13)); break;
+			case 0b0101110: cpu.SetGPR(rd, cpu.GetBankedRegister(FIQ_MODE, 14)); break;
+			case 0b0110000: cpu.SetGPR(rd, cpu.GetBankedRegister(IRQ_MODE, 14)); break;
+			case 0b0110001: cpu.SetGPR(rd, cpu.GetBankedRegister(IRQ_MODE, 13)); break;
 
-			case 0b0110010: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::SUPERVISOR_MODE, 14)); break;
-			case 0b0110011: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::SUPERVISOR_MODE, 13)); break;
+			case 0b0110010: cpu.SetGPR(rd, cpu.GetBankedRegister(SUPERVISOR_MODE, 14)); break;
+			case 0b0110011: cpu.SetGPR(rd, cpu.GetBankedRegister(SUPERVISOR_MODE, 13)); break;
 
-			case 0b0110100: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::ABORT_MODE, 14)); break;
-			case 0b0110101: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::ABORT_MODE, 13)); break;
+			case 0b0110100: cpu.SetGPR(rd, cpu.GetBankedRegister(ABORT_MODE, 14)); break;
+			case 0b0110101: cpu.SetGPR(rd, cpu.GetBankedRegister(ABORT_MODE, 13)); break;
 
-			case 0b0110110: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::UNDEFINED_MODE, 14)); break;
-			case 0b0110111: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::UNDEFINED_MODE, 13)); break;
+			case 0b0110110: cpu.SetGPR(rd, cpu.GetBankedRegister(UNDEFINED_MODE, 14)); break;
+			case 0b0110111: cpu.SetGPR(rd, cpu.GetBankedRegister(UNDEFINED_MODE, 13)); break;
 
-			case 0b0111100: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::MONITOR_MODE, 14)); break;
-			case 0b0111101: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::MONITOR_MODE, 13)); break;
+			case 0b0111100: cpu.SetGPR(rd, cpu.GetBankedRegister(MONITOR_MODE, 14)); break;
+			case 0b0111101: cpu.SetGPR(rd, cpu.GetBankedRegister(MONITOR_MODE, 13)); break;
 
-			case 0b0111110: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::HYPERVISOR_MODE, 14)); break;
-			case 0b0111111: cpu.SetGPR(rd, cpu.GetBankedRegister(PSR::HYPERVISOR_MODE, 13)); break;
+			case 0b0111110: cpu.SetGPR(rd, cpu.GetBankedRegister(HYPERVISOR_MODE, 14)); break;
+			case 0b0111111: cpu.SetGPR(rd, cpu.GetBankedRegister(HYPERVISOR_MODE, 13)); break;
 
-			case 0b1101110: cpu.SetGPR(rd, cpu.GetMode(PSR::FIQ_MODE).GetSPSR()); break;
-			case 0b1110000: cpu.SetGPR(rd, cpu.GetMode(PSR::IRQ_MODE).GetSPSR()); break;
-			case 0b1110010: cpu.SetGPR(rd, cpu.GetMode(PSR::SUPERVISOR_MODE).GetSPSR()); break;
-			case 0b1110100: cpu.SetGPR(rd, cpu.GetMode(PSR::ABORT_MODE).GetSPSR()); break;
-			case 0b1110110: cpu.SetGPR(rd, cpu.GetMode(PSR::UNDEFINED_MODE).GetSPSR()); break;
-			case 0b1111100: cpu.SetGPR(rd, cpu.GetMode(PSR::MONITOR_MODE).GetSPSR()); break;
-			case 0b1111110: cpu.SetGPR(rd, cpu.GetMode(PSR::HYPERVISOR_MODE).GetSPSR()); break;
+			case 0b1101110: cpu.SetGPR(rd, cpu.GetMode(FIQ_MODE).GetSPSR()); break;
+			case 0b1110000: cpu.SetGPR(rd, cpu.GetMode(IRQ_MODE).GetSPSR()); break;
+			case 0b1110010: cpu.SetGPR(rd, cpu.GetMode(SUPERVISOR_MODE).GetSPSR()); break;
+			case 0b1110100: cpu.SetGPR(rd, cpu.GetMode(ABORT_MODE).GetSPSR()); break;
+			case 0b1110110: cpu.SetGPR(rd, cpu.GetMode(UNDEFINED_MODE).GetSPSR()); break;
+			case 0b1111100: cpu.SetGPR(rd, cpu.GetMode(MONITOR_MODE).GetSPSR()); break;
+			case 0b1111110: cpu.SetGPR(rd, cpu.GetMode(HYPERVISOR_MODE).GetSPSR()); break;
 		}
 }}
 
@@ -24812,7 +24811,7 @@ void OpVmrs<	ARCH>::execute( ARCH & cpu)
 			// cpu.CheckVFPEnabled(FALSE);
 			typedef typename ARCH::U32 U32;
 
-			if (unlikely( cpu.Test(cpu.CPSR().Get(M) == U32(PSR::USER_MODE)) ))
+			if (unlikely( cpu.Test(cpu.CPSR().Get(M) == U32(USER_MODE)) ))
 			cpu.UndefinedInstruction( this );
 
 			switch (spr) {
@@ -24862,7 +24861,7 @@ void OpVmsr<	ARCH>::execute( ARCH & cpu)
 			// cpu.CheckVFPEnabled(FALSE);
 			typedef typename ARCH::U32 U32;
 
-			if (unlikely( cpu.Test(cpu.CPSR().Get(M) == U32(PSR::USER_MODE)) ))
+			if (unlikely( cpu.Test(cpu.CPSR().Get(M) == U32(USER_MODE)) ))
 			cpu.UndefinedInstruction( this );
 
 			switch (spr) {
@@ -26168,7 +26167,7 @@ void OpCps<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U32 U32;
 
-		if (unlikely( cpu.Test(cpu.CPSR().Get(M) == U32(PSR::USER_MODE)) ))
+		if (unlikely( cpu.Test(cpu.CPSR().Get(M) == U32(USER_MODE)) ))
 		return;
 
 		// CPSRWriteByInstr() checks for illegal mode changes

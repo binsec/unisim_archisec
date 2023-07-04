@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2009-2021,
+ *  Copyright (c) 2009-2023,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -34,8 +34,8 @@
 
 #include "decoder.hh"
 
-#include <unisim/component/cxx/processor/arm/disasm.hh>
-#include <unisim/component/cxx/processor/arm/psr.hh>
+#include <unisim/component/cxx/processor/arm/isa/disasm.hh>
+#include <unisim/component/cxx/processor/arm/isa/constants.hh>
 #include <unisim/util/symbolic/binsec/binsec.hh>
 #include <unisim/util/symbolic/symbolic.hh>
 #include <top_arm32.tcc>
@@ -51,7 +51,7 @@
 #include <cstdlib>
 #include <cstdio>
 
-namespace armsec {
+namespace aarch32 {
 
 // template <typename ARCH, unsigned OPSIZE> struct TypeFor {};
 
@@ -170,25 +170,25 @@ struct Processor
 
   struct PSR : public StatusRegister
   {
-    typedef unisim::component::cxx::processor::arm::RegisterField<31,1> NRF; /* Negative Integer Condition Flag */
-    typedef unisim::component::cxx::processor::arm::RegisterField<30,1> ZRF; /* Zero     Integer Condition Flag */
-    typedef unisim::component::cxx::processor::arm::RegisterField<29,1> CRF; /* Carry    Integer Condition Flag */
-    typedef unisim::component::cxx::processor::arm::RegisterField<28,1> VRF; /* Overflow Integer Condition Flag */
-    typedef unisim::component::cxx::processor::arm::RegisterField<27,1> QRF; /* Cumulative saturation flag */
+    typedef unisim::util::arithmetic::BitField<31,1> NRF; /* Negative Integer Condition Flag */
+    typedef unisim::util::arithmetic::BitField<30,1> ZRF; /* Zero     Integer Condition Flag */
+    typedef unisim::util::arithmetic::BitField<29,1> CRF; /* Carry    Integer Condition Flag */
+    typedef unisim::util::arithmetic::BitField<28,1> VRF; /* Overflow Integer Condition Flag */
+    typedef unisim::util::arithmetic::BitField<27,1> QRF; /* Cumulative saturation flag */
 
-    typedef unisim::component::cxx::processor::arm::RegisterField<28,4> NZCVRF; /* Grouped Integer Condition Flags */
+    typedef unisim::util::arithmetic::BitField<28,4> NZCVRF; /* Grouped Integer Condition Flags */
 
 
-    typedef unisim::component::cxx::processor::arm::RegisterField<24,1> JRF; /* Jazelle execution state bit */
-    typedef unisim::component::cxx::processor::arm::RegisterField< 9,1> ERF; /* Endianness execution state */
-    typedef unisim::component::cxx::processor::arm::RegisterField< 5,1> TRF; /* Thumb execution state bit */
+    typedef unisim::util::arithmetic::BitField<24,1> JRF; /* Jazelle execution state bit */
+    typedef unisim::util::arithmetic::BitField< 9,1> ERF; /* Endianness execution state */
+    typedef unisim::util::arithmetic::BitField< 5,1> TRF; /* Thumb execution state bit */
 
-    typedef unisim::component::cxx::processor::arm::RegisterField< 0,5> MRF; /* Mode field */
+    typedef unisim::util::arithmetic::BitField< 0,5> MRF; /* Mode field */
 
-    typedef unisim::component::cxx::processor::arm::RegisterField<10,6> ITHIRF;
-    typedef unisim::component::cxx::processor::arm::RegisterField<25,2> ITLORF;
+    typedef unisim::util::arithmetic::BitField<10,6> ITHIRF;
+    typedef unisim::util::arithmetic::BitField<25,2> ITLORF;
 
-    typedef unisim::component::cxx::processor::arm::RegisterField< 0,32> ALLRF;
+    typedef unisim::util::arithmetic::BitField< 0,32> ALLRF;
 
     static uint32_t const bg_mask = 0x00ff01c0; /* 23-20, GE[3:0], A, I, F, are not handled for now */
 
@@ -570,7 +570,7 @@ public:
         Expr value = core.eneonread(reg,size,pos);
         if (value == ref.eneonread(reg,size,pos))
           return;
-        value = unisim::util::symbolic::binsec::ASExprNode::Simplify( value );
+        unisim::util::symbolic::binsec::BitSimplify::Do( value );
         unsigned half = size / 2, mid = pos+half;
         if (value.ConstSimplify() or size <= 1 or not core.neonregs[reg][mid].node)
           {
@@ -578,10 +578,7 @@ public:
               core.path->add_sink( newRegWrite( NeonReg(reg), value ) );
             else
               {
-                unisim::util::symbolic::binsec::BitFilter bf( value, 64, 0, size*8, size*8, false );
-                bf.Retain(); // Not a heap-allocated object (never delete);
-                value = bf.Simplify();
-                if (value.node == &bf) value = new unisim::util::symbolic::binsec::BitFilter( bf );
+                value = unisim::util::symbolic::binsec::BitFilter::mksimple( value, 64, 0, size*8, size*8, false );
                 core.path->add_sink( newPartialRegWrite( NeonReg(reg), 8*pos, 8*size, value ) );
               }
           }
@@ -620,12 +617,12 @@ public:
         unsigned src = pos;
         do { src = src & (src-1); } while (not neonregs[reg][src].node);
         unsigned shift = 8*(pos - src);
-        return new unisim::util::symbolic::binsec::BitFilter( neonregs[reg][src], 64, shift, 8*size, 64, false );
+        return unisim::util::symbolic::binsec::BitFilter::mksimple( neonregs[reg][src], 64, shift, 8*size, 64, false );
       }
     else if (not neonregs[reg][(pos|size)&(NEONSIZE-1)].node)
       {
         // requested read is in lower bits of a larger value
-        return new unisim::util::symbolic::binsec::BitFilter( neonregs[reg][pos], 64, 0, 8*size, 64, false );
+        return unisim::util::symbolic::binsec::BitFilter::mksimple( neonregs[reg][pos], 64, 0, 8*size, 64, false );
       }
     else if ((size > 1) and (neonregs[reg][pos|(size >> 1)].node))
       {
@@ -705,10 +702,10 @@ public:
   void SetVDE( unsigned reg, unsigned idx, ELEMT const& value )
   {
     using unisim::util::symbolic::binsec::BitFilter;
+
     auto uvalue = ucast( value );
     unsigned usz = tsizeof( uvalue );
-    Expr neonval( new BitFilter( uvalue.expr, usz*8, 0, usz*8, 64, false ) );
-    eneonwrite( reg, usz, usz*idx, neonval );
+    eneonwrite( reg, usz, usz*idx, BitFilter::mksimple( uvalue.expr, usz*8, 0, usz*8, 64, false ) );
   }
 
   template <class ELEMT>
@@ -733,7 +730,7 @@ public:
 
   void BranchExchange( U32 const& target, branch_type_t branch_type )
   {
-    cpsr.nthumb = new unisim::util::symbolic::binsec::BitFilter( target.expr, 32, 0, 1, 1, false );
+    cpsr.nthumb = unisim::util::symbolic::binsec::BitFilter::mksimple( target.expr, 32, 0, 1, 1, false );
     Branch( target, branch_type );
   }
 
@@ -813,9 +810,6 @@ public:
   // static uint32_t const COND_GT = 0x0c;
   // static uint32_t const COND_LE = 0x0d;
   // static uint32_t const COND_AL = 0x0e;
-
-  /* mask for valid bits in processor control and status registers */
-  static uint32_t const PSR_UNALLOC_MASK = 0x00f00000;
 
   struct SRegID
     : public unisim::util::identifier::Identifier<SRegID>
@@ -1107,7 +1101,7 @@ unisim::util::symbolic::SmartValue<OP> NeonSHL( unisim::util::symbolic::SmartVal
 }
 }}}
 
-namespace armsec {
+namespace aarch32 {
 
 void UpdateStatusSub( Processor& state, Processor::U32 const& res, Processor::U32 const& lhs, Processor::U32 const& rhs )
 {
@@ -1237,7 +1231,7 @@ namespace
         if (instruction.bytecount == 2)
           encoding &= 0xffff;
 
-        sink << "(opcode . " << unisim::util::symbolic::binsec::dbx(instruction.bytecount, encoding) << ")\n(size . " << (instruction.bytecount) << ")\n";
+        sink << "(opcode . " << unisim::util::symbolic::binsec::dbx(instruction.bytecount, encoding) << ")\n(size . " << std::dec << (instruction.bytecount) << ")\n";
       }
 
       Processor::U32      insn_addr = unisim::util::symbolic::make_const(addr); //< concrete instruction address
@@ -1305,7 +1299,7 @@ namespace
       program.Generate( coderoot );
       typedef unisim::util::symbolic::binsec::Program::const_iterator Iterator;
       for (Iterator itr = program.begin(), end = program.end(); itr != end; ++itr)
-        sink << "(" << unisim::util::symbolic::binsec::dbx(4, addr) << ',' << itr->first << ") " << itr->second << std::endl;
+        sink << "(" << unisim::util::symbolic::binsec::dbx(4, addr) << ',' << std::dec << itr->first << ") " << itr->second << std::endl;
     }
 
     StatusRegister const& status;
@@ -1758,10 +1752,10 @@ Processor::CP15GetRegister( uint8_t crn, uint8_t opcode1, uint8_t crm, uint8_t o
 void
 Processor::PSR::Set( NZCVRF const& _, U32 const& value )
 {
-  n = BOOL( unisim::component::cxx::processor::arm::RegisterField< 3,1>().Get( value ) ).expr;
-  z = BOOL( unisim::component::cxx::processor::arm::RegisterField< 2,1>().Get( value ) ).expr;
-  c = BOOL( unisim::component::cxx::processor::arm::RegisterField< 1,1>().Get( value ) ).expr;
-  v = BOOL( unisim::component::cxx::processor::arm::RegisterField< 0,1>().Get( value ) ).expr;
+  n = BOOL( unisim::util::arithmetic::BitField< 3,1>().Get( value ) ).expr;
+  z = BOOL( unisim::util::arithmetic::BitField< 2,1>().Get( value ) ).expr;
+  c = BOOL( unisim::util::arithmetic::BitField< 1,1>().Get( value ) ).expr;
+  v = BOOL( unisim::util::arithmetic::BitField< 0,1>().Get( value ) ).expr;
 
 }
 
@@ -1814,5 +1808,12 @@ Processor::PSR::SetBits( U32 const& bits, uint32_t mask )
 
   bg = (bg & U32(~mask)) | (bits & U32(mask));
 }
+
+StatusRegister::StatusRegister()
+  : iset(Arm)                  // Default is ARM instruction set
+  , itstate(-1)                // initial itstate
+  , bigendian(false)           // Default is Little Endian
+  , mode(unisim::component::cxx::processor::arm::SUPERVISOR_MODE) // Default mode is supervisor
+{}
 
 }

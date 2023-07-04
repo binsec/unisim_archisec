@@ -9,7 +9,7 @@ using unisim::util::arithmetic::RotateRight;
 using unisim::util::arithmetic::BitScanReverse;
 
 #include <unisim/component/cxx/processor/arm/isa/arm64/execute.hh>
-#include <unisim/component/cxx/processor/arm/execute.hh>
+#include <unisim/component/cxx/processor/arm/isa/execute.hh>
 
 
 namespace unisim { namespace component { namespace cxx { namespace processor { namespace arm { namespace isa { namespace arm64 {

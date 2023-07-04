@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2009-2020,
+ *  Copyright (c) 2009-2023,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -152,21 +152,6 @@ struct Processor
 
     return concretize( BOOL(cond).expr );
   }
-  
-  // template <typename T>
-  // bool Cond( unisim::util::symbolic::SmartValue<T> const& cond )
-  // {
-  //   if (not cond.expr.good())
-  //     throw std::logic_error( "Not a valid condition" );
-      
-  //   Expr cexp( BOOL(cond).expr );
-  //   if (unisim::util::symbolic::ConstNodeBase const* cnode = cexp.ConstSimplify())
-  //     return cnode->Get( bool() );
-      
-  //   bool predicate = path->proceed( cexp );
-  //   path = path->next( predicate );
-  //   return predicate;
-  // }
 
   //   =====================================================================
   //   =             General Purpose Registers access methods              =
@@ -428,7 +413,7 @@ struct Translator
     program.Generate( coderoot );
     typedef unisim::util::symbolic::binsec::Program::const_iterator Iterator;
     for (Iterator itr = program.begin(), end = program.end(); itr != end; ++itr)
-      sink << "(" << unisim::util::symbolic::binsec::dbx(8, addr) << ',' << itr->first << ") " << itr->second << std::endl;
+      sink << "(" << unisim::util::symbolic::binsec::dbx(8, addr) << ',' << std::dec << itr->first << ") " << itr->second << std::endl;
   }
 
   Processor::StatusRegister status;

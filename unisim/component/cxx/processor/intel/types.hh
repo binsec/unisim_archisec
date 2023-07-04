@@ -50,6 +50,7 @@ namespace intel {
   template <typename ARCH> struct TypeFor<ARCH,16> { typedef typename ARCH::s16_t s; typedef typename ARCH::u16_t u; };
   template <typename ARCH> struct TypeFor<ARCH,32> { typedef typename ARCH::s32_t s; typedef typename ARCH::u32_t u; typedef typename ARCH::f32_t f; };
   template <typename ARCH> struct TypeFor<ARCH,64> { typedef typename ARCH::s64_t s; typedef typename ARCH::u64_t u; typedef typename ARCH::f64_t f; };
+  template <typename ARCH> struct TypeFor<ARCH,128> { typedef typename ARCH::s128_t s; typedef typename ARCH::u128_t u; };
   template <typename ARCH> struct TypeFor<ARCH,80> { typedef typename ARCH::f80_t f; };
 
   template <unsigned SIZE> struct CTypeFor {};

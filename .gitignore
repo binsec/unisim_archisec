@@ -163,6 +163,7 @@ Temporary Items
 
 # ocamlbuild working directory
 _build/
+_opam
 
 # ocamlbuild targets
 *.byte

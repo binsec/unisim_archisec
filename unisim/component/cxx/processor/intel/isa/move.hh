@@ -822,7 +822,12 @@ struct Cmovcc : public Operation<ARCH>
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::u valtype;
-    valtype res = (arch.Test( eval_cond( arch, cc ) )) ? arch.rmread( OP(), rm ) : arch.regread( OP(), gn );
+    typedef typename ARCH::bit_t bit_t;
+    bit_t cond = eval_cond( arch, cc );
+    valtype mask1 = valtype( !cond ) - valtype( 1 );
+    valtype mask0 = valtype( cond ) - valtype( 1 );
+    valtype res =
+      mask1 & arch.rmread( OP(), rm ) | mask0 & arch.regread( OP(), gn );
     arch.regwrite( OP(), gn, res );
   }
 };

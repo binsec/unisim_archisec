@@ -1,3 +1,8 @@
+## 0.0.6 (2023-07-14)
+
+- add PowerPC 64 bit decoder
+- various bug fixes and code improvements
+
 ## 0.0.5 (2023-02-24)
 
 - enable macOS Homebrew distribution

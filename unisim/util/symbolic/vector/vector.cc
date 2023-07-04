@@ -49,7 +49,7 @@ namespace vector {
   void VTransBase::Repr( std::ostream& sink ) const
   {
     sink << "VTrans<";
-    GetType()->GetName(sink);
+    GetType().Repr(sink);
     sink << ">(" << src << ", " << srcsize << ", " << srcpos << ")";
   }
 

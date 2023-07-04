@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2009-2023,
+ *  Copyright (c) 2016,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -32,32 +32,68 @@
  * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
  */
 
-#ifndef __AARCH32_DECODER_HH__
-#define __AARCH32_DECODER_HH__
+#ifndef __UNISIM_COMPONENT_CXX_PROCESSOR_POWERPC_DISASM_HH__
+#define __UNISIM_COMPONENT_CXX_PROCESSOR_POWERPC_DISASM_HH__
+
+/***************************************/
+/*** Convenience disassembly methods ***/
+/***************************************/
 
 #include <iosfwd>
 #include <inttypes.h>
 
-namespace aarch32
+namespace unisim {
+namespace component {
+namespace cxx {
+namespace processor {
+namespace powerpc {
+
+struct DASMPrint
 {
-  struct StatusRegister
-  {
-    enum InstructionSet { Arm, Thumb, Jazelle, ThumbEE };
+	virtual void Print( std::ostream& sink ) const = 0;
+	friend std::ostream& operator << (std::ostream& sink, DASMPrint const& dap);
+};
 
-    StatusRegister();
+struct GPRPrint : public DASMPrint
+{
+	GPRPrint(unsigned _reg) : reg(_reg) {} unsigned reg;
+	void Print( std::ostream& sink ) const;
+};
 
-    bool IsThumb() const { return iset == Thumb; }
+struct FPRPrint : public DASMPrint
+{
+	FPRPrint(unsigned _reg) : reg(_reg) {} unsigned reg;
+	void Print( std::ostream& sink ) const;
+};
 
-    InstructionSet iset;
-    int            itstate;
-    bool           bigendian;
-    uint8_t        mode;
-  };
+struct HexPrint : public DASMPrint
+{
+	HexPrint(uint32_t _num) : num(_num) {} unsigned num;
+	void Print( std::ostream& sink ) const;
+};
 
-  struct Decoder : StatusRegister
-  {
-    void process( std::ostream& sink, uint32_t addr, uint32_t code );
-  };
-}
+struct CRPrint : public DASMPrint
+{
+	CRPrint(unsigned _reg) : reg(_reg) {} unsigned reg;
+	void Print( std::ostream& sink ) const;
+};
 
-#endif /* __AARCH32_DECODER_HH__ */
+struct CondPrint : public DASMPrint
+{
+	CondPrint(unsigned _crb, bool _expect = true) : crb(_crb), expect(_expect) {} unsigned crb; bool expect;
+	void Print( std::ostream& sink ) const;
+};
+
+struct EAPrint : public DASMPrint
+{
+	EAPrint(int32_t _idx, unsigned _reg) : idx(_idx), reg(_reg) {} int32_t idx; unsigned reg;
+	void Print( std::ostream& sink ) const;
+};
+
+} /* end of namespace powerpc */
+} /* end of namespace processor */
+} /* end of namespace cxx */
+} /* end of namespace component */
+} /* end of namespace unisim */
+
+#endif // __UNISIM_COMPONENT_CXX_PROCESSOR_POWERPC_ISA_DISASM_HH__
