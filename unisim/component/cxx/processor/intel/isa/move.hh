@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2007-2019,
+ *  Copyright (c) 2007-2023,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -824,10 +824,7 @@ struct Cmovcc : public Operation<ARCH>
     typedef typename TypeFor<ARCH,OP::SIZE>::u valtype;
     typedef typename ARCH::bit_t bit_t;
     bit_t cond = eval_cond( arch, cc );
-    valtype mask1 = valtype( !cond ) - valtype( 1 );
-    valtype mask0 = valtype( cond ) - valtype( 1 );
-    valtype res =
-      mask1 & arch.rmread( OP(), rm ) | mask0 & arch.regread( OP(), gn );
+    valtype res = ConditionalMove(cond, arch.rmread( OP(), rm ), arch.regread( OP(), gn ));
     arch.regwrite( OP(), gn, res );
   }
 };

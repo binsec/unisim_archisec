@@ -1,3 +1,7 @@
+## 0.0.7 (2023-10-32)
+
+- various bug fixes and code improvements
+
 ## 0.0.6 (2023-07-14)
 
 - add PowerPC 64 bit decoder

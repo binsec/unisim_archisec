@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2007-2022,
+ *  Copyright (c) 2007-2023,
  *  Commissariat a l'Energie Atomique (CEA),
  *  University of Perpignan (UPVD)
  *  All rights reserved.
@@ -1694,6 +1694,12 @@ inline void OddParity(uint32_t v, uint8_t& parity_out)
 	while(v >>= 1,--n);
 	parity_out = par & 1;
 #endif
+}
+
+template <typename T>
+T ConditionalMove(bool condition, T value_if_true, T value_if_false)
+{
+  return condition ? value_if_true : value_if_false;
 }
 
 } // end of namespace arithmetic

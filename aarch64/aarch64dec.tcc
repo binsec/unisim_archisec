@@ -6987,6 +6987,8 @@ public:
 	virtual
 	void disasm( ARCH & cpu,
 	std::ostream& sink );
+	virtual
+	void execute( ARCH & cpu );
 private:
 };
 
@@ -7003,6 +7005,8 @@ public:
 	virtual
 	void disasm( ARCH & cpu,
 	std::ostream& sink );
+	virtual
+	void execute( ARCH & cpu );
 private:
 };
 
@@ -18337,6 +18341,22 @@ std::ostream& sink)
 	{
 		sink << "swp" << (&"a"[!a]) << (&"l"[!l]) << "b\t" << DisasmGZWR(rs) << ", " << DisasmGZWR(rt) << ", [" << DisasmGSXR(rn) << "]";
 }}
+template <	typename	ARCH>
+void OpSwpb_w<	ARCH>::execute( ARCH & cpu)
+{
+	{
+		typedef typename ARCH::U8 U8;
+		typedef typename ARCH::U32 U32;
+		typedef typename ARCH::U64 U64;
+
+		U64 addr( cpu.GetGSR(rn) );
+
+		/*BEG ATOMIC*/
+		U32 data( cpu.MemRead8(addr) );
+		cpu.MemWrite8(addr, U8(cpu.GetGZR(rs)));
+		cpu.SetGZR(rt, data);
+		/*END ATOMIC*/
+}}
 
 template <	typename	ARCH>
 static Operation<	ARCH> *DecodeOpSwpb_w(CodeType code, uint64_t addr)
@@ -18350,6 +18370,22 @@ std::ostream& sink)
 {
 	{
 		sink << "swp" << (&"a"[!a]) << (&"l"[!l]) << "h\t" << DisasmGZWR(rs) << ", " << DisasmGZWR(rt) << ", [" << DisasmGSXR(rn) << "]";
+}}
+template <	typename	ARCH>
+void OpSwph_w<	ARCH>::execute( ARCH & cpu)
+{
+	{
+		typedef typename ARCH::U16 U16;
+		typedef typename ARCH::U32 U32;
+		typedef typename ARCH::U64 U64;
+
+		U64 addr( cpu.GetGSR(rn) );
+
+		/*BEG ATOMIC*/
+		U32 data( cpu.MemRead16(addr) );
+		cpu.MemWrite16(addr, U16(cpu.GetGZR(rs)));
+		cpu.SetGZR(rt, data);
+		/*END ATOMIC*/
 }}
 
 template <	typename	ARCH>

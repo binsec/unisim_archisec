@@ -669,6 +669,8 @@ public:
   void xsave(unisim::component::cxx::processor::intel::XSaveMode mode,
 	     bool is64, u64_t bv, RMOp const& rmop) {
     switch (mode.code) {
+    default:
+      throw std::logic_error( "xsave unkwown save mode" );
     case unisim::component::cxx::processor::intel::XSaveMode::BASE:
     case unisim::component::cxx::processor::intel::XSaveMode::C:
       {
@@ -712,6 +714,8 @@ public:
   void xrstor(unisim::component::cxx::processor::intel::XSaveMode mode,
 	      bool is64, u64_t bv, RMOp const& rmop) {
     switch (mode.code) {
+    default:
+      throw std::logic_error( "xrstor unkwown save mode" );
     case unisim::component::cxx::processor::intel::XSaveMode::BASE:
       {
 	if (!rmop.ismem())

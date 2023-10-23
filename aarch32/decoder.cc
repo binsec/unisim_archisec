@@ -77,7 +77,7 @@ struct Processor
     static bool const     insns5J = true;
     static bool const     insns5T = true;
     static bool const     insns6  = true;
-    static bool const     insnsRM = false;
+    static bool const     insnsRM = true;
     static bool const     insnsT2 = true;
     static bool const     insns7  = true;
   };
@@ -751,7 +751,7 @@ public:
   void SWI( uint32_t imm ) { throw Unimplemented(); }
   void BKPT( uint32_t imm ) { throw Unimplemented(); }
   void CallSupervisor( uint32_t imm ) { throw Unimplemented(); }
-  bool IntegerZeroDivide( BOOL const& condition ) { return false; }
+  bool IntegerZeroDivide( BOOL const& condition ) { return Test(condition); }
 
   //   =====================================================================
   //   =                       Memory access methods                       =

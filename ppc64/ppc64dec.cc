@@ -39,13 +39,13 @@
 #undef unlikely
 #endif
 
-#define likely(x)       __builtin_expect(Arch::Test(x),1)
-#define evenly(x)       (Arch::Test(x))
-#define unlikely(x)     __builtin_expect(Arch::Test(x),0)
+#define likely(x)       __builtin_expect(Path::Test(x),1)
+#define evenly(x)       (Path::Test(x))
+#define unlikely(x)     __builtin_expect(Path::Test(x),0)
 #else
-#define likely(x)       (Arch::Test(x))
-#define evenly(x)       (Arch::Test(x))
-#define unlikely(x)     (Arch::Test(x))
+#define likely(x)       (Path::Test(x))
+#define evenly(x)       (Path::Test(x))
+#define unlikely(x)     (Path::Test(x))
 #endif
 
 	namespace ppc64 { namespace isa {
@@ -11817,9 +11817,7 @@
 			U32 s = U32(cpu->GetGPR(rs));
 
 			// Compute the result
-			U32 is_zero = U32(s == U32(0));
-			U32 result = (is_zero - U32(1)) & (U32(31) - BitScanReverse(s))
-			| (is_zero << U32(5));
+			U32 result = ConditionalMove(s != U32(0), U32(31) - BitScanReverse(s), U32(32));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -11854,9 +11852,7 @@
 			U64 s = U64(cpu->GetGPR(rs));
 
 			// Compute the result
-			U64 is_zero = U64(s == U64(0));
-			U64 result = (is_zero - U64(1)) & (U64(63) - BitScanReverse(s))
-			| (is_zero << U64(6));
+			U64 result = ConditionalMove(s != U64(0), U64(63) - BitScanReverse(s), U64(64));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -12273,9 +12269,7 @@
 			UINT a = ra ? cpu->GetGPR(ra) : UINT(0), b = cpu->GetGPR(rb);
 
 			// Compute the result
-			UINT mask =
-			UINT(U32((U32(cpu->GetCR()) << bc) >> 31) == U32(0)) - UINT(1);
-			UINT result = (mask & a) | (~mask & b);
+			UINT result = ConditionalMove(BOOL((U32(cpu->GetCR()) << bc) >> 31), a, b);
 
 			// Write back the result
 			cpu->SetGPR(rd, result);
@@ -13758,7 +13752,7 @@
 			U8 b = U8(cpu->GetGPR(rb)) & U8(0x3f);
 
 			// Compute the result
-			U32 result = (U32(b > U8(0x1f)) - U32(1)) & (s << b);
+			U32 result = ConditionalMove(b > U8(0x1f), U32(0), (s << b));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -13882,7 +13876,7 @@
 			U8  b = U8(cpu->GetGPR(rb)) & U8(0x3f);
 
 			// Compute the result
-			U32 result = (U32(b > U8(0x1f)) - U32(1)) & (s >> b);
+			U32 result = ConditionalMove(b > U8(0x1f), U32(0), (s >> b));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -14502,23 +14496,19 @@
 		{
 			// Read the input operands
 			XER& xer = cpu->GetXER();
-			UINT borrow = UINT(xer.Get<XER::CA>()) ^ UINT(1);
+			BOOL borrow = not BOOL(xer.Get<XER::CA>());
 			SINT a = SINT(cpu->GetGPR(ra)), b = SINT(cpu->GetGPR(rb));
 
 			// Compute the result
 			SINT result = b - a - SINT(borrow);
 
 			// Generate XER[CA]
-			xer.Set<XER::CA>((borrow == UINT(1) & (UINT(b) > UINT(a)))
-			| (borrow == UINT(0) & (UINT(b) >= UINT(a))));
+			xer.Set<XER::CA>(ConditionalMove(borrow, UINT(b) > UINT(a), UINT(b) >= UINT(a)));
 
 			if(unlikely(oe))
 			{
 				// Overflow: expected result sign and actual result sign differs
-				UINT overflow = UINT(
-				(((borrow == UINT(1)) & (b <= a))
-				| ((borrow == UINT(0)) & (b < a)))
-				xor (SINT(result) < SINT(0)));
+				UINT overflow = UINT(ConditionalMove(borrow, b <= a, b < a) xor (SINT(result) < SINT(0)));
 
 				// Generate XER[OV] and XER[SO]
 				xer.Set<XER::OV>(overflow);
@@ -36150,9 +36140,7 @@
 			U32 s = U32(cpu->GetGPR(rs));
 
 			// Compute the result
-			U32 is_zero = U32(s == U32(0));
-			U32 result = (is_zero - U32(1)) & (U32(31) - BitScanReverse(s))
-			| (is_zero << U32(5));
+			U32 result = ConditionalMove(s != U32(0), U32(31) - BitScanReverse(s), U32(32));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -36187,9 +36175,7 @@
 			U32 s = U32(cpu->GetGPR(rs));
 
 			// Compute the result
-			U32 is_zero = U32(s == U32(0));
-			U32 result = (is_zero - U32(1)) & (U32(31) - BitScanReverse(s))
-			| (is_zero << U32(5));
+			U32 result = ConditionalMove(s != U32(0), U32(31) - BitScanReverse(s), U32(32));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -36224,9 +36210,7 @@
 			U64 s = U64(cpu->GetGPR(rs));
 
 			// Compute the result
-			U64 is_zero = U64(s == U64(0));
-			U64 result = (is_zero - U64(1)) & (U64(63) - BitScanReverse(s))
-			| (is_zero << U64(6));
+			U64 result = ConditionalMove(s != U64(0), U64(63) - BitScanReverse(s), U64(64));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -36261,9 +36245,7 @@
 			U64 s = U64(cpu->GetGPR(rs));
 
 			// Compute the result
-			U64 is_zero = U64(s == U64(0));
-			U64 result = (is_zero - U64(1)) & (U64(63) - BitScanReverse(s))
-			| (is_zero << U64(6));
+			U64 result = ConditionalMove(s != U64(0), U64(63) - BitScanReverse(s), U64(64));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -39607,7 +39589,7 @@
 			U8 b = U8(cpu->GetGPR(rb)) & U8(0x3f);
 
 			// Compute the result
-			U32 result = (U32(b > U8(0x1f)) - U32(1)) & (s << b);
+			U32 result = ConditionalMove(b > U8(0x1f), U32(0), (s << b));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -39643,7 +39625,7 @@
 			U8 b = U8(cpu->GetGPR(rb)) & U8(0x3f);
 
 			// Compute the result
-			U32 result = (U32(b > U8(0x1f)) - U32(1)) & (s << b);
+			U32 result = ConditionalMove(b > U8(0x1f), U32(0), (s << b));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -39855,7 +39837,7 @@
 			U8  b = U8(cpu->GetGPR(rb)) & U8(0x3f);
 
 			// Compute the result
-			U32 result = (U32(b > U8(0x1f)) - U32(1)) & (s >> b);
+			U32 result = ConditionalMove(b > U8(0x1f), U32(0), (s >> b));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -39890,7 +39872,7 @@
 			U8  b = U8(cpu->GetGPR(rb)) & U8(0x3f);
 
 			// Compute the result
-			U32 result = (U32(b > U8(0x1f)) - U32(1)) & (s >> b);
+			U32 result = ConditionalMove(b > U8(0x1f), U32(0), (s >> b));
 
 			// Write back the result
 			cpu->SetGPR(ra, UINT(result));
@@ -40490,23 +40472,19 @@
 		{
 			// Read the input operands
 			XER& xer = cpu->GetXER();
-			UINT borrow = UINT(xer.Get<XER::CA>()) ^ UINT(1);
+			BOOL borrow = not BOOL(xer.Get<XER::CA>());
 			SINT a = SINT(cpu->GetGPR(ra)), b = SINT(cpu->GetGPR(rb));
 
 			// Compute the result
 			SINT result = b - a - SINT(borrow);
 
 			// Generate XER[CA]
-			xer.Set<XER::CA>((borrow == UINT(1) & (UINT(b) > UINT(a)))
-			| (borrow == UINT(0) & (UINT(b) >= UINT(a))));
+			xer.Set<XER::CA>(ConditionalMove(borrow, UINT(b) > UINT(a), UINT(b) >= UINT(a)));
 
 			if(unlikely(oe))
 			{
 				// Overflow: expected result sign and actual result sign differs
-				UINT overflow = UINT(
-				(((borrow == UINT(1)) & (b <= a))
-				| ((borrow == UINT(0)) & (b < a)))
-				xor (SINT(result) < SINT(0)));
+				UINT overflow = UINT(ConditionalMove(borrow, b <= a, b < a) xor (SINT(result) < SINT(0)));
 
 				// Generate XER[OV] and XER[SO]
 				xer.Set<XER::OV>(overflow);
@@ -40544,23 +40522,19 @@
 		{
 			// Read the input operands
 			XER& xer = cpu->GetXER();
-			UINT borrow = UINT(xer.Get<XER::CA>()) ^ UINT(1);
+			BOOL borrow = not BOOL(xer.Get<XER::CA>());
 			SINT a = SINT(cpu->GetGPR(ra)), b = SINT(cpu->GetGPR(rb));
 
 			// Compute the result
 			SINT result = b - a - SINT(borrow);
 
 			// Generate XER[CA]
-			xer.Set<XER::CA>((borrow == UINT(1) & (UINT(b) > UINT(a)))
-			| (borrow == UINT(0) & (UINT(b) >= UINT(a))));
+			xer.Set<XER::CA>(ConditionalMove(borrow, UINT(b) > UINT(a), UINT(b) >= UINT(a)));
 
 			if(unlikely(oe))
 			{
 				// Overflow: expected result sign and actual result sign differs
-				UINT overflow = UINT(
-				(((borrow == UINT(1)) & (b <= a))
-				| ((borrow == UINT(0)) & (b < a)))
-				xor (SINT(result) < SINT(0)));
+				UINT overflow = UINT(ConditionalMove(borrow, b <= a, b < a) xor (SINT(result) < SINT(0)));
 
 				// Generate XER[OV] and XER[SO]
 				xer.Set<XER::OV>(overflow);
@@ -40598,23 +40572,19 @@
 		{
 			// Read the input operands
 			XER& xer = cpu->GetXER();
-			UINT borrow = UINT(xer.Get<XER::CA>()) ^ UINT(1);
+			BOOL borrow = not BOOL(xer.Get<XER::CA>());
 			SINT a = SINT(cpu->GetGPR(ra)), b = SINT(cpu->GetGPR(rb));
 
 			// Compute the result
 			SINT result = b - a - SINT(borrow);
 
 			// Generate XER[CA]
-			xer.Set<XER::CA>((borrow == UINT(1) & (UINT(b) > UINT(a)))
-			| (borrow == UINT(0) & (UINT(b) >= UINT(a))));
+			xer.Set<XER::CA>(ConditionalMove(borrow, UINT(b) > UINT(a), UINT(b) >= UINT(a)));
 
 			if(unlikely(oe))
 			{
 				// Overflow: expected result sign and actual result sign differs
-				UINT overflow = UINT(
-				(((borrow == UINT(1)) & (b <= a))
-				| ((borrow == UINT(0)) & (b < a)))
-				xor (SINT(result) < SINT(0)));
+				UINT overflow = UINT(ConditionalMove(borrow, b <= a, b < a) xor (SINT(result) < SINT(0)));
 
 				// Generate XER[OV] and XER[SO]
 				xer.Set<XER::OV>(overflow);
@@ -40652,23 +40622,19 @@
 		{
 			// Read the input operands
 			XER& xer = cpu->GetXER();
-			UINT borrow = UINT(xer.Get<XER::CA>()) ^ UINT(1);
+			BOOL borrow = not BOOL(xer.Get<XER::CA>());
 			SINT a = SINT(cpu->GetGPR(ra)), b = SINT(cpu->GetGPR(rb));
 
 			// Compute the result
 			SINT result = b - a - SINT(borrow);
 
 			// Generate XER[CA]
-			xer.Set<XER::CA>((borrow == UINT(1) & (UINT(b) > UINT(a)))
-			| (borrow == UINT(0) & (UINT(b) >= UINT(a))));
+			xer.Set<XER::CA>(ConditionalMove(borrow, UINT(b) > UINT(a), UINT(b) >= UINT(a)));
 
 			if(unlikely(oe))
 			{
 				// Overflow: expected result sign and actual result sign differs
-				UINT overflow = UINT(
-				(((borrow == UINT(1)) & (b <= a))
-				| ((borrow == UINT(0)) & (b < a)))
-				xor (SINT(result) < SINT(0)));
+				UINT overflow = UINT(ConditionalMove(borrow, b <= a, b < a) xor (SINT(result) < SINT(0)));
 
 				// Generate XER[OV] and XER[SO]
 				xer.Set<XER::OV>(overflow);

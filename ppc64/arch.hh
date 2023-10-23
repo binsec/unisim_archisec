@@ -39,6 +39,67 @@
 
 namespace ppc64 {
 
+  struct Path
+  {
+    using ActionNode = unisim::util::symbolic::binsec::ActionNode;
+
+    struct Source
+    {
+      Source( Path& _path ) : path(_path) {} Path& path;
+    };
+
+    Path() : node() {}
+
+    void reset(ActionNode* root) { node = root; }
+
+    static bool Test( bool c ) { return c; }
+
+    template <typename T>
+    static bool Test( unisim::util::symbolic::SmartValue<T> const& cond )
+    {
+      if (not cond.expr.good())
+        throw std::logic_error( "Not a valid condition" );
+
+      return concretize( BOOL(cond).expr );
+    }
+
+    ActionNode* operator -> () { return node; }
+
+  private:
+    using Expr = unisim::util::symbolic::Expr;
+
+    static bool concretize( Expr cexp )
+    {
+      if (unisim::util::symbolic::ConstNodeBase const* cnode = cexp.ConstSimplify())
+        return dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value;
+
+      Path* path = SeekSource(cexp);
+      if (not path)
+        throw std::logic_error( "No concretization path" );
+
+      return path->choose( cexp );
+    }
+
+    static Path* SeekSource( unisim::util::symbolic::Expr const& expr )
+    {
+      if (Source const* node = dynamic_cast<Source const*>( expr.node ))
+        return &node->path;
+      for (unsigned idx = 0, end = expr->SubCount(); idx < end; ++idx)
+        if (Path* found = SeekSource( expr->GetSub(idx)))
+          return found;
+      return 0;
+    }
+
+    bool choose( Expr const& cexp )
+    {
+      bool predicate = node->proceed( cexp );
+      node = node->next( predicate );
+      return predicate;
+    }
+
+    ActionNode*     node;
+  };
+
   struct Arch
   {
     static const bool HAS_FPU = true;
@@ -59,31 +120,15 @@ namespace ppc64 {
     template <typename T>
     using SmartValue = unisim::util::symbolic::SmartValue<T>;
 
-    struct Source
-    {
-      typedef unisim::util::symbolic::ValueType ValueType;
-      Source( Arch& _arch ) : arch(_arch) {} Arch& arch;
-
-      static Arch* SeekArch( unisim::util::symbolic::Expr const& expr )
-      {
-        if (Source const* node = dynamic_cast<Source const*>( expr.node ))
-          return &node->arch;
-        for (unsigned idx = 0, end = expr->SubCount(); idx < end; ++idx)
-          if (Arch* found = SeekArch( expr->GetSub(idx)))
-            return found;
-        return 0;
-      }
-    };
-
     template <typename RID>
     Expr newRegRead( RID id )
     {
-      struct RegRead : public Source, public unisim::util::symbolic::binsec::RegRead<RID>
+      struct RegRead : public Path::Source, public unisim::util::symbolic::binsec::RegRead<RID>
       {
-        RegRead( Arch& arch, RID id ) : Source(arch), unisim::util::symbolic::binsec::RegRead<RID>(id) {}
+        RegRead( Path& path, RID id ) : Source(path), unisim::util::symbolic::binsec::RegRead<RID>(id) {}
         virtual RegRead* Mutate() const override { return new RegRead(*this); }
       };
-      return new RegRead( *this, id );
+      return new RegRead( path, id );
     }
 
     template <typename RID>
@@ -91,39 +136,9 @@ namespace ppc64 {
 
     struct Unimplemented {};
 
-    Arch(U64 const& insn_addr, ActionNode** path);
+    Arch(U64 const& insn_addr, Path& path);
 
     bool  close( Arch const& ref, uint64_t linear_nia );
-
-    bool choose( Expr const& cexp )
-    {
-      bool predicate = (*path)->proceed( cexp );
-      *path = (*path)->next( predicate );
-      return predicate;
-    }
-
-    static bool concretize( Expr cexp )
-    {
-      if (unisim::util::symbolic::ConstNodeBase const* cnode = cexp.ConstSimplify())
-        return dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value;
-
-      Arch* arch = Source::SeekArch(cexp);
-      if (not arch)
-        throw 0;
-
-      return arch->choose( cexp );
-    }
-
-    template <typename T>
-    static bool Test( unisim::util::symbolic::SmartValue<T> const& cond )
-    {
-      if (not cond.expr.good())
-        throw std::logic_error( "Not a valid condition" );
-
-      return concretize( BOOL(cond).expr );
-    }
-
-    static bool Test( bool c ) { return c; }
 
     //   =====================================================================
     //   =                         Condition Register                        =
@@ -146,14 +161,14 @@ namespace ppc64 {
 
       struct ID : public unisim::util::symbolic::WithValueType<ID> { typedef uint32_t value_type; void Repr(std::ostream& sink) const; int cmp(ID) const { return 0; } };
 
-      struct Read : public Source, public unisim::util::symbolic::binsec::RegRead<ID>
+      struct Read : public Path::Source, public unisim::util::symbolic::binsec::RegRead<ID>
       {
-        Read( Arch& arch ) : Source(arch), unisim::util::symbolic::binsec::RegRead<ID>(ID()) {}
+        Read( Path& path ) : Source(path), unisim::util::symbolic::binsec::RegRead<ID>(ID()) {}
         virtual Read* Mutate() const override { return new Read(*this); }
-        // virtual unisim::util::symbolic::ConstNodeBase const* Simplify( Expr const& mask, Expr& expr ) const override;
+        virtual unisim::util::symbolic::ConstNodeBase const* Simplify( Expr const& mask, Expr& expr ) const override;
       };
 
-      CR( Arch& arch ); // : value( new Read(arch) ) {}
+      CR( Arch& arch ) : value( new Read(arch.path) ) {}
 
       U32 value;
     };
@@ -385,12 +400,12 @@ namespace ppc64 {
     //   =====================================================================
     Expr newLoad( U64 const& addr, unsigned size )
     {
-      struct Load : public Source, public unisim::util::symbolic::binsec::Load
+      struct Load : public Path::Source, public unisim::util::symbolic::binsec::Load
       {
-        Load( Arch& arch, Expr const& addr, unsigned size ) : Source(arch), unisim::util::symbolic::binsec::Load(addr, size, 0, true) {}
+        Load( Path& path, Expr const& addr, unsigned size ) : Source(path), unisim::util::symbolic::binsec::Load(addr, size, 0, true) {}
         virtual Load* Mutate() const override { return new Load(*this); }
       };
-      return new Load( *this, addr.expr, size );
+      return new Load( path, addr.expr, size );
     }
 
     bool  Int8Load (unsigned n, U64 addr) { SetGPR(n, UINT(U8 (newLoad(addr, 1))) ); return true; }
@@ -446,7 +461,7 @@ namespace ppc64 {
     };
     template <typename T>  void ThrowException() { throw Unimplemented(); }
 
-    ActionNode**     path;
+    Path&            path;
     U64              current_instruction_address;
     U64              next_instruction_address;
     branch_type_t    branch_type;

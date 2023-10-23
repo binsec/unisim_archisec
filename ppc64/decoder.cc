@@ -90,8 +90,8 @@ struct Translator
 
     U64      insn_addr = unisim::util::symbolic::make_const(addr); //< concrete instruction address
     // Arch::U64      insn_addr = Expr(new InstructionAddress); //< symbolic instruction address
-    ActionNode* sharecode;
-    Arch reference( insn_addr, &sharecode );
+    Path path;
+    Arch reference( insn_addr, path );
 
     // Disassemble
     sink << "(mnemonic . \"";
@@ -105,7 +105,7 @@ struct Translator
         for (bool end = false; not end;)
           {
             Arch state( reference );
-	    sharecode = coderoot;
+	    path.reset(coderoot);
             instruction->execute( &state );
             end = state.close( reference, addr + 4 );
           }

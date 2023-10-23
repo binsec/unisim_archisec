@@ -38,7 +38,7 @@
 
 namespace ppc64 {
 
-  Arch::Arch( U64 const& insn_addr, ActionNode** _path )
+  Arch::Arch( U64 const& insn_addr, Path& _path )
     : path(_path)
     , current_instruction_address(insn_addr)
     , next_instruction_address(insn_addr + U64(4))
@@ -64,51 +64,51 @@ namespace ppc64 {
       unsigned bit;
     };
     
-    struct BitRead : public Arch::Source, public unisim::util::symbolic::binsec::RegRead<CRBIT>
+    struct BitRead : public Path::Source, public unisim::util::symbolic::binsec::RegRead<CRBIT>
     {
-      BitRead( Arch& arch, CRBIT bit ) : Arch::Source(arch), unisim::util::symbolic::binsec::RegRead<CRBIT>(bit) {}
+      BitRead( Path& path, CRBIT bit ) : Path::Source(path), unisim::util::symbolic::binsec::RegRead<CRBIT>(bit) {}
       virtual BitRead* Mutate() const override { return new BitRead(*this); }
     };
   }
 
-  Arch::CR::CR( Arch& arch ) : value(U32(0))
-  {
-    for (unsigned idx = 32; idx-- > 0;) {
-      Expr scratch = new BitRead( arch, CRBIT(31^idx) );
-      scratch = unisim::util::symbolic::binsec::BitFilter::
-	mksimple(scratch, 1, 0, 1, 32, false);
-      value = value | (U32(scratch) << U32(idx));
-    }
-  }
-
-  // unisim::util::symbolic::ConstNodeBase const*
-  // Arch::CR::Read::Simplify( Expr const& mask, Expr& expr ) const
+  // Arch::CR::CR( Arch& arch ) : value(U32(0))
   // {
-  //   if (not mask.good())
-  //     return 0;
-
-  //   uint32_t maskval = mask.Eval<uint32_t>();
-  //   if (maskval & (maskval-1))
-  //     return 0;
-
-  //   unisim::util::symbolic::shift_type pos = __builtin_ctz(maskval);
-  //   Expr scratch = new BitRead( arch, CRBIT(31^pos) );
-  //   scratch = unisim::util::symbolic::binsec::BitFilter::mksimple(scratch, 1, 0, 32, 32, false);
-  //   expr = unisim::util::symbolic::make_operation(unisim::util::symbolic::Op::Lsl, scratch, unisim::util::symbolic::make_const(pos));
-
-  //   return 0;
+  //   for (unsigned idx = 32; idx-- > 0;) {
+  //     Expr scratch = new BitRead( arch.path, CRBIT(31^idx) );
+  //     scratch = unisim::util::symbolic::binsec::BitFilter::
+  //       mksimple(scratch, 1, 0, 1, 32, false);
+  //     value = value | (U32(scratch) << U32(idx));
+  //   }
   // }
+
+  unisim::util::symbolic::ConstNodeBase const*
+  Arch::CR::Read::Simplify( Expr const& mask, Expr& expr ) const
+  {
+    if (not mask.good())
+      return 0;
+
+    uint32_t maskval = mask.Eval<uint32_t>();
+    if (maskval & (maskval-1))
+      return 0;
+
+    unisim::util::symbolic::shift_type pos = __builtin_ctz(maskval);
+    Expr scratch = new BitRead( path, CRBIT(31^pos) );
+    scratch = unisim::util::symbolic::binsec::BitFilter::mksimple(scratch, 1, 0, 1, 32, false);
+    expr = unisim::util::symbolic::make_operation(unisim::util::symbolic::Op::Lsl, scratch, unisim::util::symbolic::make_const(pos));
+
+    return 0;
+  }
 
   bool
   Arch::close( Arch const& ref, uint64_t linear_nia )
   {
-    bool complete = (*path)->close();
+    bool complete = path->close();
     /* TODO: branch_type */
-    (*path)->sinks.insert( Expr( new unisim::util::symbolic::binsec::Branch( next_instruction_address.expr ) ) );
+    path->add_sink( Expr( new unisim::util::symbolic::binsec::Branch( next_instruction_address.expr ) ) );
 
     for (IRegID reg; reg.next();)
       if (regvalues[reg.idx()].expr != ref.regvalues[reg.idx()].expr)
-        (*path)->sinks.insert( newRegWrite( reg, regvalues[reg.idx()].expr ) );
+        path->add_sink( newRegWrite( reg, regvalues[reg.idx()].expr ) );
 
     if (cr.value.expr != ref.cr.value.expr)
       {
@@ -125,24 +125,23 @@ namespace ppc64 {
             // unisim::util::symbolic::binsec::BitSimplify::Do(old_crbit);
             if (new_crbit == old_crbit)
               continue;
-            (*path)->sinks.insert( newRegWrite( CRBIT(idx), new_crbit ) );
+            path->add_sink( newRegWrite( CRBIT(idx), new_crbit ) );
             // new_crbit->Repr(std::cerr << "cr<" << idx << ">: ");
             // std::cerr << '\n';
           }
       }
 
     for (std::set<Expr>::const_iterator itr = stores.begin(), end = stores.end(); itr != end; ++itr)
-      (*path)->sinks.insert( *itr );
+      path->add_sink( *itr );
 
     if (xer.value.expr != ref.xer.value.expr) {
       unisim::util::symbolic::Expr x(((xer.value ^ ref.xer.value) != U64(0)).expr);
       if (auto c = unisim::util::symbolic::binsec::BitSimplify::Do(x)) {
 	if (dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*c).value)
-	  (*path)->sinks.insert( newRegWrite( XER::ID(), xer.value.expr ) );
+	  path->add_sink( newRegWrite( XER::ID(), xer.value.expr ) );
       } else
-	(*path)->sinks.insert( newRegWrite( XER::ID(), xer.value.expr ) );
+	path->add_sink( newRegWrite( XER::ID(), xer.value.expr ) );
     }
-
 
     if (fpscr.value.expr != ref.fpscr.value.expr)
       throw 0;

@@ -164,7 +164,7 @@ namespace symbolic {
         Xor, And, Or,
         Ror, Rol, Lsl, Asr, Lsr,
         Add, Sub, Div, Divu, Mod, Modu, Mul, Min, Max,
-        Inc, Dec,
+        CMov, Inc, Dec,
         Tzero, Tnzero,
         Teq, Tne, Tge, Tgt, Tle, Tlt, Tgeu, Tgtu, Tleu, Tltu,
         BSwp, BSR, BSF, POPCNT, Not, Neg,
@@ -190,6 +190,7 @@ namespace symbolic {
         case    Mul: return "Mul";
         case    Min: return "Min";
         case    Max: return "Max";
+        case   CMov: return "CMov";
         case    Ror: return "Ror";
         case    Rol: return "Rol";
         case    Lsl: return "Lsl";
@@ -258,6 +259,12 @@ namespace symbolic {
 
   typedef uint8_t shift_type;
 
+  template <typename VALUE_TYPE>
+  VALUE_TYPE EvalInc( VALUE_TYPE l ) { return l + VALUE_TYPE(1); }
+  inline bool EvalInc( bool l ) { return not l; }
+  template <typename VALUE_TYPE>
+  VALUE_TYPE EvalDec( VALUE_TYPE l ) { return l - VALUE_TYPE(1); }
+  inline bool EvalDec( bool l ) { return not l; }
   template <typename VALUE_TYPE>
   VALUE_TYPE EvalMul( VALUE_TYPE l, VALUE_TYPE r ) { return l * r; }
   bool EvalMul( bool, bool );
@@ -435,7 +442,7 @@ namespace symbolic {
         case Op::FMax: case Op::FMin:
         case Op::Xor:  case Op::And: case Op::Or:
         case Op::Lsl:  case Op::Lsr: case Op::Asr:  case Op::Ror:   case Op::Rol:
-        case Op::Add:  case Op::Sub: case Op::Min:  case Op::Max:
+        case Op::Add:  case Op::Sub: case Op::Min:  case Op::Max: case Op::CMov:
         case Op::Mul:  case Op::Div: case Op::Mod: case Op::Divu: case Op::Modu:
         case Op::ReinterpretAs: case Op::Inc: case Op::Dec:
 
@@ -489,6 +496,7 @@ namespace symbolic {
         case Op::Xor:    return new this_type( EvalXor( value, GetValue( args[1] ) ) );
         case Op::And:    return new this_type( EvalAnd( value, GetValue( args[1] ) ) );
         case Op::Or:     return new this_type( EvalOr( value, GetValue( args[1] ) ) );
+        case Op::CMov:   return new this_type( dynamic_cast<ConstNode<bool> const&>(*args[2]).value ? value : GetValue( args[1] ) );
         case Op::Lsl:    return new this_type( EvalSHL( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
         case Op::Lsr:
         case Op::Asr:    return new this_type( EvalSHR( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
@@ -499,8 +507,8 @@ namespace symbolic {
         case Op::Divu:   return new this_type( value / GetValue( args[1] ) );
         case Op::Mod:
         case Op::Modu:   return new this_type( EvalMod( value, GetValue( args[1] ) ) );
-	case Op::Inc:    return new this_type( value + VALUE_TYPE(1) );
-	case Op::Dec:    return new this_type( value - VALUE_TYPE(1) );
+	case Op::Inc:    return new this_type( EvalInc( value ) );
+	case Op::Dec:    return new this_type( EvalDec( value ) );
 
         case Op::Tnzero: return new ConstNode   <bool>   ( value != VALUE_TYPE() );
         case Op::Tzero:  return new ConstNode   <bool>   ( value == VALUE_TYPE() );
@@ -755,6 +763,8 @@ namespace symbolic {
 
   template <typename T> SmartValue<T> Minimum( SmartValue<T> const& l, SmartValue<T> const& r ) { return SmartValue<T>( make_operation( "Min", l.expr, r.expr ) ); }
   template <typename T> SmartValue<T> Maximum( SmartValue<T> const& l, SmartValue<T> const& r ) { return SmartValue<T>( make_operation( "Max", l.expr, r.expr ) ); }
+
+  template <typename T> SmartValue<T> ConditionalMove(SmartValue<bool> cond, SmartValue<T> tval, SmartValue<T> fval) { return SmartValue<T>( make_operation( "CMov", tval.expr, fval.expr, cond.expr ) ); }
 
   template <typename UTP>
   UTP ByteSwap( UTP const& value ) { return UTP( make_operation( "BSwp", value.expr ) ); }

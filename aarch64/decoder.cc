@@ -104,25 +104,25 @@ struct Processor
   {
     bool complete = path->close();
     if (branch_type == B_CALL)
-      path->sinks.insert( Expr( new unisim::util::symbolic::binsec::Call<uint64_t>( next_instruction_address.expr, linear_nia ) ) );
+      path->add_sink( Expr( new unisim::util::symbolic::binsec::Call<uint64_t>( next_instruction_address.expr, linear_nia ) ) );
     else
-      path->sinks.insert( Expr( new unisim::util::symbolic::binsec::Branch( next_instruction_address.expr ) ) );
+      path->add_sink( Expr( new unisim::util::symbolic::binsec::Branch( next_instruction_address.expr ) ) );
     if (unpredictable)
       {
-        path->sinks.insert( Expr( new unisim::util::symbolic::binsec::AssertFalse() ) );
+        path->add_sink( Expr( new unisim::util::symbolic::binsec::AssertFalse() ) );
         return complete;
       }
     
     for (GPR reg; reg.next();)
       if (gpr[reg.idx()] != ref.gpr[reg.idx()])
-        path->sinks.insert( Expr( newRegWrite( reg, gpr[reg.idx()] ) ) );
+        path->add_sink( Expr( newRegWrite( reg, gpr[reg.idx()] ) ) );
     
     for (Flag flag; flag.next();)
       if (flags[flag.idx()] != ref.flags[flag.idx()])
-        path->sinks.insert( Expr( newRegWrite( flag, flags[flag.idx()] ) ) );
+        path->add_sink( Expr( newRegWrite( flag, flags[flag.idx()] ) ) );
 
     for (std::set<Expr>::const_iterator itr = stores.begin(), end = stores.end(); itr != end; ++itr)
-      path->sinks.insert( *itr );
+      path->add_sink( *itr );
     
     return complete;
   }

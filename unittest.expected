@@ -40,9 +40,8 @@ Arm32dba.decode ~thumb:true ~addr:0x4000l 0x000af04fl
 (opcode . 0x000af04f)
 (size . 4)
 (mnemonic . "mov.w	r0, #10")
-(0x00004000,0) if (1<1> or z<1>)  goto 2 else goto 1
+(0x00004000,0) r0<32> := 0x0000000a; goto 1
 (0x00004000,1) goto (0x00004004,0)
-(0x00004000,2) r0<32> := 0x0000000a; goto 1
 
 Aarch64dba.decode ~addr:0x4000L 0x18000020l
 (address . 0x0000000000004000)
