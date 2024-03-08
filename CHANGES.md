@@ -1,3 +1,8 @@
+## 0.0.8 (2023-03-08)
+
+- support for `adcx`, `adox` and `mulx` (x86)
+- some bug fixes and code improvements
+
 ## 0.0.7 (2023-10-32)
 
 - various bug fixes and code improvements

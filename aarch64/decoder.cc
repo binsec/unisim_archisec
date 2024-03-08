@@ -308,12 +308,12 @@ struct Processor
     , unisim::util::symbolic::WithValueType<Flag>
   {
     typedef bool value_type;
-    enum Code { N, Z, C, V, end } code;
+    enum Code { N = 3, Z = 2, C = 1, V = 0, end = 4 } code;
 
     char const* c_str() const
     {
-      static char const* names[] = {"n", "z", "c", "v", "NA"};
-      return names[int(code)];
+      static char const* names[] = {"NA", "n", "z", "c", "v"};
+      return names[4 - int(code)];
     }
 
     void Repr(std::ostream& sink) const { sink << c_str(); }

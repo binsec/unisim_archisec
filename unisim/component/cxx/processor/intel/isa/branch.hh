@@ -183,7 +183,7 @@ struct Loop : public Operation<ARCH>
     if      (MOD == 0) sink << "loopne ";
     else if (MOD == 1) sink << "loope ";
     else if (MOD == 2) sink << "loop ";
-    else if (MOD == 3) sink << "j" << (&"\0\0c\0ec\0\0rc"[COUNT::SIZE/8]) << "x ";
+    else if (MOD == 3) sink << "j" << (&"\0\0c\0ec\0\0rc"[COUNT::SIZE/8]) << "xz ";
     sink << "0x" << std::hex << (Operation<ARCH>::address + Operation<ARCH>::length + offset);
   };
     
@@ -202,7 +202,7 @@ struct Loop : public Operation<ARCH>
         arch.regwrite( COUNT(), 1, count );
       }
     // Stop if count is zero
-    if (arch.Test( count == count_t(0) )) return;
+    if (arch.Test( count == count_t(0) xor bit_t(MOD == 3) )) return;
     // or ZF is set (loopne)
     if ((MOD == 0) and arch.Test(arch.flagread( ARCH::FLAG::ZF ) == bit_t( 1 ))) return;
     // or ZF is cleared (loope)
@@ -237,8 +237,16 @@ Operation<ARCH>* newLoopMod( InputCode<ARCH> const& ic, OpBase<ARCH> const& opba
 {
   if (ic.mode64())
     {
-      if (ic.opsize() == 32) return new Loop<ARCH,MOD,GOd,64>( opbase, offset );
-      if (ic.opsize() == 64) return new Loop<ARCH,MOD,GOq,64>( opbase, offset );
+      if (ic.addrsize() == 32)
+	if (ic.opsize() == 16)
+	  return new Loop<ARCH,MOD,GOd,16>( opbase, offset );
+	else /* (ic.opsize() == 64) */
+	  return new Loop<ARCH,MOD,GOd,64>( opbase, offset );
+      else /* (ic.addrsize() == 64) */
+	if (ic.opsize() == 16)
+	  return new Loop<ARCH,MOD,GOq,16>( opbase, offset );
+	else /* (ic.opsize() == 64) */
+	  return new Loop<ARCH,MOD,GOq,64>( opbase, offset );
     }
   else
     {

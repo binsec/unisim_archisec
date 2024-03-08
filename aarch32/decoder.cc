@@ -1118,19 +1118,12 @@ void UpdateStatusSubWithBorrow( Processor& state, Processor::U32 const& res, Pro
 {
   typedef Processor::S32 S32;
   typedef Processor::U32 U32;
-  Processor::BOOL neg = S32(res) < S32(0);
+  typedef Processor::BOOL BOOL;
+  BOOL neg = S32(res) < S32(0);
   state.cpsr.n = neg.expr;
   state.cpsr.z = ( res == U32(0) ).expr;
-  if (state.Test(borrow != U32(0)))
-    {
-      state.cpsr.c = ( lhs >  rhs ).expr;
-      state.cpsr.v = ( neg xor (S32(lhs) <= S32(rhs)) ).expr;
-    }
-  else
-    {
-      state.cpsr.c = ( lhs >= rhs ).expr;
-      state.cpsr.v = ( neg xor (S32(lhs) <  S32(rhs)) ).expr;
-    }
+  state.cpsr.c = (( lhs > rhs ) or (!BOOL(borrow) and ( lhs == rhs ))).expr;
+  state.cpsr.v = ( neg xor ((S32(lhs) <  S32(rhs)) or (BOOL(borrow) and ( lhs == rhs ))) ).expr;
 }
 
 void UpdateStatusAdd( Processor& state, Processor::U32 const& res, Processor::U32 const& lhs, Processor::U32 const& rhs )
@@ -1148,19 +1141,13 @@ void UpdateStatusAddWithCarry( Processor& state, Processor::U32 const& res, Proc
 {
   typedef Processor::S32 S32;
   typedef Processor::U32 U32;
-  Processor::BOOL neg = S32(res) < S32(0);
+  typedef Processor::BOOL BOOL;
+  BOOL neg = S32(res) < S32(0);
   state.cpsr.n = neg.expr;
   state.cpsr.z = ( res == U32(0) ).expr;
-  if (state.Test(carry != U32(0)))
-    {
-      state.cpsr.c = ( lhs >= ~rhs ).expr;
-      state.cpsr.v = ( neg xor (S32(lhs) <  S32(~rhs)) ).expr;
-    }
-  else
-    {
-      state.cpsr.c = ( lhs >  ~rhs ).expr;
-      state.cpsr.v = ( neg xor (S32(lhs) <= S32(~rhs)) ).expr;
-    }
+  state.cpsr.c = (( lhs >  ~rhs ) or (BOOL(carry) and ( lhs == ~rhs ))).expr;
+  state.cpsr.v =
+    ( neg xor ((S32(lhs) < S32(~rhs)) or (!BOOL(carry) and ( lhs == ~rhs))) ).expr;
 }
 
 

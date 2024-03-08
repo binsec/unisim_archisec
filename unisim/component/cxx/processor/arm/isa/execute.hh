@@ -59,16 +59,16 @@ namespace arm {
     typedef Source<3> N; typedef Source<2> Z; typedef Source<1> C; typedef Source<0> V;
   };
   
-  /** Check the given condition against the current CPSR status.
-   * Returns true if the condition matches CPSR, false otherwise.
+  /** Create the given condition against the current CPSR status.
+   * Returns 1 if the condition matches CPSR, 0 otherwise.
    *
    * @param core the core for which the CPSR will be matched
    * @param cond the condition to check
-   * @return true if the condition matches CPSR, false otherwise
+   * @return 1 if the condition matches CPSR, 0 otherwise
    */
   template <typename coreT>
-  bool
-  CheckCondition( coreT& core, uint32_t cond )
+  typename coreT::U16
+  MakeCondition( coreT& core, uint32_t cond )
   {
     util::truth_table::InBit<uint16_t,3> const N;
     util::truth_table::InBit<uint16_t,2> const Z;
@@ -98,9 +98,25 @@ namespace arm {
     };
     if (cond >= 16) throw std::logic_error("invalid condition code");
     U8 nzcv( core.GetNZCV() );
-    return core.Test( ((condition_truth_tables[cond] >> nzcv) & U16(1)) != U16(0) );
+    return (condition_truth_tables[cond] >> nzcv) & U16(1);
   }
-  
+
+  /** Check the given condition against the current CPSR status.
+   * Returns true if the condition matches CPSR, false otherwise.
+   *
+   * @param core the core for which the CPSR will be matched
+   * @param cond the condition to check
+   * @return true if the condition matches CPSR, false otherwise
+   */
+  template <typename coreT>
+  bool
+  CheckCondition( coreT& core, uint32_t cond )
+  {
+    typedef typename coreT::U16 U16;
+
+    return core.Test( MakeCondition( core, cond ) != U16(0) );
+  }
+
   template <typename coreT>
   typename coreT::U32
   ComputeImmShift( coreT& core, typename coreT::U32 const& shift_lhs, unsigned shift, unsigned shift_rhs )

@@ -10302,13 +10302,13 @@ void OpCcmn_wi<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::U32 U32;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U32 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 + op2;
-			cpu.SetNZCV( S32(res) < S32(0), res == U32(0), op1 > ~op2, (S32(res) < S32(0)) xor (S32(op1) <= S32(~op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U32 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 + op2;
+		cpu.SetNZCV( rcond & (S32(res) < S32(0)) | !rcond & BOOL(n==1),
+		rcond & (res == U32(0)) | !rcond & BOOL(z==1),
+		rcond & (op1 > ~op2) | !rcond & BOOL(c==1),
+		rcond & ((S32(res) < S32(0)) xor (S32(op1) <= S32(~op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10332,13 +10332,13 @@ void OpCcmn_xi<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::U64 U64;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U64 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 + op2;
-			cpu.SetNZCV( S64(res) < S64(0), res == U64(0), op1 > ~op2, (S64(res) < S64(0)) xor (S64(op1) <= S64(~op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U64 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 + op2;
+		cpu.SetNZCV( rcond & (S64(res) < S64(0)) | !rcond & BOOL(n==1),
+		rcond & (res == U64(0)) | !rcond & BOOL(z==1),
+		rcond & (op1 > ~op2) | !rcond & BOOL(c==1),
+		rcond & ((S64(res) < S64(0)) xor (S64(op1) <= S64(~op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10362,13 +10362,13 @@ void OpCcmn_w<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::U32 U32;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U32 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 + op2;
-			cpu.SetNZCV( S32(res) < S32(0), res == U32(0), op1 > ~op2, (S32(res) < S32(0)) xor (S32(op1) <= S32(~op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U32 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 + op2;
+		cpu.SetNZCV( rcond & (S32(res) < S32(0)) | !rcond & BOOL(n==1),
+		rcond & (res == U32(0)) | !rcond & BOOL(z==1),
+		rcond & (op1 > ~op2) | !rcond & BOOL(c==1),
+		rcond & ((S32(res) < S32(0)) xor (S32(op1) <= S32(~op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10392,13 +10392,13 @@ void OpCcmn_x<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::U64 U64;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U64 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 + op2;
-			cpu.SetNZCV( S64(res) < S64(0), res == U64(0), op1 > ~op2, (S64(res) < S64(0)) xor (S64(op1) <= S64(~op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U64 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 + op2;
+		cpu.SetNZCV( rcond & (S64(res) < S64(0)) | !rcond & BOOL(n==1),
+		rcond & (res == U64(0)) | !rcond & BOOL(z==1),
+		rcond & (op1 > ~op2) | !rcond & BOOL(c==1),
+		rcond & ((S64(res) < S64(0)) xor (S64(op1) <= S64(~op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10422,13 +10422,13 @@ void OpCcmp_wi<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::S32 S32;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U32 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 - op2;
-			cpu.SetNZCV( S32(res) < S32(0), op1 == op2, op1 >= op2, (S32(res) < S32(0)) xor (S32(op1) < S32(op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U32 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 - op2;
+		cpu.SetNZCV( rcond & (S32(res) < S32(0)) | !rcond & BOOL(n==1),
+		rcond & (op1 == op2) | !rcond & BOOL(z==1),
+		rcond & (op1 >= op2) | !rcond & BOOL(c==1),
+		rcond & ((S32(res) < S32(0)) xor (S32(op1) < S32(op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10452,13 +10452,13 @@ void OpCcmp_xi<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::S64 S64;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U64 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 - op2;
-			cpu.SetNZCV( S64(res) < S64(0), op1 == op2, op1 >= op2, (S64(res) < S64(0)) xor (S64(op1) < S64(op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U64 op1( cpu.GetGZR(rn) ), op2( imm ), res = op1 - op2;
+		cpu.SetNZCV( rcond & (S64(res) < S64(0)) | !rcond & BOOL(n==1),
+		rcond & (op1 == op2) | !rcond & BOOL(z==1),
+		rcond & (op1 >= op2) | !rcond & BOOL(c==1),
+		rcond & ((S64(res) < S64(0)) xor (S64(op1) < S64(op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10482,13 +10482,13 @@ void OpCcmp_w<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::S32 S32;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U32 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 - op2;
-			cpu.SetNZCV( S32(res) < S32(0), op1 == op2, op1 >= op2, (S32(res) < S32(0)) xor (S32(op1) < S32(op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U32 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 - op2;
+		cpu.SetNZCV( rcond & (S32(res) < S32(0)) | !rcond & BOOL(n==1),
+		rcond & (op1 == op2) | !rcond & BOOL(z==1),
+		rcond & (op1 >= op2) | !rcond & BOOL(c==1),
+		rcond & ((S32(res) < S32(0)) xor (S32(op1) < S32(op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10512,13 +10512,13 @@ void OpCcmp_x<	ARCH>::execute( ARCH & cpu)
 		typedef typename ARCH::S64 S64;
 		typedef typename ARCH::BOOL BOOL;
 
-		if (CheckCondition(cpu, cond))
-		{
-			U64 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 - op2;
-			cpu.SetNZCV( S64(res) < S64(0), op1 == op2, op1 >= op2, (S64(res) < S64(0)) xor (S64(op1) < S64(op2)) );
-		}
-		else
-		cpu.SetNZCV( BOOL(n==1), BOOL(z==1), BOOL(c==1), BOOL(v==1) );
+		BOOL rcond = BOOL(MakeCondition(cpu, cond));
+		U64 op1( cpu.GetGZR(rn) ), op2( cpu.GetGZR(rm) ), res = op1 - op2;
+		cpu.SetNZCV( rcond & (S64(res) < S64(0)) | !rcond & BOOL(n==1),
+		rcond & (op1 == op2) | !rcond & BOOL(z==1),
+		rcond & (op1 >= op2) | !rcond & BOOL(c==1),
+		rcond & ((S64(res) < S64(0)) xor (S64(op1) < S64(op2)))
+		| !rcond & BOOL(v==1) );
 }}
 
 template <	typename	ARCH>
@@ -10678,11 +10678,8 @@ void OpCsel_w<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U32 U32;
 
-		U32 res;
-		if (CheckCondition(cpu, cond))
-		res = U32(cpu.GetGZR(rn));
-		else
-		res = U32(cpu.GetGZR(rm));
+		U32 mask0 = U32(MakeCondition(cpu, cond)) - U32(1);
+		U32 res = ~mask0 & U32(cpu.GetGZR(rn)) | mask0 & U32(cpu.GetGZR(rm));
 		cpu.SetGZR(rd, res);
 }}
 
@@ -10705,11 +10702,8 @@ void OpCsel_x<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U64 U64;
 
-		U64 res;
-		if (CheckCondition(cpu, cond))
-		res = cpu.GetGZR(rn);
-		else
-		res = cpu.GetGZR(rm);
+		U64 mask0 = U64(MakeCondition(cpu, cond)) - U64(1);
+		U64 res = ~mask0 & cpu.GetGZR(rn) | mask0 & cpu.GetGZR(rm);
 		cpu.SetGZR(rd, res);
 }}
 
@@ -10736,13 +10730,12 @@ template <	typename	ARCH>
 void OpCsinc_w<	ARCH>::execute( ARCH & cpu)
 {
 	{
+
 		typedef typename ARCH::U32 U32;
 
-		U32 res;
-		if (CheckCondition(cpu, cond))
-		res = U32(cpu.GetGZR(rn));
-		else
-		res = U32(cpu.GetGZR(rm)) + U32(1);
+		U32 mask0 = U32(MakeCondition(cpu, cond)) - U32(1);
+		U32 res = ~mask0 & U32(cpu.GetGZR(rn))
+		| mask0 & (U32(cpu.GetGZR(rm)) + U32(1));
 		cpu.SetGZR(rd, res);
 }}
 
@@ -10771,11 +10764,8 @@ void OpCsinc_x<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U64 U64;
 
-		U64 res;
-		if (CheckCondition(cpu, cond))
-		res = cpu.GetGZR(rn);
-		else
-		res = cpu.GetGZR(rm) + U64(1);
+		U64 mask0 = U64(MakeCondition(cpu, cond)) - U64(1);
+		U64 res = ~mask0 & cpu.GetGZR(rn) | mask0 & (cpu.GetGZR(rm) + U64(1));
 		cpu.SetGZR(rd, res);
 }}
 
@@ -10804,11 +10794,8 @@ void OpCsinv_w<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U32 U32;
 
-		U32 res;
-		if (CheckCondition(cpu, cond))
-		res = U32(cpu.GetGZR(rn));
-		else
-		res = ~U32(cpu.GetGZR(rm));
+		U32 mask0 = U32(MakeCondition(cpu, cond)) - U32(1);
+		U32 res = ~mask0 & U32(cpu.GetGZR(rn)) | mask0 & ~U32(cpu.GetGZR(rm));
 		cpu.SetGZR(rd, res);
 }}
 
@@ -10837,11 +10824,8 @@ void OpCsinv_x<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U64 U64;
 
-		U64 res;
-		if (CheckCondition(cpu, cond))
-		res = cpu.GetGZR(rn);
-		else
-		res = ~(cpu.GetGZR(rm));
+		U64 mask0 = U64(MakeCondition(cpu, cond)) - U64(1);
+		U64 res = ~mask0 & cpu.GetGZR(rn) | mask0 & ~cpu.GetGZR(rm);
 		cpu.SetGZR(rd, res);
 }}
 
@@ -10867,11 +10851,8 @@ void OpCsneg_w<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U32 U32;
 
-		U32 res;
-		if (CheckCondition(cpu, cond))
-		res = U32(cpu.GetGZR(rn));
-		else
-		res = -U32(cpu.GetGZR(rm));
+		U32 mask0 = U32(MakeCondition(cpu, cond)) - U32(1);
+		U32 res = ~mask0 & U32(cpu.GetGZR(rn)) | mask0 & -U32(cpu.GetGZR(rm));
 		cpu.SetGZR(rd, res);
 }}
 
@@ -10897,11 +10878,8 @@ void OpCsneg_x<	ARCH>::execute( ARCH & cpu)
 	{
 		typedef typename ARCH::U64 U64;
 
-		U64 res;
-		if (CheckCondition(cpu, cond))
-		res = cpu.GetGZR(rn);
-		else
-		res = -(cpu.GetGZR(rm));
+		U64 mask0 = U64(MakeCondition(cpu, cond)) - U64(1);
+		U64 res = ~mask0 & cpu.GetGZR(rn) | mask0 & -cpu.GetGZR(rm);
 		cpu.SetGZR(rd, res);
 }}
 

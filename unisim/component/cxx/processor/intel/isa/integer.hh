@@ -1862,6 +1862,30 @@ struct MulE8 : public Operation<ARCH>
   }
 };
 
+template <class ARCH, class OP>
+struct Mulx : public Operation<ARCH>
+{
+  Mulx( OpBase<ARCH> const& opbase, uint8_t _gn, MOp<ARCH> const* _rmop, uint8_t _vn ) : Operation<ARCH>( opbase ), rmop( _rmop ), vn( _vn ), gn( _gn ) {}
+  RMOp<ARCH> rmop;
+  uint8_t vn, gn;
+
+  void disasm( std::ostream& sink ) const { sink << "mulx " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), vn ) << ',' << DisasmG( OP(), gn ); }
+
+  void execute( ARCH& arch ) const {
+    typedef typename TypeFor<ARCH,OP::SIZE>::u val_t;
+    typedef typename atpinfo<ARCH,val_t>::twice dval_t;
+
+    val_t src1 = arch.regread( OP(), 2 /* EDX */ );
+    val_t src2 = arch.rmread( OP(), rmop );
+    dval_t result = dval_t( src1 ) * dval_t( src2 );
+    val_t dst2 = val_t( result );
+    val_t dst1 = val_t( result >> int(atpinfo<ARCH,val_t>::bitsize) );
+    arch.regwrite( OP(), vn, dst2 );
+    arch.regwrite( OP(), gn, dst1 );
+  }
+};
+
+
 template <class ARCH> struct DC<ARCH,MUL> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (auto _ = match( ic, opcode( "\xf6" ) /4 & RM() ))
@@ -1878,6 +1902,16 @@ template <class ARCH> struct DC<ARCH,MUL> { Operation<ARCH>* get( InputCode<ARCH
       else if (ic.opsize() == 32) return new MulE<ARCH,GOd>( _.opbase(), _.rmop() );
       else if (ic.opsize() == 64) return new MulE<ARCH,GOq>( _.opbase(), _.rmop() );
       return 0;
+    }
+
+  if (auto _ = match( ic, vex( "\xf2\x0f\x38\xf6" ) & RM() ))
+
+    {
+      if ((not ic.vex()) || (ic.vlen() != 128)) return 0;
+      if (ic.mode64() && ic.w())
+	return new Mulx<ARCH,GOq>( _.opbase(), _.greg(), _.rmop(), ic.vreg() );
+      else
+	return new Mulx<ARCH,GOd>( _.opbase(), _.greg(), _.rmop(), ic.vreg() );
     }
 
   return 0;
@@ -2659,18 +2693,30 @@ template <class ARCH> struct DC<ARCH,BOUND> { Operation<ARCH>* get( InputCode<AR
   return 0;
 }};
 
-template <class ARCH, class OP>
+template <class ARCH, class OP, bool CF>
 struct Adcx : public Operation<ARCH>
 {
   Adcx( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  void disasm( std::ostream& sink ) const { sink << "adcx " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
-};
+  void disasm( std::ostream& sink ) const { sink << "ad" << (CF ? 'c' : 'o') << "x " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
 
-template <class ARCH, class OP>
-struct Adox : public Operation<ARCH>
-{
-  Adox( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
-  void disasm( std::ostream& sink ) const { sink << "adox " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
+  typedef typename TypeFor<ARCH,OP::SIZE>::u val_t;
+  typedef typename ARCH::bit_t bit_t;
+
+
+  void execute( ARCH& arch ) const
+  {
+    val_t src1 = arch.regread( OP(), gn );
+    val_t src2 = arch.rmread( OP(), rmop );
+    val_t res = src1 + src2
+      + val_t( arch.flagread( CF ? ARCH::FLAG::CF : ARCH::FLAG::OF ) );
+
+    val_t const msbmask( val_t( 1 ) << (atpinfo<ARCH,val_t>::bitsize-1) );
+    val_t msb = (((src1 | src2) & ~res) | (src1 & src2 & res)) & msbmask ;
+    bit_t cf = bit_t( msb == msbmask );
+
+    arch.regwrite( OP(), gn, res );
+    arch.flagwrite( CF ? ARCH::FLAG::CF : ARCH::FLAG::OF, cf );
+  }
 };
 
 template <class ARCH> struct DC<ARCH,ADF> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
@@ -2681,15 +2727,15 @@ template <class ARCH> struct DC<ARCH,ADF> { Operation<ARCH>* get( InputCode<ARCH
   if (auto _ = match( ic, simd66() & opcode( "\x0f\x38\xf6" ) & RM() ))
 
     {
-      if (ic.opsize() == 64) return new Adcx<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
-      else                   return new Adcx<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
+      if (ic.opsize() == 64) return new Adcx<ARCH,GOq,true>( _.opbase(), _.rmop(), _.greg() );
+      else                   return new Adcx<ARCH,GOd,true>( _.opbase(), _.rmop(), _.greg() );
     }
 
   if (auto _ = match( ic, simdF3() & opcode( "\x0f\x38\xf6" ) & RM() ))
 
     {
-      if (ic.opsize() == 64) return new Adox<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
-      else                   return new Adox<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
+      if (ic.opsize() == 64) return new Adcx<ARCH,GOq,false>( _.opbase(), _.rmop(), _.greg() );
+      else                   return new Adcx<ARCH,GOd,false>( _.opbase(), _.rmop(), _.greg() );
     }
 
   return 0;
