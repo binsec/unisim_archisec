@@ -1079,6 +1079,7 @@ namespace binsec {
                             if (shift >= bitsize) { struct Bad {}; throw Bad(); }
 
                             expr = BitFilter::mksimple( src, bitsize, shift, bitsize - shift, bitsize, op == Op::Asr );
+                            continue;
                           }
 
                         auto tp = expr->GetType();

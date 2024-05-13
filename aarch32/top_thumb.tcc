@@ -20917,13 +20917,13 @@ void OpClz<	ARCH>::execute( ARCH & cpu)
 {
 	{
 		typedef typename ARCH::U32 U32;
+		typedef typename ARCH::BOOL BOOL;
 		U32 val = cpu.GetGPR( rm );
-		if (cpu.Test(val == U32(0)))
-		val = U32(32);
-		else
-		val = U32(31) - BitScanReverse( cpu.GetGPR( rm ) );
-
-		cpu.SetGPR( rd, val );
+		BOOL z = val == U32(0);
+		U32 nz_mask = U32(z) - U32(1);
+		U32 res = ~nz_mask & U32(32)
+		| nz_mask & (U32(31) - BitScanReverse( cpu.GetGPR( rm ) ));
+		cpu.SetGPR( rd, res );
 }}
 
 template <	typename	ARCH>
