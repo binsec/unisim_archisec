@@ -24332,8 +24332,8 @@ void OpSmlaxy<	ARCH>::execute( ARCH & cpu)
 		op2 = cpu.GetGPR(ra),
 		res = op1 + op2;
 
-		U32 overflow = ((op1 & op2 & (~res)) | ((~op1) & (~op2) & res)) >> 31;
-		cpu.CPSR().Set( Q, BOOL(overflow | cpu.CPSR().Get( Q )) );
+		U32 overflow = ((op1 & op2 & (~res)) | ((~op1) & (~op2) & res)) & U32(0x80000000);
+		cpu.CPSR().Set( Q, BOOL(overflow != U32(0)) | BOOL(cpu.CPSR().Get( Q )) );
 
 		cpu.SetGPR( rd, res );
 }}
