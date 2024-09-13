@@ -46,21 +46,21 @@ struct Translator
 {
   typedef isa::Decoder Decoder;
   typedef isa::Operation Operation;
-  
+
   typedef unisim::util::symbolic::binsec::ActionNode ActionNode;
-  
+
   Translator( uint64_t _addr, uint32_t _code )
     : coderoot(new ActionNode), addr(_addr), code(_code)
   {}
   ~Translator() { delete coderoot; }
-   
+
   void
   translate( std::ostream& sink )
   {
     sink << "(address . " << unisim::util::symbolic::binsec::dbx(8, addr) << ")\n";
     sink << "(opcode . " << unisim::util::symbolic::binsec::dbx(4, code) << ")\n";
     sink << "(size . 4)\n";
-    
+
     struct Instruction
     {
       Instruction(uint32_t addr, uint32_t code)
@@ -119,11 +119,7 @@ struct Translator
       }
 
     // Translate to DBA
-    unisim::util::symbolic::binsec::Program program;
-    program.Generate( coderoot );
-    typedef unisim::util::symbolic::binsec::Program::const_iterator Iterator;
-    for (Iterator itr = program.begin(), end = program.end(); itr != end; ++itr)
-      sink << "(" << unisim::util::symbolic::binsec::dbx(8, addr) << ',' << std::dec << itr->first << ") " << itr->second << std::endl;
+    coderoot->generate(sink, 8, addr);
   }
 
   ActionNode*          coderoot;

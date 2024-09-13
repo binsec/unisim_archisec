@@ -37,6 +37,7 @@
 
 #include <unisim/component/cxx/processor/arm/isa/decode.hh>
 #include <inttypes.h>
+#include <limits>
 
 namespace unisim {
 namespace component {
@@ -45,6 +46,11 @@ namespace processor {
 namespace arm {
 namespace isa {
 namespace arm64 {
+
+template <typename T> struct Signed {};
+template <> struct Signed<uint16_t> { typedef int16_t T; };
+template <> struct Signed<uint32_t> { typedef int32_t T; };
+template <> struct Signed<uint64_t> { typedef int64_t T; };
 
 struct FPImm
 {
@@ -60,6 +66,23 @@ struct FPImm
     return sign * (fixed / 128);
   }
   operator float () const { return this->toFP<float>(); }
+
+  template <typename T>
+  T toPacked() const
+  {
+    unsigned const N = std::numeric_limits<T>::digits + std::numeric_limits<T>::is_signed;
+    unsigned const E = (N == 16) ? 5 : ((N == 32) ? 8 : 11);
+    unsigned const F = (N - E) - 1;
+    T const EXP_MASK = T(typename Signed<T>::T(T(1) << (N - 1)) >> (E + 1)) ^ (T(1) << (N - 1));
+    T sign = (T(smallfp & 0x80) << (N - 8));
+    T exp = ((typename Signed<T>::T(T(smallfp & 0x70) << (N - 1 - 6)) >> (E - 2)) ^ (T(1) << (N - 2))) & EXP_MASK;
+    T frac = T(smallfp & 0xf) << (F - 4);
+    return sign | exp | frac;
+  }
+
+  uint16_t toPacked16() const { return toPacked<uint16_t>(); }
+  uint32_t toPacked32() const { return toPacked<uint32_t>(); }
+  uint64_t toPacked64() const { return toPacked<uint64_t>(); }
 };
 
 struct DecodeBitMasks

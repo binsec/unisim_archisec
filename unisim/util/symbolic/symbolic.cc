@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017-2023,
+ *  Copyright (c) 2017,
  *  Commissariat a l'Energie Atomique (CEA),
  *  All rights reserved.
  *
@@ -256,7 +256,7 @@ namespace symbolic {
     typedef long double f80_t;
     typedef unisim::util::arithmetic::Integer<4,false> uint128_t;
     typedef unisim::util::arithmetic::Integer<4,true>  int128_t;
-    
+
     static Expr  F32Zero = make_const    <float>(0);
     static Expr  F64Zero = make_const   <double>(0);
     static Expr  F80Zero = make_const    <f80_t>(0);
@@ -317,6 +317,20 @@ namespace symbolic {
     sink << "( " << src << " )";
   }
 
+  void
+  OpaqueNodeBase::Repr( std::ostream& sink ) const
+  {
+    sink << "OpaqueOperation<";
+    GetType().Repr(sink);
+    sink << ">(";
+    for (unsigned idx = 0, end = this->SubCount(); idx < end; ++idx)
+      {
+        sink << (idx ? ", " : "");
+        this->GetSub(idx)->Repr(sink);
+      }
+    sink << ")";
+  }
+
   void FP::DefaultNaNNode::Repr( std::ostream& sink ) const { sink << "DefaultNaN()"; }
   void FP::IsNaNNode::Repr( std::ostream& sink ) const { sink << "IsNaN(" << src << ", " << int(signaling) << ", " << int(quiet) << ")"; }
   void FP::MulAddNode::Repr( std::ostream& sink ) const { sink << "MulAdd( " << acc << ", " << left << ", " << right << " )"; }
@@ -371,7 +385,7 @@ namespace symbolic {
   uint64_t EvalRotateRight( uint64_t v, shift_type s ) { return unisim::util::arithmetic::RotateRight( v, s ); }
 
   uint32_t EvalRotateLeft( uint32_t v, shift_type s ) { return unisim::util::arithmetic::RotateLeft( v, s ); }
-  
+
 } /* end of namespace symbolic */
 } /* end of namespace util */
 } /* end of namespace unisim */

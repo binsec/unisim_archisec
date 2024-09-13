@@ -132,14 +132,55 @@ namespace vector {
 
         if (unsigned src_size = byte->is_source())
           {
-            Expr res = new VTrans<T>(byte->expr(), byte->size(), 0);
+	    if (src_size > bytecount) {
+	      dst = T(new VTrans<T>(byte->expr(), byte->size(), 0));
+	      return;
+	    }
+
+	    if (auto vt = dynamic_cast<VTransBase const*>( byte->get_node() )) {
+	      ExprNode const* target = vt->src.node;
+	      unsigned pos = vt->srcpos;
+	      for (unsigned next = src_size, idx = 1; next < bytecount; ++idx) {
+		// Lookahead for recombination
+		for (;idx < next; ++idx)
+		  if (byte[idx].get_node()) throw CorruptedSource();
+		if (ExprNode const* node = byte[next].get_node()) {
+		  if (auto vti = dynamic_cast<VTransBase const*>( node )) {
+		    if (vti->srcpos == pos + src_size
+			&& target == vti->src.node) {
+		      pos = vti->srcpos;
+		    } else {
+		      target = 0;
+		      break;
+		    }
+		  } else {
+		    target = 0;
+		    break;
+		  }
+		} else
+		  throw CorruptedSource(); // missing value
+		if (unsigned span = byte[next].is_source())
+		  next = next + span;
+		else
+		  throw CorruptedSource();
+	      }
+	      if (target) {
+		if (vt->srcpos != 0
+		    || (vt->srcsize != (pos - vt->srcpos) / src_size) )
+		  target = new VTrans<T>(target, vt->srcsize, vt->srcpos);
+		dst = T(target);
+		return;
+	      }
+	    }
+
+            Expr res = byte[0].expr();
             for (unsigned next = src_size, idx = 1; next < bytecount; ++idx)
               {
                 // Requested read is a concatenation of multiple source values
                 for (;idx < next; ++idx)
                   if (byte[idx].get_node()) throw CorruptedSource();
                 if (ExprNode const* node = byte[next].get_node())
-                  res = new VMix( new VTrans<T>(byte[next].expr(), byte[next].size(), -int(next)), res );
+                  res = new VMix( byte[next].expr(), res );
                 else
                   throw CorruptedSource(); // missing value
                 if (unsigned span = byte[next].is_source())

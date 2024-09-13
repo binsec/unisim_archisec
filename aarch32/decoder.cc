@@ -178,7 +178,6 @@ struct Processor
 
     typedef unisim::util::arithmetic::BitField<28,4> NZCVRF; /* Grouped Integer Condition Flags */
 
-
     typedef unisim::util::arithmetic::BitField<24,1> JRF; /* Jazelle execution state bit */
     typedef unisim::util::arithmetic::BitField< 9,1> ERF; /* Endianness execution state */
     typedef unisim::util::arithmetic::BitField< 5,1> TRF; /* Thumb execution state bit */
@@ -477,6 +476,8 @@ public:
 
   U32  GetCPSR()                                 { return cpsr.GetBits(); }
   void SetCPSR( U32 const& bits, uint32_t mask ) { cpsr.SetBits( bits, mask ); }
+
+  void SetQC() {}
 
   U32& SPSR() { throw Unimplemented(); static U32 spsr_dummy; return spsr_dummy; }
 
@@ -1006,7 +1007,7 @@ public:
     }
 
     void Repr(std::ostream& sink) const { sink << c_str(); }
-    
+
     Flag() : code(end) {}
     Flag( Code _code ) : code(_code) {}
     Flag( char const* _code ) : code(end) { init( _code ); }
@@ -1118,12 +1119,19 @@ void UpdateStatusSubWithBorrow( Processor& state, Processor::U32 const& res, Pro
 {
   typedef Processor::S32 S32;
   typedef Processor::U32 U32;
-  typedef Processor::BOOL BOOL;
-  BOOL neg = S32(res) < S32(0);
+  Processor::BOOL neg = S32(res) < S32(0);
   state.cpsr.n = neg.expr;
   state.cpsr.z = ( res == U32(0) ).expr;
-  state.cpsr.c = (( lhs > rhs ) or (!BOOL(borrow) and ( lhs == rhs ))).expr;
-  state.cpsr.v = ( neg xor ((S32(lhs) <  S32(rhs)) or (BOOL(borrow) and ( lhs == rhs ))) ).expr;
+  if (state.Test(borrow != U32(0)))
+    {
+      state.cpsr.c = ( lhs >  rhs ).expr;
+      state.cpsr.v = ( neg xor (S32(lhs) <= S32(rhs)) ).expr;
+    }
+  else
+    {
+      state.cpsr.c = ( lhs >= rhs ).expr;
+      state.cpsr.v = ( neg xor (S32(lhs) <  S32(rhs)) ).expr;
+    }
 }
 
 void UpdateStatusAdd( Processor& state, Processor::U32 const& res, Processor::U32 const& lhs, Processor::U32 const& rhs )
@@ -1141,15 +1149,20 @@ void UpdateStatusAddWithCarry( Processor& state, Processor::U32 const& res, Proc
 {
   typedef Processor::S32 S32;
   typedef Processor::U32 U32;
-  typedef Processor::BOOL BOOL;
-  BOOL neg = S32(res) < S32(0);
+  Processor::BOOL neg = S32(res) < S32(0);
   state.cpsr.n = neg.expr;
   state.cpsr.z = ( res == U32(0) ).expr;
-  state.cpsr.c = (( lhs >  ~rhs ) or (BOOL(carry) and ( lhs == ~rhs ))).expr;
-  state.cpsr.v =
-    ( neg xor ((S32(lhs) < S32(~rhs)) or (!BOOL(carry) and ( lhs == ~rhs))) ).expr;
+  if (state.Test(carry != U32(0)))
+    {
+      state.cpsr.c = ( lhs >= ~rhs ).expr;
+      state.cpsr.v = ( neg xor (S32(lhs) <  S32(~rhs)) ).expr;
+    }
+  else
+    {
+      state.cpsr.c = ( lhs >  ~rhs ).expr;
+      state.cpsr.v = ( neg xor (S32(lhs) <= S32(~rhs)) ).expr;
+    }
 }
-
 
 struct ARMISA : public unisim::component::cxx::processor::arm::isa::arm32::Decoder<Processor>
 {
@@ -1282,11 +1295,7 @@ namespace
         }
 
       // Translate to DBA
-      unisim::util::symbolic::binsec::Program program;
-      program.Generate( coderoot );
-      typedef unisim::util::symbolic::binsec::Program::const_iterator Iterator;
-      for (Iterator itr = program.begin(), end = program.end(); itr != end; ++itr)
-        sink << "(" << unisim::util::symbolic::binsec::dbx(4, addr) << ',' << std::dec << itr->first << ") " << itr->second << std::endl;
+      coderoot->generate(sink, 4, addr);
     }
 
     StatusRegister const& status;
@@ -1299,7 +1308,7 @@ void
 Decoder::process( std::ostream& sink, uint32_t addr, uint32_t code )
 {
   Translator actset( *this, addr, code );
-  
+
   actset.translate( sink );
 }
 
@@ -1467,7 +1476,6 @@ Processor::CP15GetRegister( uint8_t crn, uint8_t opcode1, uint8_t crm, uint8_t o
         } x;
         return &x;
       } break;
-
 
       /*********************************
        * Memory system fault registers *

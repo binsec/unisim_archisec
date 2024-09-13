@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017-2023,
+ *  Copyright (c) 2017,
  *  Commissariat a l'Energie Atomique (CEA),
  *  All rights reserved.
  *
@@ -40,6 +40,7 @@
 #include <unisim/util/identifier/identifier.hh>
 #include <stdexcept>
 #include <map>
+#include <set>
 #include <limits>
 #include <typeinfo>
 #include <cstring>
@@ -152,8 +153,6 @@ namespace symbolic {
     virtual void Repr( std::ostream& sink ) const override;
     virtual ValueType GetType() const override { return type; }
     virtual int cmp( ExprNode const& rhs ) const override { return 0; }
-    // virtual int cmp( ExprNode const& rhs ) const override { return compare(dunamic_cast<Zero const&>(rhs)); }
-    // int compare(Zero const& rhs) const { if (int delta = int(is_signed) - rhs.is_signed) return delta; return int(bitsize) - int (rhs.bitsize); }
     ValueType type;
   };
 
@@ -170,7 +169,7 @@ namespace symbolic {
         BSwp, BSR, BSF, POPCNT, Not, Neg,
         FCmp, FSQB, FFZ, FNeg, FSqrt, FAbs, FDen, FMod, FPow,
         FCeil, FFloor, FTrunc, FRound, FNear, FMax, FMin,
-        Cast, ReinterpretAs,
+        Cast, ReinterpretAs, Opaque,
         end
       } code;
 
@@ -226,13 +225,14 @@ namespace symbolic {
         case   FMod: return "FMod";
         case   FPow: return "FPow";
         case FFloor: return "FFloor";
-        case FCeil:  return "FCeil";
+        case  FCeil: return "FCeil";
         case FRound: return "FRound";
         case FTrunc: return "FTrunc";
         case  FNear: return "FNear";
-        case  FMax: return "FMax";
-        case  FMin: return "FMin";
+        case   FMax: return "FMax";
+        case   FMin: return "FMin";
         case   Cast: return "Cast";
+        case Opaque: return "Opaque";
         case ReinterpretAs: return "ReinterpretAs";
         case    end: break;
         }
@@ -346,7 +346,7 @@ namespace symbolic {
   {
     if (CELLCOUNT & 1)
       res.cells[CELLCOUNT-1] = cst->GetBits(CELLCOUNT/2);
-    
+
     for (unsigned idx = CELLCOUNT/2; idx-- > 0;)
       {
         uint64_t bits = cst->GetBits(idx);
@@ -363,7 +363,7 @@ namespace symbolic {
     virtual ~Evaluator() {}
     virtual ConstNodeBase const* Simplify(unsigned, Expr&) const;
   };
-  
+
   struct Expr
   {
     Expr() : node() {} ExprNode const* node;
@@ -456,8 +456,10 @@ namespace symbolic {
         case Op::FCmp:
           return CValueType(int32_t());
 
-        case Op::Cast: /* Should have been handled elsewhere */
-        case Op::end:   throw std::logic_error("???");
+        case Op::Opaque: case Op::Cast:
+           /* Should have been handled in derived type */
+        case Op::end:
+          throw std::logic_error("???");
         }
       return NoValueType();
     }
@@ -526,6 +528,7 @@ namespace symbolic {
         case Op::Rol:    return new this_type( EvalRotateLeft( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
         case Op::ReinterpretAs: return new this_type( EvalReinterpretAs( value, args[1] ) );
 
+        case Op::Opaque: break;
         case Op::FSQB:   break;
         case Op::FFZ:    break;
         case Op::FNeg:   break;
@@ -557,8 +560,11 @@ namespace symbolic {
     long double GetFloat( long double ) const override { typedef long double long_double; return long_double(value); }
     uint64_t GetBits(unsigned idx) const override
     {
+      /* Return bits of infinitely precise encoding. */
       if (std::is_floating_point<VALUE_TYPE>::value)
         {
+          struct Bad {};
+          throw Bad();
           return 0;
         }
       else if (idx == 0)
@@ -621,6 +627,57 @@ namespace symbolic {
 
     Expr subs[SUBCOUNT];
   };
+
+  struct OpaqueNodeBase : public OpNodeBase
+  {
+    OpaqueNodeBase() : OpNodeBase( Op::Opaque ) {}
+    virtual void Repr( std::ostream& sink ) const override;
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<OpaqueNodeBase const&>( rhs ) ); }
+    int compare( OpaqueNodeBase const& rhs ) const { return 0; }
+  };
+
+  template <typename T, unsigned SUBCOUNT>
+  struct OpaqueNode : public OpaqueNodeBase
+  {
+    typedef OpaqueNode<T, SUBCOUNT> this_type;
+
+    virtual unsigned SubCount() const override { return SUBCOUNT; };
+    virtual Expr const& GetSub(unsigned idx) const override { if (idx < SUBCOUNT) { return subs[idx]; } return ExprNode::GetSub(idx); }
+    virtual this_type* Mutate() const override { return new this_type( *this ); }
+    virtual ValueType GetType() const override { return CValueType(T()); }
+
+    Expr subs[SUBCOUNT];
+  };
+
+  /* 1 operand opaque operation */
+  template <typename VALUE_TYPE>
+  Expr make_opaque_operation( VALUE_TYPE, Expr const& op0 )
+  {
+    typedef OpaqueNode<VALUE_TYPE,1> result_type;
+    result_type* result = new result_type;
+    result->subs[0] = op0;
+    return result;
+  }
+
+  /* 2 operands opaque operation */
+  template <typename VALUE_TYPE>
+  Expr make_opaque_operation( VALUE_TYPE, Expr const& op0, Expr const& op1 )
+  {
+    typedef OpaqueNode<VALUE_TYPE,2> result_type;
+    result_type* result = new result_type;
+    result->subs[0] = op0; result->subs[1] = op1;
+    return result;
+  }
+
+  /* 3 operands opaque operation */
+  template <typename VALUE_TYPE>
+  Expr make_opaque_operation( VALUE_TYPE, Expr const& op0, Expr const& op1, Expr const& op2 )
+  {
+    typedef OpaqueNode<VALUE_TYPE,3> result_type;
+    result_type* result = new result_type;
+    result->subs[0] = op0; result->subs[1] = op1; result->subs[2] = op2;
+    return result;
+  }
 
   struct CastNodeBase : public OpNodeBase
   {
@@ -722,6 +779,10 @@ namespace symbolic {
     this_type operator << ( SmartValue<SHT> const& sh ) const { return this_type( make_operation( "Lsl", expr, SmartValue<shift_type>(sh).expr ) ); }
     template <typename SHT>
     this_type operator >> ( SmartValue<SHT> const& sh ) const {return this_type( make_operation( is_signed?"Asr":"Lsr", expr, SmartValue<shift_type>(sh).expr ) ); }
+    template <typename SHT>
+    this_type& operator <<= ( SmartValue<SHT> const& sh ) { expr = make_operation( "Lsl", expr, SmartValue<shift_type>(sh).expr ); return *this; }
+    template <typename SHT>
+    this_type& operator >>= ( SmartValue<SHT> const& sh ) { expr = make_operation( is_signed?"Asr":"Lsr", expr, SmartValue<shift_type>(sh).expr ); return *this; }
 
     this_type operator - () const { return this_type( make_operation( "Neg", expr ) ); }
     this_type operator ~ () const { return this_type( make_operation( "Not", expr ) ); }
@@ -796,6 +857,7 @@ namespace symbolic {
   FTP fmodulo( FTP const& left, FTP const& right ) { return FTP( make_operation( "FMod", left.expr, right.expr ) ); }
 
   template <typename FTP>  FTP fabs( FTP const& value ) { return FTP( make_operation( "FAbs", value.expr ) ); }
+  template <typename FTP>  FTP FAbs( FTP const& value ) { return fabs<FTP>( value ); }
   template <typename FTP>  FTP ceil( FTP const& value ) { return FTP( make_operation( "FCeil", value.expr ) ); }
   template <typename FTP>  FTP floor( FTP const& value ) { return FTP( make_operation( "FFloor", value.expr ) ); }
   template <typename FTP>  FTP trunc( FTP const& value ) { return FTP( make_operation( "FTrunc", value.expr ) ); }
@@ -804,6 +866,7 @@ namespace symbolic {
   template <typename FTP>  FTP sqrt( FTP const& value ) { return FTP( make_operation( "FSqrt", value.expr ) ); }
   template <typename FTP>  FTP fmin( FTP const& l, FTP const& r ) { return FTP( make_operation( "FMin", l.expr, r.expr ) ); }
   template <typename FTP>  FTP fmax( FTP const& l, FTP const& r ) { return FTP( make_operation( "FMax", l.expr, r.expr ) ); }
+  template <typename FTP>  FTP FMax( FTP const& l, FTP const& r ) { return fmax<FTP>( l, r ); }
 
   struct FP
   {
@@ -1035,6 +1098,8 @@ namespace symbolic {
     return SmartValue<bool>( Expr( new FP::IsNaNNode( op.expr, true, true ) ) );
   }
 
+  template <typename FTP> SmartValue<bool> IsNaN( FTP const& value ) { return isnan<FTP>( value ); }
+
   template <typename FTP>
   SmartValue<bool> issignaling( FTP const& op )
   {
@@ -1077,11 +1142,15 @@ namespace symbolic {
   template <class T>
   struct Conditional : public Choice<T>
   {
-    Conditional() : Choice<T>(), cond() {}
+    Conditional() : Choice<T>(), cond(), updates() {}
 
     bool  proceed( Expr const& _cond );
+    void  add_update( Expr expr ) { expr.ConstSimplify(); updates.insert( expr ); }
+    void  factorize();
+    bool  merge(int, Expr const&, Expr const&) { return false; }
 
     Expr  cond;
+    std::set<Expr> updates;
   };
 
   template <class T>
@@ -1094,21 +1163,42 @@ namespace symbolic {
     return Choice<T>::proceed();
   }
 
-  template <class PoolT, typename Merger>
+  template <class T>
   void
-  factorize( PoolT& dst, PoolT& lho, PoolT& rho, Merger merger )
+  Conditional<T>::factorize()
   {
-    for (typename PoolT::iterator lhi = lho.begin(), rhi = rho.begin(), lie = lho.end(), rie = rho.end(); lhi != lie and rhi != rie; )
+    T* self = static_cast<T*>(this);
+    std::set<Expr>::iterator
+      lhi = self->nexts[0]->updates.begin(),
+      lhe = self->nexts[0]->updates.end(),
+      rhi = self->nexts[1]->updates.begin(),
+      rhe = self->nexts[1]->updates.end();
+
+    for (;;)
       {
-        if (lho.value_comp()(*lhi, *rhi))
-          ++lhi;
-        else if (lho.value_comp()(*rhi, *lhi))
-          ++rhi;
+        bool lstop = lhi == lhe;
+        bool rstop = rhi == rhe;
+        if (lstop and rstop)
+          break;
+
+        if (int delta = rstop ? -1 : lstop ? +1 : lhi->compare(*rhi))
+          {
+            if (self->merge(delta, lstop ? Expr() : *lhi, rstop ? Expr() : *rhi))
+              {
+                if (delta <= 0) self->nexts[0]->updates.erase( lhi++ );
+                if (delta >= 0) self->nexts[1]->updates.erase( rhi++ );
+              }
+            else
+              {
+                if (delta < 0) ++lhi;
+                else           ++rhi;
+              }
+          }
         else
           {
-            merger( dst, *lhi, *rhi );
-            lho.erase( lhi++ );
-            rho.erase( rhi++ );
+            self->updates.insert( *lhi );
+            self->nexts[0]->updates.erase( lhi++ );
+            self->nexts[1]->updates.erase( rhi++ );
           }
       }
   }

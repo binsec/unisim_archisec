@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017-2023,
+ *  Copyright (c) 2017,
  *  Commissariat a l'Energie Atomique (CEA),
  *  All rights reserved.
  *
@@ -31,196 +31,74 @@
  *
  * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
  */
- 
+
 #ifndef __UNISIM_UTIL_SYMBOLIC_BINSEC_BINSEC_HH__
 #define __UNISIM_UTIL_SYMBOLIC_BINSEC_BINSEC_HH__
 
-#include <unisim/util/symbolic/vector/vector.hh>
 #include <unisim/util/symbolic/symbolic.hh>
 #include <iostream>
 #include <map>
 #include <set>
-#include <vector>
 
 namespace unisim {
 namespace util {
 namespace symbolic {
-
-  struct Unimplemented {};
-
-  template <typename VALUE_TYPE>
-  struct FpSmartValue : SmartValue<VALUE_TYPE>
-  {
-
-    typedef VALUE_TYPE value_type;
-    typedef SmartValue<value_type> this_type;
-    static ValueType const* GetType() { return CValueType(value_type()); }
-
-    Expr expr;
-
-    FpSmartValue() : SmartValue<value_type>() {}
-
-    FpSmartValue( Expr const& _expr ) : SmartValue<value_type>( _expr ) {}
-
-    explicit FpSmartValue( value_type value ) :
-      FpSmartValue( make_const( value ) ) {}
-
-    template <typename SRC_VALUE_TYPE>
-    explicit FpSmartValue( SmartValue<SRC_VALUE_TYPE> const& other )
-    {
-      if (CmpTypes<SRC_VALUE_TYPE,VALUE_TYPE>::same) {
-        expr = other.expr;
-      } else {
-        expr = new CastNode<VALUE_TYPE,SRC_VALUE_TYPE>( other.expr );
-        expr.ConstSimplify();
-      }
-    }
-
-    static bool const is_signed = std::numeric_limits<value_type>::is_signed;
-
-    this_type& operator = ( this_type const& other ) { expr = other.expr; return *this; }
-
-    template <typename SHT>
-    this_type operator << ( SHT sh ) const { throw Unimplemented(); return FpSmartValue(); }
-    template <typename SHT>
-    this_type operator >> ( SHT sh ) const { throw Unimplemented(); return FpSmartValue(); }
-    template <typename SHT>
-    this_type& operator <<= ( SHT sh ) { throw Unimplemented(); return *this; }
-    template <typename SHT>
-    this_type& operator >>= ( SHT sh ) { throw Unimplemented(); return *this; }
-
-    template <typename SHT>
-    this_type operator << ( SmartValue<SHT> const& sh ) const { throw Unimplemented(); return FpSmartValue(); }
-    template <typename SHT>
-    this_type operator >> ( SmartValue<SHT> const& sh ) const { throw Unimplemented(); return FpSmartValue(); }
-
-    this_type operator - () const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator ~ () const { throw Unimplemented(); return FpSmartValue(); }
-
-    this_type& operator += ( this_type const& other ) { throw Unimplemented(); return *this; }
-    this_type& operator -= ( this_type const& other ) { throw Unimplemented(); return *this; }
-    this_type& operator *= ( this_type const& other ) { throw Unimplemented(); return *this; }
-    this_type& operator /= ( this_type const& other ) { throw Unimplemented(); return *this; }
-    this_type& operator %= ( this_type const& other ) { throw Unimplemented(); return *this; }
-    this_type& operator ^= ( this_type const& other ) { throw Unimplemented(); return *this; }
-    this_type& operator &= ( this_type const& other ) { throw Unimplemented(); return *this; }
-    this_type& operator |= ( this_type const& other ) { throw Unimplemented(); return *this; }
-
-    this_type operator + ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator - ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator * ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator / ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator % ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator ^ ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator & ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-    this_type operator | ( this_type const& other ) const { throw Unimplemented(); return FpSmartValue(); }
-
-    SmartValue<bool> operator == ( this_type const& other ) const { return SmartValue<bool>( make_operation( "Teq", expr, other.expr ) ); }
-    SmartValue<bool> operator != ( this_type const& other ) const { return SmartValue<bool>( make_operation( "Tne", expr, other.expr ) ); }
-    SmartValue<bool> operator <= ( this_type const& other ) const { throw Unimplemented(); return SmartValue<bool>(); }
-    SmartValue<bool> operator >= ( this_type const& other ) const { throw Unimplemented(); return SmartValue<bool>(); }
-    SmartValue<bool> operator < ( this_type const& other ) const  { throw Unimplemented(); return SmartValue<bool>(); }
-    SmartValue<bool> operator > ( this_type const& other ) const  { throw Unimplemented(); return SmartValue<bool>(); }
-
-  };
-
 namespace binsec {
-  
-  typedef FpSmartValue<double> F64;
-  typedef FpSmartValue<float>  F32;
-  typedef SmartValue<bool>     BOOL;
-  typedef SmartValue<uint8_t>  U8;
-  typedef SmartValue<uint16_t> U16;
-  typedef SmartValue<uint32_t> U32;
-  typedef SmartValue<uint64_t> U64;
-  typedef SmartValue<int8_t>   S8;
-  typedef SmartValue<int16_t>  S16;
-  typedef SmartValue<int32_t>  S32;
-  typedef SmartValue<int64_t>  S64;
+
+  typedef SmartValue<shift_type> USH;
+  typedef SmartValue<uint8_t>    U8;
+  typedef SmartValue<uint16_t>   U16;
+  typedef SmartValue<uint32_t>   U32;
+  typedef SmartValue<uint64_t>   U64;
 
   struct dbx
   {
     dbx( unsigned _bytes, uint64_t _value ) : value(_value << (64 - 8 * _bytes) >> (64 - 8 * _bytes)), bytes(_bytes) {} uint64_t value; unsigned bytes;
     friend std::ostream& operator << ( std::ostream& sink, dbx const& _ );
   };
-  
+
   struct ActionNode : public Conditional<ActionNode>
   {
-    ActionNode() : Conditional<ActionNode>(), sinks(), sestats() {}
+    ActionNode() : Conditional<ActionNode>(), sestats() {}
 
-    void                    add_sink( Expr expr ) { /*expr.ConstSimplify();*/ sinks.insert( expr ); }
+    void                    add_sink( Expr expr ) { updates.insert( expr ); }
     void                    simplify();
+    bool                    merge( int& cmp, Expr const& t, Expr const& f );
     void                    commit_stats();
     std::map<Expr,unsigned> const& get_sestats() const { return sestats; }
-    std::set<Expr> const& get_sinks() const { return sinks; }
+    std::set<Expr> const&   get_sinks() const { return updates; }
+    void                    generate(std::ostream& sink, unsigned bytes, uint64_t address) const;
 
   private:
-    std::set<Expr>          sinks;
     std::map<Expr,unsigned> sestats;
   };
 
-  struct Program : public std::map<int,std::string>
+  struct Instruction;
+
+  struct Point
   {
-    typedef std::map<int,std::string> MapType;
-    typedef MapType::iterator iterator;
-    typedef MapType::const_iterator const_iterator;
-    
-    Program() : insn_count(0) {}
-    
-    void        Generate( ActionNode const* action_tree );
-    
-    int         next_insn() const { return insn_count; }
-    int         allocate() { return insn_count++; }
-    iterator    write(int idx, std::string const& s)
-    {
-      iterator itr = lower_bound(idx);
-      if (itr != end() and itr->first == idx)
-        throw std::runtime_error("overwriting statement");
-      return insert( itr, std::make_pair(idx,s) );
-    }
-    
-    int insn_count;
+    Point(Instruction* _insn) : insn(_insn) {}
+    Point(Point const&) = default;
+    Point& operator = (Point const&) = default;
+
+    void connect( Point const& point );
+    Point& append( Instruction* nins ) { Point np(nins); this->connect(np); return *this = np; }
+    Point& prepend( Instruction* nins ) { Point np(nins); np.connect(*this); return *this = np; }
+
+    Instruction* operator -> () const { return insn; }
+    Instruction* get() const { return insn; }
+
+    Instruction* insn;
   };
-  
-  struct Label
-  {
-    Label( Program& _program ) : program(_program), id(-1) {}
-    
-    Label& operator= (Label const& l)
-    {
-      if (&program != &l.program) throw std::runtime_error("label programs must aggree");
-      id = l.id;
-      return *this;
-    }
-    
-    int allocate() { return (id = program.allocate()); }
-    
-    bool valid() const { return id >= 0; }
-    
-    static bool subst_next( std::string& s, int next );
-    
-    int write( std::string const& src )
-    {
-      Program::iterator insn = program.write( id, src );
-      if (subst_next(insn->second, program.next_insn()))
-        id = program.allocate();
-      return insn->first;
-    }
-    
-    int GetID() const { return id; }
-    
-  private:
-    Program& program;
-    int id;
-  };
-  
+
   typedef std::map<Expr,std::pair<std::string,int>> Variables;
-  
+
   struct ASExprNode : public ExprNode
   {
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const = 0;
     virtual ConstNodeBase const* Simplify( Expr const& mask, Expr& expr ) const;
-    static  int GenerateCode( Expr const& expr, Variables& vars, Label& label, std::ostream& sink );
+    virtual int GenCode( std::ostream& sink, Variables& vars, Point& head ) const = 0;
+    static  int GenerateCode( Expr const& expr, std::ostream& sink, Variables& vars, Point& head );
+    static  int GenConstCode( ConstNodeBase const* node, std::ostream& sink );
   };
 
   struct BitFilter : public ASExprNode
@@ -229,7 +107,7 @@ namespace binsec {
 
     virtual BitFilter* Mutate() const override { return new BitFilter( *this ); }
     virtual ValueType GetType() const { return ValueType(extend == 1 ? ValueType::BOOL : ValueType::UNSIGNED, extend); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
+    virtual int GenCode( std::ostream& sink, Variables& vars, Point& head ) const override;
     virtual void Repr( std::ostream& sink ) const;
     virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<BitFilter const&>( rhs ) ); }
     int compare( BitFilter const& rhs ) const;
@@ -268,7 +146,7 @@ namespace binsec {
     int compare(BitInsertNode const& rhs) const { if (int delta = int(size) - int(rhs.size)) return delta; return int(pos) - int(rhs.pos); }
     ExprNode* Mutate() const { return new BitInsertNode(*this); }
     ValueType GetType() const override { return dst->GetType(); }
-    int GenCode(Label&, Variables&, std::ostream&) const override;
+    int GenCode(std::ostream&, Variables&, Point&) const override;
     ConstNodeBase const* Simplify( Expr const&, Expr& ) const override;
 
     friend class BitSimplify;
@@ -288,27 +166,24 @@ namespace binsec {
 
   struct GetCode
   {
-    GetCode(Expr const& _expr, Variables& _vars, Label& _label)
-      : expr(_expr), vars(_vars), label(_label), expected(-1)
+    GetCode(Expr const& _expr, Variables& _vars, Point& _head, int _expected=-1)
+      : expr(_expr), vars(_vars), head(_head), expected(-1)
     {}
-    GetCode(Expr const& _expr, Variables& _vars, Label& _label, int _expected)
-      : expr(_expr), vars(_vars), label(_label), expected(_expected)
-    {}
-    
+
     friend std::ostream& operator << ( std::ostream& sink, GetCode const& gc )
     {
-      int size = ASExprNode::GenerateCode( gc.expr, gc.vars, gc.label, sink );
+      int size = ASExprNode::GenerateCode( gc.expr, sink, gc.vars, gc.head );
       if (gc.expected >= 0 and gc.expected != size) { struct TypeSizeMisMatch {}; throw TypeSizeMisMatch(); }
       return sink;
     }
-    Expr const& expr; Variables& vars; Label& label;
-    int expected;
+
+    Expr const& expr; Variables& vars; Point& head; int expected;
   };
 
   struct RegReadBase : public ASExprNode
   {
     virtual void GetRegName( std::ostream& ) const = 0;
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const;
+    virtual int GenCode( std::ostream& sink, Variables& vars, Point& head ) const;
     virtual void Repr( std::ostream& sink ) const;
     virtual unsigned SubCount() const { return 0; }
     virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegReadBase const&>( rhs ) ); }
@@ -333,32 +208,36 @@ namespace binsec {
   struct Assignment : public ExprNode
   {
     Assignment( Expr const& _value ) : value(_value) {}
-    
-    virtual ValueType GetType() const { return NoValueType(); }
-    virtual unsigned SubCount() const { return 1; }
-    virtual Expr const& GetSub(unsigned idx) const { if (idx != 0) return ExprNode::GetSub(idx); return value; }
-    
+
+    virtual ValueType GetType() const override { return NoValueType(); }
+    virtual unsigned SubCount() const override { return 1; }
+    virtual Expr const& GetSub(unsigned idx) const override { if (idx != 0) return ExprNode::GetSub(idx); return value; }
+    virtual void GenerateCode( std::ostream& sink, Variables& vars ) const = 0;
+    virtual Expr SourceRead() const = 0;
+    static int GenInputCode( Expr const& input, Variables& vars, std::ostream& sink );
+
     Expr value;
   };
-  
+
   struct RegWriteBase : public Assignment
   {
-    RegWriteBase( Expr const& _value, int _size ) : Assignment(_value), size(_size), rbase(0), rsize(_size) {}
-    RegWriteBase( Expr const& _value, int _size, int _rbase, int _rsize ) : Assignment(_value), size(_size), rbase(_rbase), rsize(_rsize) {}
-    
+    RegWriteBase( Expr const& _value, int _size ) : Assignment(_value), reg_size(_size), slice_base(0), slice_size(_size) {}
+    RegWriteBase( Expr const& _value, int _size, int _slice_base, int _slice_size ) : Assignment(_value), reg_size(_size), slice_base(_slice_base), slice_size(_slice_size) {}
+
     virtual void GetRegName( std::ostream& ) const = 0;
-    
-    int GenerateCode( Label& label, Variables& vars, std::ostream& sink ) const;
-    virtual void Repr( std::ostream& sink ) const;
+
+    virtual void GenerateCode( std::ostream& sink, Variables& vars ) const override;
+    virtual void Repr( std::ostream& sink ) const override;
     virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWriteBase const&>( rhs ) ); }
+    Expr source_read( RegReadBase* reg_read ) const;
     int compare( RegWriteBase const& rhs ) const
     {
-      if (int delta = size - rhs.size) return delta;
-      if (int delta = rbase - rhs.rbase) return delta;
-      return rsize - rhs.rsize;
+      if (int delta = reg_size - rhs.reg_size) return delta;
+      if (int delta = slice_base - rhs.slice_base) return delta;
+      return slice_size - rhs.slice_size;
     }
-    
-    int size, rbase, rsize;
+
+    int reg_size, slice_base, slice_size;
   };
 
   template <typename RID>
@@ -367,10 +246,11 @@ namespace binsec {
     typedef RegWrite<RID> this_type;
     typedef RegWriteBase Super;
     RegWrite( RID _id, Expr const& _value ) : Super(_value, TypeInfo<typename RID::value_type>::BITSIZE), id(_id) {}
-    RegWrite( RID _id, int rbase, int rsize, Expr const& _value ) : Super(_value, RID::GetType().bitsize, rbase, rsize), id(_id) {}
+    RegWrite( RID _id, int slice_base, int slice_size, Expr const& _value ) : Super(_value, RID::GetType().bitsize, slice_base, slice_size), id(_id) {}
     virtual this_type* Mutate() const override { return new this_type( *this ); }
     virtual void GetRegName( std::ostream& sink ) const override { id.Repr(sink); }
     virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegWrite const&>( rhs ) ); }
+    virtual Expr SourceRead() const override { return source_read(new RegRead<RID>(id)); }
     int compare( RegWrite const& rhs ) const { if (int delta = id.cmp( rhs.id )) return delta; return Super::compare( rhs ); }
 
     RID id;
@@ -382,7 +262,9 @@ namespace binsec {
     virtual Branch* Mutate() const override { return new Branch( *this ); }
     virtual void annotate(std::ostream& sink) const {};
     virtual int cmp( ExprNode const& rhs ) const override { return 0; }
-    virtual void Repr( std::ostream& sink ) const;
+    virtual void Repr( std::ostream& sink ) const override;
+    virtual void GenerateCode( std::ostream& sink, Variables& vars ) const override;
+    virtual Expr SourceRead() const override { return Expr(); }
   };
 
   template <typename T>
@@ -428,12 +310,12 @@ namespace binsec {
       sink << ")";
     }
   };
-  
+
   struct AssertFalse : public ASExprNode
   {
     AssertFalse() {}
     virtual AssertFalse* Mutate() const override { return new AssertFalse( *this ); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const override
+    virtual int GenCode( std::ostream& sink, Variables& vars, Point& head ) const override
     {
       sink << "assert (false)";
       return 0;
@@ -445,62 +327,64 @@ namespace binsec {
     virtual void Repr( std::ostream& sink ) const override { sink << "assert (false)"; }
   };
 
-  struct MemAccess : public ASExprNode
+  struct MemAccess
   {
     MemAccess(Expr const& _addr, unsigned _size, unsigned _alignment, bool _bigendian)
       : addr(_addr), lastbyte(_size-1), alignment(_alignment), bigendian(_bigendian)
     {}
-    unsigned bytecount() const { return lastbyte+1; }
+    int bytecount() const { return lastbyte+1; }
     virtual void Repr( std::ostream& sink ) const;
-    int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<MemAccess const&>( rhs ) ); }
     int compare( MemAccess const& rhs ) const
     {
       if (int delta = int(lastbyte) - int(rhs.lastbyte)) return delta;
       if (int delta = int(alignment) - int(rhs.alignment)) return delta;
       return (int(bigendian) - int(rhs.bigendian));
     }
-    
+
     Expr addr;
     uint32_t lastbyte  : 16; // size in bytes [1,..;65536]
     uint32_t alignment :  4; // (log2) [1,2,4,8,...,32768] bytes
     uint32_t bigendian :  1; // 0=little-endian
     uint32_t reserved  : 11; // reserved
   };
-    
-  struct Load : public MemAccess
+
+  struct Load : public MemAccess, ASExprNode
   {
     Load( Expr const& _addr, unsigned _size, unsigned _alignment, bool _bigendian )
       : MemAccess(_addr, _size, _alignment, _bigendian)
     {}
+    Load(MemAccess const& ma) : MemAccess(ma) {}
+
+    int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<MemAccess const&>( rhs ) ); }
     virtual Load* Mutate() const override { return new Load(*this); }
     virtual ValueType GetType() const override { return CValueType(ValueType::UNSIGNED, 8*bytecount()); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const override;
+    virtual int GenCode( std::ostream& sink, Variables& vars, Point& head ) const override;
     virtual void Repr( std::ostream& sink ) const override { MemAccess::Repr(sink); }
     virtual unsigned SubCount() const override { return 1; }
     virtual Expr const& GetSub(unsigned idx) const override { if (idx != 0) return ExprNode::GetSub(idx); return addr; }
   };
 
-  struct Store : public MemAccess
+  struct Store : public MemAccess, Assignment
   {
     Store( Expr const& _addr, Expr const& _value, unsigned _size, unsigned _alignment, bool _bigendian )
-      : MemAccess(_addr, _size, _alignment, _bigendian), value(_value)
+      : MemAccess(_addr, _size, _alignment, _bigendian), Assignment(_value)
     {}
+    int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<MemAccess const&>( rhs ) ); }
     virtual ValueType GetType() const override { return NoValueType(); }
     virtual Store* Mutate() const override { return new Store(*this); }
-    virtual int GenCode( Label& label, Variables& vars, std::ostream& sink ) const override;
     virtual void Repr( std::ostream& sink ) const override;
     virtual unsigned SubCount() const override { return 2; }
-    virtual Expr const& GetSub(unsigned idx) const override { switch (idx) { case 0: return addr; case 1: return value; } return ExprNode::GetSub(idx); }
-      
-    Expr value;
+    virtual Expr const& GetSub(unsigned idx) const override { switch (idx) { case 0: return value; case 1: return addr; } return ExprNode::GetSub(idx); }
+    virtual Expr SourceRead() const override { return new Load( *this ); }
+    virtual void GenerateCode( std::ostream& sink, Variables& vars ) const override;
   };
-    
+
   struct UndefinedValueBase : public ASExprNode
   {
-    UndefinedValueBase() {}
+    virtual unsigned SubCount() const override { return 0; };
     virtual void Repr( std::ostream& sink ) const override;
-    virtual int cmp( ExprNode const& rhs ) const override { return 0; }
-    virtual int GenCode(Label&, Variables&, std::ostream& sink) const;
+    virtual int cmp( ExprNode const& rhs ) const override { return this > &rhs ? +1 : this < &rhs ? -1 : 0; }
+    virtual int GenCode( std::ostream& sink, Variables& vars, Point& head ) const override;
   };
 
   template <typename T>
@@ -508,56 +392,12 @@ namespace binsec {
   {
     typedef UndefinedValue<T> this_type;
 
-    virtual unsigned SubCount() const override { return 0; };
     virtual this_type* Mutate() const override { return new this_type( *this ); }
     virtual ValueType GetType() const override { return CValueType(T()); }
-  };
-
-  template <typename T, unsigned SUBCOUNT>
-  struct UndefinedOperation : public UndefinedValueBase
-  {
-    typedef UndefinedOperation<T, SUBCOUNT> this_type;
-
-    virtual unsigned SubCount() const override { return SUBCOUNT; };
-    virtual Expr const& GetSub(unsigned idx) const override { if (idx < SUBCOUNT) { return subs[idx]; } return ExprNode::GetSub(idx); }
-    virtual this_type* Mutate() const override { return new this_type( *this ); }
-    virtual ValueType GetType() const override { return CValueType(T()); }
-
-    Expr subs[SUBCOUNT];
   };
 
   template <typename VALUE_TYPE>
   Expr make_undefined_value( VALUE_TYPE ) { return Expr( new UndefinedValue<VALUE_TYPE>() ); }
-
-  /* 1 operand undefined operation */
-  template <typename VALUE_TYPE>
-  Expr make_undefined_operation( VALUE_TYPE, Expr const& op0 )
-  {
-    typedef UndefinedOperation<VALUE_TYPE,1> result_type;
-    result_type* result = new result_type;
-    result->subs[0] = op0;
-    return result;
-  }
-
-  /* 2 operands undefined operation */
-  template <typename VALUE_TYPE>
-  Expr make_undefined_operation( VALUE_TYPE, Expr const& op0, Expr const& op1 )
-  {
-    typedef UndefinedOperation<VALUE_TYPE,2> result_type;
-    result_type* result = new result_type;
-    result->subs[0] = op0; result->subs[1] = op1;
-    return result;
-  }
-
-  /* 3 operands undefined operation */
-  template <typename VALUE_TYPE>
-  Expr make_undefined_operation( VALUE_TYPE, Expr const& op0, Expr const& op1, Expr const& op2 )
-  {
-    typedef UndefinedOperation<VALUE_TYPE,3> result_type;
-    result_type* result = new result_type;
-    result->subs[0] = op0; result->subs[1] = op1; result->subs[2] = op2;
-    return result;
-  }
 
 } /* end of namespace binsec */
 } /* end of namespace symbolic */

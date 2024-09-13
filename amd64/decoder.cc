@@ -124,10 +124,7 @@ struct Translator
           extract( Compat32(), sink );
 
         // Translate to DBA
-        unisim::util::symbolic::binsec::Program program;
-        program.Generate( coderoot );
-        for (auto stmt : program)
-          sink << "(" << print_dbx(mode64 ? 8 : 4, addr) << ',' << std::dec << stmt.first << ") " << stmt.second << std::endl;
+        coderoot->generate(sink, mode64 ? 8 : 4, addr);
       }
     catch (ProcessorBase::Undefined const&)
       {

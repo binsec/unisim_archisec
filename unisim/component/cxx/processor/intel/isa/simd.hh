@@ -763,6 +763,26 @@ struct BroadcastI128 : public Operation<ARCH>
   }
 };
 
+template <class ARCH, class VR, class GOP>
+struct FBroadcast : public Operation<ARCH>
+{
+  FBroadcast( OpBase<ARCH> const& opbase, RMOp<ARCH>&& _rm, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( std::move(_rm) ), gn( _gn ) {} RMOp<ARCH> rm; uint8_t gn;
+  void disasm( std::ostream& sink ) const { sink << "vbroadcast" << SizeID<GOP::SIZE>::fid() << SizeID<GOP::SIZE>::fid() << ' ';
+    if (rm.isreg())
+      sink << DisasmW( XMM(), rm );
+    else
+      sink << DisasmE( GOP(), rm );
+    sink << ',' << DisasmV( VR(), gn );
+  }
+  void execute( ARCH& arch ) const
+  {
+    typedef typename TypeFor<ARCH,GOP::SIZE>::u src_type;
+    src_type value = arch.vmm_read( XMM(), rm, 0, src_type());
+    for (unsigned idx = 0, end = VR::size() / GOP::SIZE; idx < end; ++idx)
+      arch.vmm_write( VR(), gn, idx, value );
+  }
+};
+
 template <class ARCH> struct DC<ARCH,BROADCAST> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
   if (ic.f0()) return 0;
@@ -789,6 +809,10 @@ template <class ARCH> struct DC<ARCH,BROADCAST> { Operation<ARCH>* get( InputCod
     return new BroadcastI128<ARCH>( _.opbase(), _.rmop(), _.greg() );
   }
 
+  if (auto _ = match( ic, vex( "\x66\x0f\x38\x18" ) & RM() ))
+
+    return newFBroadcast<GOq>( ic, _.opbase(), _.rmop(), _.greg() );
+
   return 0;
 }
 template <class GOP>
@@ -797,6 +821,14 @@ Operation<ARCH>* newBroadcast( InputCode<ARCH> const& ic, OpBase<ARCH> const& op
   if (not ic.vex() || ic.vreg() || ic.w()) return 0;
   if (ic.vlen() == 128) return new Broadcast<ARCH,XMM,GOP>( opbase, std::move(rm), gn );
   if (ic.vlen() == 256) return new Broadcast<ARCH,YMM,GOP>( opbase, std::move(rm), gn );
+  return 0;
+}
+template <class GOP>
+Operation<ARCH>* newFBroadcast( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, uint8_t gn )
+{
+  if (not ic.vex() || ic.vreg() || ic.w()) return 0;
+  if (ic.vlen() == 128) return new FBroadcast<ARCH,XMM,GOP>( opbase, std::move(rm), gn );
+  if (ic.vlen() == 256) return new FBroadcast<ARCH,YMM,GOP>( opbase, std::move(rm), gn );
   return 0;
 }
 };
@@ -2706,6 +2738,49 @@ template <class ARCH> struct DC<ARCH,VPERMQ> { Operation<ARCH>* get( InputCode<A
   return 0;
 }};
 
+template <class ARCH, class VR>
+struct Vperm2i128 : public Operation<ARCH>
+{
+  Vperm2i128( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _vn, uint8_t _gn, uint8_t _oo ) : Operation<ARCH>(opbase), rm(_rm), gn(_gn), vn(_vn), oo(_oo) {} RMOp<ARCH> rm; uint8_t gn, vn, oo;
+  void disasm( std::ostream& sink ) const
+  {
+    sink << "vperm2i128 " << DisasmI(oo) << ',' << DisasmW( VR(), rm ) << ',' << DisasmV( VR(), vn ) << ',' << DisasmV( VR(), gn );
+  }
+  void execute( ARCH& arch ) const
+  {
+    typedef typename ARCH::u128_t u128_t;
+
+    u128_t tmp[4];
+
+    tmp[0] = arch.vmm_read( VR(), vn, 0, u128_t() );
+    tmp[1] = arch.vmm_read( VR(), vn, 1, u128_t() );
+    tmp[2] = arch.vmm_read( VR(), rm, 0, u128_t() );
+    tmp[3] = arch.vmm_read( VR(), rm, 1, u128_t() );
+
+    if (oo & 0b00001000)
+      arch.vmm_write( VR(), gn, 0, u128_t(0) );
+    else
+      arch.vmm_write( VR(), gn, 0, tmp[oo & 0b00000011] );
+    if (oo & 0b10000000)
+      arch.vmm_write( VR(), gn, 1, u128_t(0) );
+    else
+      arch.vmm_write( VR(), gn, 1, tmp[(oo & 0b00110000) >> 4] );
+  }
+};
+
+/* VPERM2I128 -- Permute Integer Values */
+template <class ARCH> struct DC<ARCH,VPERM2I128> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
+{
+  if (ic.f0()) return 0;
+
+  if (auto _ = match( ic, vex( "\x66\x0f\x3a\x46" ) & RM() & Imm<8>() ))
+    {
+      if (ic.w() == 1) return 0;
+      if (ic.vlen() == 256) return new Vperm2i128<ARCH,YMM>( _.opbase(), _.rmop(), _.vreg(), _.greg(), _.i(uint8_t()) );
+    }
+
+  return 0;
+}};
 
 template <class ARCH, class VR>
 struct Pshufd : public Operation<ARCH>
@@ -2749,6 +2824,69 @@ template <class ARCH> struct DC<ARCH,PSHUFD> { Operation<ARCH>* get( InputCode<A
       if (ic.vreg()) return 0;
       if (ic.vlen() == 128) return new Pshufd<ARCH,XMM>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
       if (ic.vlen() == 256) return new Pshufd<ARCH,YMM>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
+    }
+
+  return 0;
+}};
+
+template <class ARCH, class VR, bool HIGH>
+struct Pshuf_w : public Operation<ARCH>
+{
+  Pshuf_w( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn, uint8_t _oo ) : Operation<ARCH>(opbase), rm(_rm), gn(_gn), oo(_oo) {} RMOp<ARCH> rm; uint8_t gn, oo;
+  void disasm( std::ostream& sink ) const
+  {
+    sink << (VR::vex() ? "v" : "") << "pshuf" << (HIGH ? "h" : "l") << "w " << DisasmI(oo) << ',' << DisasmW( VR(), rm ) << ',' << DisasmV( VR(), gn );
+  }
+  void execute( ARCH& arch ) const
+  {
+    typedef typename ARCH::u16_t u16_t;
+
+
+    for (unsigned chunk = 0, cend = VR::size() / 128; chunk < cend; ++ chunk)
+      {
+	u16_t res[64 / 16];
+
+        for (unsigned idx = 0, end = 64 / 16; idx < end; ++idx)
+          {
+            unsigned part = (oo >> 2*idx) % 4;
+            res[idx] = arch.vmm_read( VR(), rm, part + chunk*end + (64 / 16) * HIGH, u16_t() );
+          }
+
+	for (unsigned idx = 0, end = 64 / 16; idx < end; ++idx)
+          {
+            arch.vmm_write( VR(), gn, idx + chunk*end + (64 / 16) * HIGH, res[idx] );
+          }
+
+	for (unsigned idx = 64 / 16, end = 128 / 16; idx < end; ++idx)
+          {
+	    arch.vmm_write( VR(), gn, idx + chunk*end - (64 / 16) * HIGH,
+			    arch.vmm_read( VR(), rm, idx + chunk*end - (64 / 16) * HIGH, u16_t() ));
+          }
+
+      }
+  }
+};
+
+// /* PSHUFHW -- Shuffle Packed High Words */
+// /* PSHUFLW -- Shuffle Packed Low Words */
+template <class ARCH> struct DC<ARCH,PSHUF_W> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
+{
+  if (ic.f0()) return 0;
+
+  if (auto _ = match( ic, vex( "\xf2\x0f\x70" ) & RM() & Imm<8>() ))
+    {
+      if (not ic.vex())     return new Pshuf_w<ARCH,SSE,false>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
+      if (ic.vreg()) return 0;
+      if (ic.vlen() == 128) return new Pshuf_w<ARCH,XMM,false>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
+      if (ic.vlen() == 256) return new Pshuf_w<ARCH,YMM,false>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
+    }
+
+  if (auto _ = match( ic, vex( "\xf3\x0f\x70" ) & RM() & Imm<8>() ))
+    {
+      if (not ic.vex())     return new Pshuf_w<ARCH,SSE,true>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
+      if (ic.vreg()) return 0;
+      if (ic.vlen() == 128) return new Pshuf_w<ARCH,XMM,true>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
+      if (ic.vlen() == 256) return new Pshuf_w<ARCH,YMM,true>( _.opbase(), _.rmop(), _.greg(), _.i(uint8_t()) );
     }
 
   return 0;
@@ -2947,16 +3085,6 @@ Operation<ARCH>* newPshdq( InputCode<ARCH> const& ic, bool right, OpBase<ARCH> c
 }
 };
 
-// /* PSHUFHW -- Shuffle Packed High Words */
-// op pshufhw_vdq_wdq_ib( 0xf3[8]:> <:0x0f[8]:> <:0x70[8]:> <:?[2]:gn[3]:?[3]:> rewind <:*modrm[ModRM]:> <:imm[8] );
-//
-// pshufhw_vdq_wdq_ib.disasm = { _sink << "pshufhw " << DisasmI(imm) << DisasmW( SSE(), rm ) << ',' << DisasmV( SSE(), gn ); };
-//
-// /* PSHUFLW -- Shuffle Packed Low Words */
-// op pshuflw_vdq_wdq_ib( 0xf2[8]:> <:0x0f[8]:> <:0x70[8]:> <:?[2]:gn[3]:?[3]:> rewind <:*modrm[ModRM]:> <:imm[8] );
-//
-// pshuflw_vdq_wdq_ib.disasm = { _sink << "pshuflw " << DisasmI(imm) << DisasmW( SSE(), rm ) << ',' << DisasmV( SSE(), gn ); };
-//
 // /* PSHUFW -- Shuffle Packed Words */
 // op pshufw_pq_qq( 0x0f[8]:> <:0x70[8]:> <:?[2]:gn[3]:?[3]:> rewind <:*modrm[ModRM] );
 //
@@ -3650,11 +3778,64 @@ Operation<ARCH>* newShufp( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase
 }
 };
 
-// shufpd_vdq_wdq_ib.disasm = { _sink << "shufpd " << DisasmI(imm) << ',' << DisasmW( SSE(), rm ) << ',' << DisasmV( SSE(), gn ); };
-//
-// /* MOVDDUP -- Move One Double-FP and Duplicate */
-// op movddup_vdq_wdq( 0xf2[8]:> <:0x0f[8]:> <:0x12[8]:> <:?[2]:gn[3]:?[3]:> rewind <:*modrm[ModRM] );
-// movddup_vdq_wdq.disasm = { _sink << "movddup " << DisasmW( SSE(), rm ) << ',' << DisasmV( SSE(), gn ); };
+template <class ARCH, class VR>
+struct Movddup : public Operation<ARCH>
+{
+  Movddup( OpBase<ARCH> const& opbase, RMOp<ARCH>&& _rm, uint8_t _gn) :
+    Operation<ARCH>(opbase), rm(std::move(_rm)), gn(_gn) {}
+
+  void disasm( std::ostream& sink ) const {
+    sink << (VR::vex() ? "v" : "") << "movddup" << ' ' << DisasmV( VR(), gn ) << ',' << DisasmW( VR(), rm ); }
+
+  void execute( ARCH& arch ) const
+  {
+    enum {
+      OPSIZE = 64,
+      N = VR::SIZE / (2 * OPSIZE)
+    };
+
+    typedef typename TypeFor<ARCH,OPSIZE>::f src_type;
+
+    src_type value[N];
+
+    for (unsigned idx = 0; idx < N; ++idx) {
+      value[idx] = arch.vmm_read( VR(), rm, 2 * idx, src_type() );
+    }
+    for (unsigned idx = 0; idx < N; ++idx) {
+      arch.vmm_write( VR(), gn, 2 * idx, value[idx] );
+      arch.vmm_write( VR(), gn, 2 * idx + 1, value[idx] );
+    }
+  }
+
+  RMOp<ARCH> rm;
+  uint8_t gn;
+};
+
+template <class ARCH> struct DC<ARCH,MOVDDUP> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
+{
+  if (ic.f0()) return 0;
+
+  if (auto _ = match( ic, vex( "\xf2\x0f\x12" ) & RM() ))
+
+    return newMovddup( ic, _.opbase(), _.rmop(), _.greg() );
+
+  return 0;
+}
+
+Operation<ARCH>* newMovddup( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, uint8_t gn )
+{
+  if (not ic.vex())
+    return new Movddup<ARCH,SSE>( opbase, std::move(rm), gn );
+
+  uint8_t vn = ic.vreg();
+  if (ic.vlen() == 128)
+    return new Movddup<ARCH,XMM>( opbase, std::move(rm), gn );
+  if (ic.vlen() == 256)
+    return new Movddup<ARCH,YMM>( opbase, std::move(rm), gn );
+
+  return 0;
+}
+};
 
 template <class ARCH, class VR>
 struct VZeroUpper : public Operation<ARCH>
@@ -3731,7 +3912,9 @@ template <class ARCH> struct DC<ARCH,EXTRACT> { Operation<ARCH>* get( InputCode<
 
   if (auto _ = match( ic, vex( "\x66\x0f\xc5" ) & RM_reg() & Imm<8>() ))
 
-    return newExtr<GOw>( ic, _.opbase(), _.i( uint8_t() ), _.rmop(), _.greg() );
+    return newExtr<GOw>( ic, _.opbase(), _.i( uint8_t() ),
+			 RMOp<ARCH>((MOp<ARCH> const*)(uintptr_t)_.greg()),
+			 _.ereg() );
 
   if (auto _ = match( ic, vex( "\x66\x0f\x3a\x15" ) & RM() & Imm<8>() ))
 

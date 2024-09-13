@@ -1,7 +1,7 @@
 (env
  (_
-  (c_flags :standard -std=gnu11 -g0)
-  (cxx_flags :standard -std=gnu++11 -g0)))
+  (c_flags :standard -std=gnu14 -g0)
+  (cxx_flags :standard -std=gnu++14 -g0)))
 
 (subdir
  unisim/util
@@ -14,6 +14,7 @@
    (names :standard)
    (flags :standard -I../..)
    (extra_deps
+    floating_point/floating_point.hh
     symbolic/symbolic.hh
     arithmetic/arithmetic.hh
     inlining/inlining.hh
@@ -21,12 +22,12 @@
     identifier/identifier.hh
     endian/endian.hh
     symbolic/binsec/binsec.hh
-    symbolic/vector/vector.hh
     symbolic/symbolic.hh
     arithmetic/arithmetic.hh
     inlining/inlining.hh
     arithmetic/integer.hh
     identifier/identifier.hh
+    symbolic/vector/vector.hh
     symbolic/vector/vector.hh
     symbolic/symbolic.hh
     arithmetic/arithmetic.hh
@@ -66,7 +67,6 @@
    ../unisim/component/cxx/processor/arm/isa/constants.hh
    ../unisim/util/arithmetic/bitfield.hh
    ../unisim/util/symbolic/binsec/binsec.hh
-   ../unisim/util/symbolic/vector/vector.hh
    ../unisim/util/symbolic/symbolic.hh
    ../unisim/util/arithmetic/arithmetic.hh
    ../unisim/util/inlining/inlining.hh
@@ -113,13 +113,16 @@
   (flags :standard -I. -I..)
   (extra_deps
    decoder.hh
+   ../unisim/component/cxx/processor/arm/regs64/cpu.hh
+   ../unisim/component/cxx/vector/vector.hh
    ../unisim/util/symbolic/binsec/binsec.hh
-   ../unisim/util/symbolic/vector/vector.hh
    ../unisim/util/symbolic/symbolic.hh
    ../unisim/util/arithmetic/arithmetic.hh
    ../unisim/util/inlining/inlining.hh
    ../unisim/util/arithmetic/integer.hh
    ../unisim/util/identifier/identifier.hh
+   ../unisim/util/symbolic/vector/vector.hh
+   ../unisim/util/floating_point/floating_point.hh
    aarch64dec.tcc
    aarch64dec.hh
    ../unisim/component/cxx/processor/arm/isa/arm64/decode.hh
@@ -166,7 +169,6 @@
    arch.hh
    types.hh
    ../unisim/util/symbolic/binsec/binsec.hh
-   ../unisim/util/symbolic/vector/vector.hh
    ../unisim/util/symbolic/symbolic.hh
    ../unisim/util/arithmetic/arithmetic.hh
    ../unisim/util/inlining/inlining.hh
@@ -178,7 +180,6 @@
    arch.hh
    types.hh
    ../unisim/util/symbolic/binsec/binsec.hh
-   ../unisim/util/symbolic/vector/vector.hh
    ../unisim/util/symbolic/symbolic.hh
    ../unisim/util/arithmetic/arithmetic.hh
    ../unisim/util/inlining/inlining.hh
@@ -188,7 +189,6 @@
    arch.hh
    types.hh
    ../unisim/util/symbolic/binsec/binsec.hh
-   ../unisim/util/symbolic/vector/vector.hh
    ../unisim/util/symbolic/symbolic.hh
    ../unisim/util/arithmetic/arithmetic.hh
    ../unisim/util/inlining/inlining.hh

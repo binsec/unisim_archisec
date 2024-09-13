@@ -113,7 +113,6 @@ namespace ppc64 {
     using ExprNode = unisim::util::symbolic::ExprNode;
     using ValueType = unisim::util::symbolic::ValueType;
     using ActionNode = unisim::util::symbolic::binsec::ActionNode;
-    using Label = unisim::util::symbolic::binsec::Label;
     using Variables = unisim::util::symbolic::binsec::Variables;
     using BitInsertNode = unisim::util::symbolic::binsec::BitInsertNode;
 
@@ -354,7 +353,7 @@ namespace ppc64 {
       typedef FBit<32+27> ZE; /* IEEE floating-point zero divide exception enable */
       typedef FBit<32+28> XE; /* Floating-point inexact exception enable */
       typedef FBit<32+29> NI; /* Floating-point non-IEEE mode */
-      
+
       template <typename PART> void Write(PART, Expr const& bit) { value = Expr(new BitInsertNode(value.expr, bit, 63 ^ PART::pos, 1 )); }
       template <typename PART,typename T> void Set( SmartValue<T> const& bits ) { Write(PART(), U64(bits).expr); }
       // template <typename PART> void Set( uint32_t value ) { Set<PART,uint32_t>( unisim::util::symbolic::make_const(value) ); }

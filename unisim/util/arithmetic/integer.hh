@@ -32,7 +32,7 @@
  *
  * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
  */
- 
+
 #ifndef __UNISIM_UTIL_ARITHMETIC_INTEGER_HH__
 #define __UNISIM_UTIL_ARITHMETIC_INTEGER_HH__
 
@@ -52,7 +52,7 @@ namespace arithmetic {
     template <typename T> T next32bits( T bits ) { return int64_t( bits ) >> 32; }
     inline uint64_t next32bits( uint64_t bits ) { return bits >> 32; }
   }
-  
+
   template <unsigned CELLCOUNT, bool SIGNED>
   struct Integer
   {
@@ -76,6 +76,8 @@ namespace arithmetic {
     explicit operator int64_t () const { return operator uint64_t(); }
     explicit operator uint32_t () const { return cells[0]; }
     explicit operator int32_t () const { return operator uint32_t(); }
+    explicit operator uint8_t () const { return cells[0]; }
+    explicit operator int8_t () const { return operator int8_t(); }
     template <typename FLOAT> FLOAT to_float() const { struct TODO {}; throw TODO(); return 0; }
     explicit operator float () const { return to_float<float>(); }
     explicit operator double () const { return to_float<double>(); }
@@ -144,7 +146,10 @@ namespace arithmetic {
     Integer operator & (this_type const& rhs) const { Integer result; result.bitwise_binop(&cells[0], &rhs.cells[0], [] (uint32_t x, uint32_t y) { return x & y; }); return result; }
     Integer operator | (this_type const& rhs) const { Integer result; result.bitwise_binop(&cells[0], &rhs.cells[0], [] (uint32_t x, uint32_t y) { return x | y; }); return result; }
     Integer operator ^ (this_type const& rhs) const { Integer result; result.bitwise_binop(&cells[0], &rhs.cells[0], [] (uint32_t x, uint32_t y) { return x ^ y; }); return result; }
-    
+    Integer& operator &= (this_type const& rhs) { bitwise_binop(&cells[0], &rhs.cells[0], [] (uint32_t x, uint32_t y) { return x & y; }); return *this; }
+    Integer& operator |= (this_type const& rhs) { bitwise_binop(&cells[0], &rhs.cells[0], [] (uint32_t x, uint32_t y) { return x | y; }); return *this; }
+    Integer& operator ^= (this_type const& rhs) { bitwise_binop(&cells[0], &rhs.cells[0], [] (uint32_t x, uint32_t y) { return x ^ y; }); return *this; }
+
     int32_t scell() const { return int32_t(cells[CELLCOUNT-1]); }
     uint32_t vcell(unsigned pos) const { return pos < CELLCOUNT ? cells[pos] : SIGNED ? uint32_t(scell() >> 31): 0; }
 
@@ -174,6 +179,8 @@ namespace arithmetic {
 
     Integer operator >> (int amount) const { return operator>>(unsigned(amount)); }
 
+    Integer& operator >>= (int amount) { *this = *this >> unsigned(amount); return *this; }
+
     Integer operator << (unsigned amount) const
     {
       Integer result;
@@ -197,6 +204,7 @@ namespace arithmetic {
       return result;
     }
 
+    Integer operator <<= (int amount) { *this = *this << unsigned(amount); return *this; }
 
     int cmp(this_type const& rhs) const
     {
@@ -219,7 +227,7 @@ namespace arithmetic {
     bool operator >= (this_type const& rhs) const { return cmp(rhs) >= 0; }
     bool operator <= (this_type const& rhs) const { return cmp(rhs) <= 0; }
     bool operator  > (this_type const& rhs) const { return cmp(rhs)  > 0; }
-    
+
     uint32_t cells[CELLCOUNT];
   };
 

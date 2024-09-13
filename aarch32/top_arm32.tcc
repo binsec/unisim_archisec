@@ -21746,7 +21746,7 @@ void OpNop<	ARCH>::disasm( ARCH & cpu,
 std::ostream& buffer)
 {
 	{
-		buffer << "nop" << DisasmCondition(cond) << "\t{" << idx << "}";
+		buffer << "nop" << DisasmCondition(cond) << "\t{" << (int)idx << "}";
 }}
 template <	typename	ARCH>
 void OpNop<	ARCH>::execute( ARCH & cpu)
@@ -34224,7 +34224,7 @@ void OpVshl_s8<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>
@@ -34250,7 +34250,7 @@ void OpVshl_s16<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>
@@ -34276,7 +34276,7 @@ void OpVshl_s32<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>
@@ -34302,7 +34302,7 @@ void OpVshl_s64<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>
@@ -34328,7 +34328,7 @@ void OpVshl_u8<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>
@@ -34354,7 +34354,7 @@ void OpVshl_u16<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>
@@ -34380,7 +34380,7 @@ void OpVshl_u32<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>
@@ -34406,7 +34406,7 @@ void OpVshl_u64<	ARCH>::execute( ARCH & cpu)
 		// CheckAdvSIMDEnabled();
 		for (unsigned dd = 0, dde = 1<<q; dd < dde; ++dd)
 		for (unsigned idx = 0; idx < elements; ++idx)
-		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
+		cpu.SetVDE( vd+dd, idx, NeonSHL(cpu, cpu.GetVDE( vm+dd, idx, OP() ), typename ARCH::S8(cpu.GetVDE( vn+dd, idx, OP() ))) );
 }}
 
 template <	typename	ARCH>

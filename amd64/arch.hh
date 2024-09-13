@@ -54,7 +54,6 @@
 
 void show(unsigned, unisim::util::symbolic::ExprNode const*);
 
-
 struct VmmValue
 {
   enum { BYTECOUNT = 32, VPREFIX='y' };
@@ -320,7 +319,6 @@ struct Processor : public ProcessorBase
   typedef           SmartValue<nat_gr_type>  gr_type;
   typedef                           gr_type  addr_t;
 
-
   struct OpHeader { OpHeader( nat_addr_t _address ) : address( _address ) {} nat_addr_t address; };
 
   /*** SEGMENTS ***/
@@ -537,29 +535,30 @@ struct Processor : public ProcessorBase
 
     virtual ValueType GetType() const override { return ELEM::GetType(); }
 
-    virtual int GenCode(unisim::util::symbolic::binsec::Label& label, unisim::util::symbolic::binsec::Variables& vars, std::ostream& sink) const override {
+    virtual int GenCode(std::ostream& sink, unisim::util::symbolic::binsec::Variables& vars, unisim::util::symbolic::binsec::Point& head ) const override
+    {
       for (int i = 0; i < elemcount - 1; i += 1) {
 	sink << "(if";
-	ASExprNode::GenerateCode( GetSub(elemcount), vars, label, sink );
+	ASExprNode::GenerateCode( GetSub(elemcount), sink, vars, head );
 	sink << " = "
 	     << unisim::util::symbolic::binsec::dbx(traits::BITSIZE/8, i)
 	     << " then ";
-	ASExprNode::GenerateCode( GetSub(i), vars, label, sink );
+	ASExprNode::GenerateCode( GetSub(i), sink, vars, head );
 	sink << " else ";
       }
-      ASExprNode::GenerateCode( GetSub(elemcount - 1), vars, label, sink );
+      ASExprNode::GenerateCode( GetSub(elemcount - 1), sink, vars, head );
       for (int i = 0; i < elemcount - 1; i += 1) {
 	sink << ')';
       }
       // sink << "((";
       // for (int i = elemcount - 1; 0 < i; i -= 1) {
-      // 	ASExprNode::GenerateCode( GetSub(i), vars, label, sink );
+      // 	ASExprNode::GenerateCode( GetSub(i), vars, bloc, sink );
       // 	sink << " :: ";
       // }
-      // ASExprNode::GenerateCode( GetSub(0), vars, label, sink );
+      // ASExprNode::GenerateCode( GetSub(0), vars, bloc, sink );
       // sink << ") >>u (" << traits::BITSIZE
       // 	   << '<' << GetVSize() << "> * (extu ";
-      // ASExprNode::GenerateCode( GetSub(elemcount), vars, label, sink );
+      // ASExprNode::GenerateCode( GetSub(elemcount), vars, bloc, sink );
       // sink << ' ' << GetVSize() << "))){0," << traits::BITSIZE - 1 << '}';
       return traits::BITSIZE;
     }
@@ -635,7 +634,6 @@ struct Processor : public ProcessorBase
 
 private:
   Processor( Processor const& );
-
 
 public:
 

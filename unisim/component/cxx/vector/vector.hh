@@ -29,11 +29,16 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Authors: Gilles Mouchard (gilles.mouchard@cea.fr)
+ * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
+ *          Gilles Mouchard (gilles.mouchard@cea.fr)
  */
 
 #ifndef __UNISIM_COMPONENT_CXX_VECTOR_VECTOR_HH__
 #define __UNISIM_COMPONENT_CXX_VECTOR_VECTOR_HH__
+
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include <inttypes.h>
 
@@ -123,10 +128,11 @@ namespace vector {
       if (size > final_size)
         size = final_size;
     }
-    
+
     static void initial( Byte*, void*, unsigned, bool ) {}
 
     VUnion() : transfer( &initial ), size(0) {}
+    VUnion(VUnion const&) =delete;
 
     void Clear( void* storage )
     {
@@ -147,13 +153,13 @@ namespace vector {
     static void ToBytes( uint8_t* dst, T src )
     {
       for (unsigned idx = 0; idx < sizeof (T); ++idx)
-        { dst[idx^E] = src & 0xff; src >>= 8; }
+        { dst[idx^E] = uint8_t(src & T(0xff)); src >>= 8; }
     }
     static void FromBytes( T& dst, uint8_t const* src )
     {
-      T tmp = 0;
+      T tmp = T(0);
       for (unsigned idx = sizeof (T); idx-- > 0;)
-        { tmp <<= 8; tmp |= uint32_t( src[idx^E] ); }
+        { tmp <<= 8; tmp |= T( src[idx^E] ); }
       dst = tmp;
     }
     static void Destroy( T& obj ) { /* Base scalar, no need for specific destructor */ }
@@ -177,6 +183,17 @@ namespace vector {
     static void Destroy( int8_t& obj ) { /* No need for specific destructor */ }
     static void Allocate( int8_t& obj ) { /* No need for specific constructor */ }
   };
+
+#if HAVE_FLOAT16
+  template <unsigned E> struct VectorTypeInfo<_Float16,E>
+  {
+    enum bytecount_t { bytecount = 2 };
+    static void ToBytes( uint8_t* dst, _Float16 const& src ) { VectorTypeInfo<uint16_t,E>::ToBytes( dst, reinterpret_cast<uint16_t const&>( src ) ); }
+    static void FromBytes( _Float16& dst, uint8_t const* src ) { VectorTypeInfo<uint16_t,E>::FromBytes( reinterpret_cast<uint16_t&>( dst ), src ); }
+    static void Destroy( _Float16& obj ) { /* No need for specific destructor */ }
+    static void Allocate( _Float16& obj ) { /* No need for specific constructor */ }
+  };
+#endif
 
   template <unsigned E> struct VectorTypeInfo<float,E>
   {

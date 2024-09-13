@@ -64,8 +64,8 @@ public:
 	static unsigned int const minsize = 32;
 	static unsigned int const maxsize = 32;
 	virtual void disasm( ARCH & cpu,
-	std::ostream& sink );
-	virtual void execute( ARCH & cpu );
+	std::ostream& sink ) const;
+	virtual void execute( ARCH & cpu ) const;
 protected:
 	CodeType encoding;
 	uint64_t addr;

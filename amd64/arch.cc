@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2019-2020,
+ *  Copyright (c) 2019,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -95,11 +95,11 @@ ProcessorBase::flagwrite( FLAG flag, bit_t fval, bit_t def )
 {
   if (unisim::util::symbolic::ConstNodeBase const* cnode = def.expr.ConstSimplify())
     {
-      flagvalues[flag.idx()] = dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value ? fval.expr : new unisim::util::symbolic::binsec::UndefinedValue<bool>();
+      flagvalues[flag.idx()] = dynamic_cast<unisim::util::symbolic::ConstNode<bool> const&>(*cnode).value ? fval.expr : unisim::util::symbolic::binsec::make_undefined_value(bool());
     }
   else
     {
-      flagvalues[flag.idx()] = ((def and fval) or ((not def) and bit_t(new unisim::util::symbolic::binsec::UndefinedValue<bool>()))).expr;
+      flagvalues[flag.idx()] = ConditionalMove(def, fval, bit_t(unisim::util::symbolic::binsec::make_undefined_value(bool()))).expr;
     }
 }
 
