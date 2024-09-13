@@ -213,7 +213,7 @@ float FMin( float a, float b ) { return unisim::util::floating_point::_FMin<floa
 float FMinNumber( float a, float b ) { return unisim::util::floating_point::_FMinNumber<float>( a, b ); }
 float FMax( float a, float b ) { return unisim::util::floating_point::_FMax<float>( a, b ); }
 float FMaxNumber( float a, float b ) { return unisim::util::floating_point::_FMaxNumber<float>( a, b ); }
-bool IsSignaling( float a ) { return issignaling( a ); }
+bool IsSignaling( float a ) { return unisim::util::floating_point::_IsSignaling<float>( a ); }
 template <> float DefaultNaN<float>() { return unisim::util::floating_point::_DefaultNaN<float>(); }
 
 // Functions for double
@@ -289,7 +289,7 @@ double FMin( double a, double b ) { return unisim::util::floating_point::_FMin<d
 double FMinNumber( double a, double b ) { return unisim::util::floating_point::_FMinNumber<double>( a, b ); }
 double FMax( double a, double b ) { return unisim::util::floating_point::_FMax<double>( a, b ); }
 double FMaxNumber( double a, double b ) { return unisim::util::floating_point::_FMaxNumber<double>( a, b ); }
-bool IsSignaling( double a ) { return issignaling( a ); }
+bool IsSignaling( double a ) { return unisim::util::floating_point::_IsSignaling<double>( a ); }
 template <> double DefaultNaN<double>() { return unisim::util::floating_point::_DefaultNaN<double>(); }
 
 namespace unisim {
