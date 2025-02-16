@@ -1,0 +1,268 @@
+/*
+ *  Copyright (c) 2007-2020,
+ *  Commissariat a l'Energie Atomique (CEA)
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without 
+ *  modification, are permitted provided that the following conditions are met:
+ *
+ *   - Redistributions of source code must retain the above copyright notice, 
+ *     this list of conditions and the following disclaimer.
+ *
+ *   - Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *
+ *   - Neither the name of CEA nor the names of its contributors may be used to
+ *     endorse or promote products derived from this software without specific 
+ *     prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+ *  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+ *  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+ *  ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY 
+ *  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+ *  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND 
+ *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF 
+ *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
+ */
+
+/* Read State Register Instructions */
+
+op rdy( 0b10[2]:rd[5]:0b101000[6]:0b00000[5]:?[1]:?[13] );
+
+rdy.disasm = {
+  sink << "rd %y, " << DisasmGPR(rd);
+};
+
+rdy.execute = {
+  cpu.SetGPR(rd, cpu.GetY());
+};
+
+op stbar( 0b10[2]:0b00000[5]:0b101000[6]:0b01111[5]:?[1]:?[13] );
+
+stbar.disasm = {
+  sink << "stbar";
+};
+
+op rdasr( 0b10[2]:rd[5]:0b101000[6]:rs1[5]:?[1]:?[13] );
+
+rdasr.disasm = {
+  sink << "rd %asr" << DisasmI(rs1) << ", " << DisasmGPR(rd);
+};
+
+rdasr.execute = {
+  if (rs1 < 16)
+    cpu.Abort( Trap_t::illegal_instruction );
+  else if (not cpu.asr_perm( rs1 ))
+    cpu.Abort( Trap_t::privileged_instruction );
+  else
+    cpu.SetGPR(rd, cpu.rdasr( rs1 ));
+}
+
+op rdpsr( 0b10[2]:rd[5]:0b101001[6]:?[5]:?[1]:?[13] );
+
+rdpsr.disasm = {
+  sink << "rd %psr, " << DisasmGPR(rd);
+};
+
+rdpsr.execute = {
+  if (not cpu.IsSuper())
+    cpu.Abort( Trap_t::privileged_instruction );
+  
+  cpu.SetGPR(rd, cpu.GetPSR());
+};
+
+op rdwim( 0b10[2]:rd[5]:0b101010[6]:?[5]:?[1]:?[13] );
+
+rdwim.disasm = {
+  sink << "rd %wim, " << DisasmGPR(rd);
+};
+
+rdwim.execute = {
+  typedef typename ARCH::U32 U32;
+
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  cpu.SetGPR(rd, cpu.GetWIM() & U32((uint64_t( 1 ) << cpu.nwindows())-1));
+};
+
+op rdtbr( 0b10[2]:rd[5]:0b101011[6]:?[5]:?[1]:?[13] );
+
+rdtbr.disasm = {
+  sink << "rd %tbr, " << DisasmGPR(rd);
+};
+
+rdtbr.execute = {
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  cpu.SetGPR(rd, cpu.GetTBR());
+};
+
+/* Write State Register Instructions */
+
+op wry( 0b10[2]:0b00000[5]:0b110000[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+wry.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", %y";
+};
+
+wry.execute = {
+  cpu.SetY( cpu.GetGPR(rs1) ^ cpu.GetGPR(rs2) );
+};
+
+op wryi( 0b10[2]:0b00000[5]:0b110000[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+wryi.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", %y";
+};
+
+wryi.execute = {
+  cpu.SetY( cpu.GetGPR(rs1) ^ typename ARCH::U32(simm13) );
+};
+
+op wrasr( 0b10[2]:rd[5]:0b110000[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+wrasr.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", %asr" << DisasmI(rd);
+};
+
+wrasr.execute = {
+  if (rd < 16)
+    cpu.Abort( Trap_t::illegal_instruction );
+  else if (not cpu.asr_perm( rd ))
+    cpu.Abort( Trap_t::privileged_instruction );
+  else
+    cpu.wrasr( rd, cpu.GetGPR(rs1) ^ cpu.GetGPR(rs2) );
+};
+
+op wrasri( 0b10[2]:rd[5]:0b110000[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+wrasri.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", %asr" << std::dec << int(rd);
+};
+
+wrasri.execute = {
+  if (rd < 16)
+    cpu.Abort( Trap_t::illegal_instruction );
+  else if (not cpu.asr_perm( rd ))
+    cpu.Abort( Trap_t::privileged_instruction );
+  else
+    cpu.wrasr( rd, cpu.GetGPR(rs1) ^ typename ARCH::U32(simm13) );
+};
+
+op wrpsr( 0b10[2]:?[5]:0b110001[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+wrpsr.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", %psr";
+};
+
+wrpsr.execute = {
+  typedef typename ARCH::U32 U32;
+
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  U32 res = cpu.GetGPR(rs1) ^ cpu.GetGPR(rs2);
+  
+  if (cpu.Test((res & U32(0x1f)) >= U32(cpu.nwindows())))
+    cpu.Abort( Trap_t::illegal_instruction );
+  
+  cpu.SetPSR( res );
+};
+
+op wrpsri( 0b10[2]:?[5]:0b110001[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+wrpsri.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", %psr";
+};
+
+wrpsri.execute = {
+  typedef typename ARCH::U32 U32;
+
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  U32 res = cpu.GetGPR(rs1) ^ U32(simm13);
+  if (cpu.Test((res & U32(0x1f)) >= U32(cpu.nwindows())))
+    cpu.Abort( Trap_t::illegal_instruction );
+  
+  cpu.SetPSR( res );
+};
+
+op wrwim( 0b10[2]:?[5]:0b110010[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+wrwim.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", %wim";
+};
+
+wrwim.execute = {
+  typedef typename ARCH::U32 U32;
+
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  cpu.SetWIM( (cpu.GetGPR(rs1) ^ cpu.GetGPR(rs2)) & U32((uint64_t( 1 ) << cpu.nwindows())-1) );
+};
+
+op wrwimi( 0b10[2]:?[5]:0b110010[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+wrwimi.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", %wim";
+};
+
+wrwimi.execute = {
+  typedef typename ARCH::U32 U32;
+
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  cpu.SetWIM( (cpu.GetGPR(rs1) ^ U32(simm13)) & U32((uint64_t( 1 ) << cpu.nwindows())-1) );
+};
+
+op wrtbr( 0b10[2]:?[5]:0b110011[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+wrtbr.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", %tbr";
+};
+
+wrtbr.execute = {
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  cpu.SetTBR((cpu.GetGPR(rs1) ^ cpu.GetGPR(rs2)));
+};
+
+op wrtbri( 0b10[2]:?[5]:0b110011[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+wrtbri.disasm = {
+  sink << "wr " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", %tbr";
+};
+
+wrtbri.execute = {
+  typedef typename ARCH::U32 U32;
+
+  if (not cpu.IsSuper())
+     cpu.Abort( Trap_t::privileged_instruction );
+
+  cpu.SetTBR((cpu.GetGPR(rs1) ^ U32(simm13)) & U32((uint64_t( 1 ) << cpu.nwindows())-1));
+};
+
+/* Unimplemented Instruction */
+
+op unimp( 0b00[2]:?[5]:0b000[3]:const22[22] );
+
+unimp.disasm = {
+  sink << "unimp " << const22;
+};
+
+unimp.execute = {
+  cpu.Abort( Trap_t::illegal_instruction );
+};

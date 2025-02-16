@@ -1,5 +1,5 @@
 /******************************************************************************/
-/*  Copyright (c) 2007-2021,                                                  */
+/*  Copyright (c) 2017,                                                       */
 /*  Commissariat a l'Énergie Atomique et aux Énergies Alternatives (CEA)      */
 /*  All rights reserved.                                                      */
 /*                                                                            */
@@ -32,7 +32,7 @@
 /*  POSSIBILITY OF SUCH DAMAGE.                                               */
 /******************************************************************************/
 
-#include <ppc64/decoder.hh>
+#include <unisim/component/cxx/processor/powerpc/dba/arch64/decoder.hh>
 
 #include <vector>
 #include <iostream>
@@ -45,7 +45,7 @@
 
 extern "C" value ppc64dba_decode(value vaddr, value vopcode) {
   std::stringstream s;
-  ppc64::Decoder decoder;
+  unisim::component::cxx::processor::powerpc::dba::arch64::Decoder decoder;
 
   decoder.process(s, Int64_val(vaddr), Int32_val(vopcode));
 

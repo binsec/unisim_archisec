@@ -1,3 +1,9 @@
+## 0.0.10 (2025-02-17)
+
+- add SPARCv8 decoder
+- better handling for some AVX2 instructions (x86)
+- bug fixes and code refactoring
+
 ## 0.0.9 (2024-09-13)
 
 - support for NEON instructions in AARCH64

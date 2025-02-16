@@ -1,0 +1,1282 @@
+/*
+ *  Copyright (c) 2007-2020,
+ *  Commissariat a l'Energie Atomique (CEA)
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without 
+ *  modification, are permitted provided that the following conditions are met:
+ *
+ *   - Redistributions of source code must retain the above copyright notice, 
+ *     this list of conditions and the following disclaimer.
+ *
+ *   - Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *
+ *   - Neither the name of CEA nor the names of its contributors may be used to
+ *     endorse or promote products derived from this software without specific 
+ *     prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+ *  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+ *  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+ *  ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY 
+ *  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+ *  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND 
+ *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF 
+ *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
+ */
+
+/* SETHI And NOP Instruction */
+
+op sethi( 0b00[2]:rd[5]:0b100[3]:shl<10> imm22[22] );
+
+sethi.disasm = {
+  if( rd == 0 and imm22 == 0 ) sink << "nop";
+  else sink << "sethi %hi(" << DisasmHex(imm22) << "), " << DisasmGPR(rd);
+};
+
+sethi.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, U32(imm22) /* | (cpu.GetGPR(rd) & 0x3ff) */);
+};
+
+/* Logical Instructions */
+
+op and_( 0b10[2]:rd[5]:0b000001[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+and_.disasm = {
+  sink << "and " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+and_.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) & cpu.GetGPR(rs2));
+};
+
+op andi( 0b10[2]:rd[5]:0b000001[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+andi.disasm = {
+  sink << "and " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+andi.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) & U32(simm13));
+};
+
+op andcc( 0b10[2]:rd[5]:0b010001[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+andcc.disasm = {
+  sink << "andcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+andcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) & cpu.GetGPR(rs2);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op andcci( 0b10[2]:rd[5]:0b010001[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+andcci.disasm = {
+  sink << "andcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+andcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) & U32(simm13);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op andn( 0b10[2]:rd[5]:0b000101[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+andn.disasm = {
+  sink << "andn " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+andn.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) & ~(cpu.GetGPR(rs2)));
+};
+
+op andni( 0b10[2]:rd[5]:0b000101[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+andni.disasm = {
+  sink << "andn " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+andni.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) & ~U32(simm13));
+};
+
+op andncc( 0b10[2]:rd[5]:0b010101[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+andncc.disasm = {
+  sink << "andncc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+andncc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) & ~(cpu.GetGPR(rs2));
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op andncci( 0b10[2]:rd[5]:0b010101[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+andncci.disasm = {
+  sink << "andncc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+andncci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) & ~U32(simm13);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op or_( 0b10[2]:rd[5]:0b000010[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+or_.disasm = {
+  sink << "or " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+or_.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) | cpu.GetGPR(rs2));
+};
+
+op ori( 0b10[2]:rd[5]:0b000010[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+ori.disasm = {
+  sink << "or " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+ori.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) | U32(simm13));
+};
+
+op orcc( 0b10[2]:rd[5]:0b010010[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+orcc.disasm = {
+  if (rd == 0) {
+    sink << "tst " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2);
+  } else {
+    sink << "orcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+  }
+};
+
+orcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) | cpu.GetGPR(rs2);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op orcci( 0b10[2]:rd[5]:0b010010[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+orcci.disasm = {
+  if (rd == 0) {
+    sink << "tst " << DisasmGPR(rs1) << ", " << DisasmI(simm13);
+  } else {
+    sink << "orcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+  }
+};
+
+orcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) | U32(simm13);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op orn( 0b10[2]:rd[5]:0b000110[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+orn.disasm = {
+  sink << "orn " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+orn.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) | ~(cpu.GetGPR(rs2)));
+};
+
+op orni( 0b10[2]:rd[5]:0b000110[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+orni.disasm = {
+  sink << "orn " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+orni.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) | ~U32(simm13));
+};
+
+op orncc( 0b10[2]:rd[5]:0b010110[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+orncc.disasm = {
+  sink << "orncc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+orncc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) | ~(cpu.GetGPR(rs2));
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op orncci( 0b10[2]:rd[5]:0b010110[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+orncci.disasm = {
+  sink << "orncc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+orncci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) | ~U32(simm13);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op xor_( 0b10[2]:rd[5]:0b000011[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+xor_.disasm = {
+  sink << "xor " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+xor_.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) ^ cpu.GetGPR(rs2));
+};
+
+op xori( 0b10[2]:rd[5]:0b000011[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+xori.disasm = {
+  sink << "xor " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+xori.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) ^ U32(simm13));
+};
+
+op xorcc( 0b10[2]:rd[5]:0b010011[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+xorcc.disasm = {
+  sink << "xorcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+xorcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) ^ cpu.GetGPR(rs2);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op xorcci( 0b10[2]:rd[5]:0b010011[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+xorcci.disasm = {
+  sink << "xorcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+xorcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) ^ U32(simm13);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op xnor( 0b10[2]:rd[5]:0b000111[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+xnor.disasm = {
+  sink << "xnor " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+xnor.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) ^ ~(cpu.GetGPR(rs2)));
+};
+
+op xnori( 0b10[2]:rd[5]:0b000111[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+xnori.disasm = {
+  sink << "xnor " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+xnori.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) ^ ~U32(simm13));
+};
+
+op xnorcc( 0b10[2]:rd[5]:0b010111[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+xnorcc.disasm = {
+  sink << "xnorcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+xnorcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) ^ ~(cpu.GetGPR(rs2));
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+op xnorcci( 0b10[2]:rd[5]:0b010111[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+xnorcci.disasm = {
+  sink << "xnorcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+xnorcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 result = cpu.GetGPR(rs1) ^ ~U32(simm13);
+  cpu.SetNZVC( S32(result) < S32(0), result == U32(0), BOOL(false), BOOL(false) );
+  cpu.SetGPR(rd, result);
+};
+
+/* Shift Instructions */
+
+op sll( 0b10[2]:rd[5]:0b100101[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+sll.disasm = {
+  sink << "sll " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+
+sll.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) << (cpu.GetGPR(rs2) & U32(0x1f)));
+};
+
+op slli( 0b10[2]:rd[5]:0b100101[6]:rs1[5]:0b1[1]:?[8]:shcnt[5] );
+
+slli.disasm = {
+  sink << "sll " << DisasmGPR(rs1) << ", " << DisasmI(shcnt) << ", " << DisasmGPR(rd);
+};
+
+slli.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) << (shcnt & 0x1f));
+};
+
+op srl( 0b10[2]:rd[5]:0b100110[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+srl.disasm = {
+  sink << "srl " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+srl.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) >> (cpu.GetGPR(rs2) & U32(0x1f)));
+};
+
+op srli( 0b10[2]:rd[5]:0b100110[6]:rs1[5]:0b1[1]:?[8]:shcnt[5] );
+
+srli.disasm = {
+  sink << "srl " << DisasmGPR(rs1) << ", " << DisasmI(shcnt) << ", " << DisasmGPR(rd);
+};
+
+srli.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) >> (shcnt & 0x1f));
+};
+
+op sra( 0b10[2]:rd[5]:0b100111[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+sra.disasm = {
+  sink << "sra " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+sra.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+
+  cpu.SetGPR(rd, U32(S32( cpu.GetGPR(rs1) ) >> (cpu.GetGPR(rs2) & U32(0x1f))));
+};
+
+op srai( 0b10[2]:rd[5]:0b100111[6]:rs1[5]:0b1[1]:?[8]:shcnt[5] );
+
+srai.disasm = {
+  sink << "sra " << DisasmGPR(rs1) << ", " << DisasmI(shcnt) << ", " << DisasmGPR(rd);
+};
+
+srai.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+
+  cpu.SetGPR(rd, U32(S32( cpu.GetGPR(rs1) ) >> shcnt));
+};
+
+/* Add Instructions */
+
+op add( 0b10[2]:rd[5]:0b000000[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+add.disasm = {
+  sink << "add " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+add.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) + cpu.GetGPR(rs2));
+};
+
+op addi( 0b10[2]:rd[5]:0b000000[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+addi.disasm = {
+  sink << "add " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+addi.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) + U32(simm13));
+};
+
+op addcc( 0b10[2]:rd[5]:0b010000[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+addcc.disasm = {
+  sink << "addcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+addcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 + op2;
+  BOOL n = S32(res) < S32(0);
+  cpu.SetNZVC( n, res == U32(0), n xor (S32(op1) <= S32(~op2)), op1 > ~op2 );
+  cpu.SetGPR(rd, res);
+};
+
+op addcci( 0b10[2]:rd[5]:0b010000[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+addcci.disasm = {
+  sink << "addcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+addcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 + op2;
+  BOOL n = S32(res) < S32(0);
+  cpu.SetNZVC( n, res == U32(0), n xor (S32(op1) <= S32(~op2)), op1 > ~op2 );
+  cpu.SetGPR(rd, res);
+};
+
+op addx( 0b10[2]:rd[5]:0b001000[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+addx.disasm = {
+  sink << "addx " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+addx.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) + cpu.GetGPR(rs2) + U32(cpu.GetCarry()));
+};
+
+op addxi( 0b10[2]:rd[5]:0b001000[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+addxi.disasm = {
+  sink << "addx " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+addxi.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) + U32(simm13) + U32(cpu.GetCarry()));
+};
+
+op addxcc( 0b10[2]:rd[5]:0b011000[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+addxcc.disasm = {
+  sink << "addxcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+addxcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  BOOL carry( cpu.GetCarry() );
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 + op2 + U32(carry);
+
+  BOOL n = S32(res) < S32(0), z = res == U32(0);
+  if (cpu.Test(carry))
+    cpu.SetNZVC( n, z, n xor (S32(op1) <  S32(~op2)), op1 >= ~op2 );
+  else
+    cpu.SetNZVC( n, z, n xor (S32(op1) <= S32(~op2)), op1 >  ~op2 );
+
+  cpu.SetGPR(rd, res);
+};
+
+op addxcci( 0b10[2]:rd[5]:0b011000[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+addxcci.disasm = {
+  sink << "addxcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+addxcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  BOOL carry( cpu.GetCarry() );
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 + op2 + U32(carry);
+
+  BOOL n = S32(res) < S32(0), z = res == U32(0);
+  if (cpu.Test(carry))
+    cpu.SetNZVC( n, z, n xor (S32(op1) <  S32(~op2)), op1 >= ~op2 );
+  else
+    cpu.SetNZVC( n, z, n xor (S32(op1) <= S32(~op2)), op1 >  ~op2 );
+
+  cpu.SetGPR(rd, res);
+};
+
+/* Tagged Add Instructions */
+
+op taddcc( 0b10[2]:rd[5]:0b100000[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+taddcc.disasm = {
+  sink << "taddcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+taddcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 + op2;
+  
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) <= S32(~op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 > ~op2 );
+  
+  cpu.SetGPR(rd, res);
+};
+
+op taddcci( 0b10[2]:rd[5]:0b100000[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+taddcci.disasm = {
+  sink << "taddcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+taddcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 + op2;
+  
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) <= S32(~op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 > ~op2 );
+  
+  cpu.SetGPR(rd, res);
+};
+
+op taddcctv( 0b10[2]:rd[5]:0b100010[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+taddcctv.disasm = {
+  sink << "taddcctv " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+taddcctv.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 + op2;
+  
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) <= S32(~op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  if (cpu.Test(overflow))
+    cpu.Abort( Trap_t::tag_overflow );
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 > ~op2 );
+  
+  cpu.SetGPR(rd, res);
+};
+
+op taddcctvi( 0b10[2]:rd[5]:0b100010[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+taddcctvi.disasm = {
+  sink << "taddcctv " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+taddcctvi.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 + op2;
+  
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) <= S32(~op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  if (cpu.Test(overflow))
+    cpu.Abort( Trap_t::tag_overflow );
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 > ~op2 );
+  
+  cpu.SetGPR(rd, res);
+};
+
+/* Substract Instructions */
+
+op sub( 0b10[2]:rd[5]:0b000100[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+sub.disasm = {
+  sink << "sub " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+sub.execute = {
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) - cpu.GetGPR(rs2));
+};
+
+op subi( 0b10[2]:rd[5]:0b000100[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+subi.disasm = {
+  sink << "sub " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+subi.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) - U32(simm13));
+};
+
+op subcc( 0b10[2]:rd[5]:0b010100[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+subcc.disasm = {
+  if (rd == 0) {
+    sink << "cmp " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2);
+  } else {
+    sink << "subcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+  }
+};
+
+subcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 - op2;
+
+  BOOL n = S32(res) < S32(0);
+  cpu.SetNZVC( n, res == U32(0), n xor (S32(op1) < S32(op2)), op1 < op2 );
+  cpu.SetGPR(rd, res);
+};
+
+op subcci( 0b10[2]:rd[5]:0b010100[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+subcci.disasm = {
+  if (rd == 0) {
+    sink << "cmp " << DisasmGPR(rs1) << ", " << DisasmI(simm13);
+  } else {
+    sink << "subcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+  }
+};
+
+subcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 - op2;
+
+  BOOL n = S32(res) < S32(0);
+  cpu.SetNZVC( n, res == U32(0), n xor (S32(op1) < S32(op2)), op1 < op2 );
+  cpu.SetGPR(rd, res);
+};
+
+op subx( 0b10[2]:rd[5]:0b001100[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+subx.disasm = {
+  sink << "subx " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+subx.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) - cpu.GetGPR(rs2) - U32(cpu.GetCarry()));
+};
+
+op subxi( 0b10[2]:rd[5]:0b001100[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+subxi.disasm = {
+  sink << "subx " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+subxi.execute = {
+  typedef typename ARCH::U32 U32;
+
+  cpu.SetGPR(rd, cpu.GetGPR(rs1) - U32(simm13) - U32(cpu.GetCarry()));
+};
+
+op subxcc( 0b10[2]:rd[5]:0b011100[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+subxcc.disasm = {
+  sink << "subxcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+subxcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  BOOL borrow( cpu.GetCarry() );
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 - op2 - U32(borrow);
+
+  BOOL n = S32(res) < S32(0), z = res == U32(0);
+  if (cpu.Test(borrow))
+    cpu.SetNZVC( n, z, n xor (S32(op1) <= S32(op2)), op1 <=  op2 );
+  else
+    cpu.SetNZVC( n, z, n xor (S32(op1) <  S32(op2)), op1 < op2 );
+  
+  cpu.SetGPR(rd, res);
+};
+
+op subxcci( 0b10[2]:rd[5]:0b011100[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+subxcci.disasm = {
+  sink << "subxcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+subxcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  BOOL borrow( cpu.GetCarry() );
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 - op2 - U32(borrow);
+
+  BOOL n = S32(res) < S32(0), z = res == U32(0);
+  if (cpu.Test(borrow))
+    cpu.SetNZVC( n, z, n xor (S32(op1) <= S32(op2)), op1 <=  op2 );
+  else
+    cpu.SetNZVC( n, z, n xor (S32(op1) <  S32(op2)), op1 < op2 );
+  
+  cpu.SetGPR(rd, res);
+};
+
+/* Tagged Substract Instructions */
+
+op tsubcc( 0b10[2]:rd[5]:0b100001[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+tsubcc.disasm = {
+  sink << "tsubcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+tsubcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 - op2;
+
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) < S32(op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 < op2 );
+
+  cpu.SetGPR(rd, res);
+};
+
+op tsubcci( 0b10[2]:rd[5]:0b100001[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+tsubcci.disasm = {
+  sink << "tsubcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+tsubcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 - op2;
+
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) < S32(op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 < op2 );
+
+  cpu.SetGPR(rd, res);
+};
+
+op tsubcctv( 0b10[2]:rd[5]:0b100011[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+tsubcctv.disasm = {
+  sink << "tsubcctv " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+tsubcctv.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( cpu.GetGPR(rs2) ), res = op1 - op2;
+
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) < S32(op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  if (cpu.Test(overflow))
+    cpu.Abort( Trap_t::tag_overflow );
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 < op2 );
+
+  cpu.SetGPR(rd, res);
+};
+
+op tsubcctvi( 0b10[2]:rd[5]:0b100011[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+tsubcctvi.disasm = {
+  sink << "tsubcctv " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+tsubcctvi.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( cpu.GetGPR(rs1) ), op2( simm13 ), res = op1 - op2;
+
+  BOOL n = S32(res) < S32(0), overflow = n xor (S32(op1) < S32(op2));
+  overflow |= BOOL((op1 | op2) & U32(3));
+  if (cpu.Test(overflow))
+    cpu.Abort( Trap_t::tag_overflow );
+  cpu.SetNZVC( n, res == U32(0), overflow, op1 < op2 );
+
+  cpu.SetGPR(rd, res);
+};
+
+/* Multiply Step Instructions */
+
+op mulscc( 0b10[2]:rd[5]:0b100100[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+mulscc.disasm = {
+  sink << "mulscc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+mulscc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( (U32(cpu.GetN() ^ cpu.GetV()) << 31) | (cpu.GetGPR(rs1) >> 1) ),
+      op2( cpu.Test(cpu.GetY() & U32(1)) ? cpu.GetGPR(rs2) : U32(0) ),
+      res = op1 + op2;
+
+  BOOL n = S32(res) < S32(0);
+  cpu.SetNZVC( n, res == U32(0), n xor (S32(op1) <= S32(~op2)), op1 > ~op2 );
+
+  cpu.SetY( (cpu.GetGPR(rs1) << 31) | (cpu.GetY() >> 1) );
+  cpu.SetGPR(rd, res);
+};
+
+op mulscci( 0b10[2]:rd[5]:0b100100[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+mulscci.disasm = {
+  sink << "mulscc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+mulscci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U32 op1( (U32(cpu.GetN() ^ cpu.GetV()) << 31) | (cpu.GetGPR(rs1) >> 1) ),
+      op2( cpu.Test(cpu.GetY() & U32(1)) ? simm13 : 0 ),
+      res = op1 + op2;
+
+  BOOL n = S32(res) < S32(0);
+  cpu.SetNZVC( n, res == U32(0), n xor (S32(op1) <= S32(~op2)), op1 > ~op2 );
+
+  cpu.SetY( (cpu.GetGPR(rs1) << 31) | (cpu.GetY() >> 1) );
+  cpu.SetGPR(rd, res);
+};
+
+/* Multiply Instructions */
+
+op umul( 0b10[2]:rd[5]:0b001010[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+umul.disasm = {
+  sink << "umul " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+umul.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+
+  U64 op1( U32( cpu.GetGPR(rs1) ) ), op2( U32( cpu.GetGPR(rs2) ) ), res = op1 * op2;
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+op umuli( 0b10[2]:rd[5]:0b001010[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+umuli.disasm = {
+  sink << "umul " << DisasmGPR(rs1) << ", " << DisasmI(unsigned(simm13)) << ", " << DisasmGPR(rd);
+};
+
+umuli.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+
+  U64 op1( U32( cpu.GetGPR(rs1) ) ), op2 = U64( U32(simm13) ), res = op1 * op2;
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+op smul( 0b10[2]:rd[5]:0b001011[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+smul.disasm = {
+  sink << "smul " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+smul.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+                
+  S64 op1( S32( cpu.GetGPR(rs1) ) ), op2( S32( cpu.GetGPR(rs2) ) ), res = op1 * op2;
+  
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+op smuli( 0b10[2]:rd[5]:0b001011[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+smuli.disasm = {
+  sink << "smul " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+smuli.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+                
+  S64 op1( S32( cpu.GetGPR(rs1) ) ), op2 = S64( S32( simm13 ) ), res = op1 * op2;
+  
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+op umulcc( 0b10[2]:rd[5]:0b011010[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+umulcc.disasm = {
+  sink << "umulcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+umulcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U64 op1( U32( cpu.GetGPR(rs1) ) ), op2( U32( cpu.GetGPR(rs2) ) ), res = op1 * op2;
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), BOOL(false), BOOL(false) );
+
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+op umulcci( 0b10[2]:rd[5]:0b011010[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+umulcci.disasm = {
+  sink << "umulcc " << DisasmGPR(rs1) << ", " << DisasmI(unsigned(simm13)) << ", " << DisasmGPR(rd);
+};
+
+umulcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  U64 op1( U32( cpu.GetGPR(rs1) ) ), op2 = U64( U32( simm13) ), res = op1 * op2;
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), BOOL(false), BOOL(false) );
+
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+op smulcc( 0b10[2]:rd[5]:0b011011[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+smulcc.disasm = {
+  sink << "smulcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+smulcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+  typedef typename ARCH::BOOL BOOL;
+                
+  S64 op1( S32( cpu.GetGPR(rs1) ) ), op2( S32( cpu.GetGPR(rs2) ) ), res = op1 * op2;
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), BOOL(false), BOOL(false) );
+
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+op smulcci( 0b10[2]:rd[5]:0b011011[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+smulcci.disasm = {
+  sink << "smulcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+smulcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+  typedef typename ARCH::BOOL BOOL;
+                
+  S64 op1( S32( cpu.GetGPR(rs1) ) ), op2( simm13 ), res = op1 * op2;
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), BOOL(false), BOOL(false) );
+
+  cpu.SetY( U32(res >> 32) );
+  cpu.SetGPR(rd, U32(res));
+};
+
+/* Divide Instructions */
+
+op udiv( 0b10[2]:rd[5]:0b001110[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+udiv.disasm = {
+  sink << "udiv " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+udiv.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (cpu.Test(cpu.GetGPR(rs2) == U32(0)))
+    cpu.Abort( Trap_t::division_by_zero );
+  
+  U64 op1( U64( cpu.GetY() ) << 32 | U64(cpu.GetGPR(rs1)) ), op2( cpu.GetGPR(rs2) ), res64 = op1 / op2;
+
+  BOOL overflow(U64(U32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? U32(0xffffffff) : U32(res64);
+
+  cpu.SetGPR(rd, res);
+};
+
+op udivi( 0b10[2]:rd[5]:0b001110[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+udivi.disasm = {
+  sink << "udiv " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+udivi.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (simm13 == 0)
+    cpu.Abort( Trap_t::division_by_zero );
+  
+  U64 op1( U64( cpu.GetY() ) << 32 | U64(cpu.GetGPR(rs1)) ), op2 = U64( U32( simm13 ) ), res64 = op1 / op2;
+
+  BOOL overflow(U64(U32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? U32(0xffffffff) : U32(res64);
+
+  cpu.SetGPR(rd, res);
+};
+
+op sdiv( 0b10[2]:rd[5]:0b001111[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+sdiv.disasm = {
+  sink << "sdiv " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+sdiv.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (cpu.Test(cpu.GetGPR(rs2) == U32(0)))
+    cpu.Abort( Trap_t::division_by_zero );
+
+  S64 op1( U64( cpu.GetY() ) << 32 | U64( cpu.GetGPR(rs1) ) ), op2( S32(cpu.GetGPR(rs2)) ), res64 = op1 / op2;
+  
+  BOOL overflow(S64(S32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? (U32(res64 >> 63) ^ U32(0x7fffffff)) : U32(res64);
+
+  cpu.SetGPR(rd, res);
+};
+
+op sdivi( 0b10[2]:rd[5]:0b001111[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+sdivi.disasm = {
+  sink << "sdiv " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+sdivi.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (simm13 == 0)
+    cpu.Abort( Trap_t::division_by_zero );
+
+  S64 op1( U64( cpu.GetY() ) << 32 | U64( cpu.GetGPR(rs1) ) ), op2( simm13 ), res64 = op1 / op2;
+  
+  BOOL overflow(S64(S32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? (U32(res64 >> 63) ^ U32(0x7fffffff)) : U32(res64);
+
+  cpu.SetGPR(rd, res);
+};
+
+op udivcc( 0b10[2]:rd[5]:0b011110[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+udivcc.disasm = {
+  sink << "udivcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+udivcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (cpu.Test(cpu.GetGPR(rs2) == U32(0)))
+    cpu.Abort( Trap_t::division_by_zero );
+  
+  U64 op1( U64( cpu.GetY() ) << 32 | U64(cpu.GetGPR(rs1)) ), op2( cpu.GetGPR(rs2) ), res64 = op1 / op2;
+  
+  BOOL overflow(U64(U32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? U32(0xffffffff) : U32(res64);
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), overflow, BOOL(false) );
+  
+  cpu.SetGPR(rd, res);
+};
+
+op udivcci( 0b10[2]:rd[5]:0b011110[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+udivcci.disasm = {
+  sink << "udivcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+udivcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (simm13 == 0)
+    cpu.Abort( Trap_t::division_by_zero );
+  
+  U64 op1( U64( cpu.GetY() ) << 32 | U64(cpu.GetGPR(rs1)) ), op2 = U64( U32( simm13 ) ), res64 = op1 / op2;
+
+  BOOL overflow(U64(U32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? U32(0xffffffff) : U32(res64);
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), overflow, BOOL(false) );
+
+  cpu.SetGPR(rd, res);
+};
+
+op sdivcc( 0b10[2]:rd[5]:0b011111[6]:rs1[5]:0b0[1]:?[8]:rs2[5] );
+
+sdivcc.disasm = {
+  sink << "sdivcc " << DisasmGPR(rs1) << ", " << DisasmGPR(rs2) << ", " << DisasmGPR(rd);
+};
+
+sdivcc.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (cpu.Test(cpu.GetGPR(rs2) == U32(0)))
+    cpu.Abort( Trap_t::division_by_zero );
+
+  S64 op1( U64( cpu.GetY() ) << 32 | U64( cpu.GetGPR(rs1) ) ), op2( S32(cpu.GetGPR(rs2)) ), res64 = op1 / op2;
+
+  BOOL overflow(S64(S32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? (U32(res64 >> 63) ^ U32(0x7fffffff)) : U32(res64);
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), overflow, BOOL(false) );
+
+  cpu.SetGPR(rd, res);
+};
+
+op sdivcci( 0b10[2]:rd[5]:0b011111[6]:rs1[5]:0b1[1]:sext<32> simm13[13] );
+
+sdivcci.disasm = {
+  sink << "sdivcc " << DisasmGPR(rs1) << ", " << DisasmI(simm13) << ", " << DisasmGPR(rd);
+};
+
+sdivcci.execute = {
+  typedef typename ARCH::U32 U32;
+  typedef typename ARCH::U64 U64;
+  typedef typename ARCH::S32 S32;
+  typedef typename ARCH::S64 S64;
+  typedef typename ARCH::BOOL BOOL;
+
+  if (simm13 == 0)
+    cpu.Abort( Trap_t::division_by_zero );
+
+  S64 op1( U64( cpu.GetY() ) << 32 | U64( cpu.GetGPR(rs1) ) ), op2( simm13 ), res64 = op1 / op2;
+
+  BOOL overflow(S64(S32(res64)) != res64);
+  U32 res = cpu.Test(overflow) ? (U32(res64 >> 63) ^ U32(0x7fffffff)) : U32(res64);
+
+  cpu.SetNZVC( S32(res) < S32(0), U32(res) == U32(0), overflow, BOOL(false) );
+
+  cpu.SetGPR(rd, res);
+};
+

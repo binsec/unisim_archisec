@@ -1,5 +1,5 @@
 /******************************************************************************/
-/*  Copyright (c) 2007-2023,                                                  */
+/*  Copyright (c) 2017,                                                       */
 /*  Commissariat a l'Énergie Atomique et aux Énergies Alternatives (CEA)      */
 /*  All rights reserved.                                                      */
 /*                                                                            */
@@ -33,7 +33,7 @@
 /******************************************************************************/
 
 #include <unisim/component/cxx/processor/arm/isa/constants.hh>
-#include <aarch32/decoder.hh>
+#include <unisim/component/cxx/processor/arm/dba/aarch32/decoder.hh>
 
 #include <vector>
 #include <iostream>
@@ -47,7 +47,7 @@
 extern "C" value arm32dba_decode(value vmode, value vendian,
 				 value vitstate, value vaddr, value vopcode) {
   std::stringstream s;
-  aarch32::Decoder decoder;
+  unisim::component::cxx::processor::arm::dba::aarch32::Decoder decoder;
 
   decoder.iset = Long_val(vmode) ? decoder.Thumb : decoder.Arm;
   decoder.bigendian = Long_val(vendian);

@@ -1,0 +1,8 @@
+unisim/component/cxx/processor/sparc/dba/sv8/sparc.tcc unisim/component/cxx/processor/sparc/dba/sv8/sparc.hh: \
+unisim/component/cxx/processor/sparc/dba/sv8/sparc.isa \
+/home/fr251746/workspace/unisim_archisec/unisim_lib/./unisim/component/cxx/processor/sparc/isa/sv8/memory.isa \
+/home/fr251746/workspace/unisim_archisec/unisim_lib/./unisim/component/cxx/processor/sparc/isa/sv8/integer.isa \
+/home/fr251746/workspace/unisim_archisec/unisim_lib/./unisim/component/cxx/processor/sparc/isa/sv8/control.isa \
+/home/fr251746/workspace/unisim_archisec/unisim_lib/./unisim/component/cxx/processor/sparc/isa/sv8/special.isa \
+/home/fr251746/workspace/unisim_archisec/unisim_lib/./unisim/component/cxx/processor/sparc/isa/sv8/floating-point.isa
+
