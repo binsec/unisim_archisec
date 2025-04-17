@@ -32,4 +32,4 @@
 (*  POSSIBILITY OF SUCH DAMAGE.                                               *)
 (******************************************************************************)
 
-external decode : addr:int32 -> int32 -> int32 -> string = "sparcdba_decode"
+include Unisim_archisec.Sparc

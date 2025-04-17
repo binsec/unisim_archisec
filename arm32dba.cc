@@ -44,7 +44,8 @@
 #include <caml/alloc.h>
 #include <caml/fail.h>
 
-extern "C" value arm32dba_decode(value vmode, value vendian,
+extern "C" __attribute__ ((visibility ("default")))
+value arm32dba_decode(value vmode, value vendian,
 				 value vitstate, value vaddr, value vopcode) {
   std::stringstream s;
   unisim::component::cxx::processor::arm::dba::aarch32::Decoder decoder;

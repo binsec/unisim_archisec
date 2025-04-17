@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2007-2023,
+ *  Copyright (c) 2022,
  *  Commissariat a l'Energie Atomique (CEA),
  *  University of Perpignan (UPVD)
  *  All rights reserved.
@@ -57,6 +57,7 @@ namespace arithmetic {
   struct Integer
   {
     typedef Integer<CELLCOUNT,SIGNED> this_type;
+    struct numeric_type { enum nfo { is_signed = SIGNED, is_integral = 1, is_floating_point = 0, bitsize = 32*CELLCOUNT }; };
 
     Integer() : cells() {}
     template <typename T>

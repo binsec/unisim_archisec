@@ -195,7 +195,7 @@ namespace arch64 {
       template <typename PART> U64 Read(PART) { return value >> (63 ^ PART::pos) & U64(1); }
       U64 Read(_0_3) { return value >> 28 & U64(0xf); }
       operator U64 () { return value; }
-      XER& operator= ( U64 const& _value ) { value = value; return *this; }
+      XER& operator= ( U64 const& _value ) { value = _value; return *this; }
 
       struct ID : public unisim::util::symbolic::WithValueType<ID> { typedef uint64_t value_type; void Repr(std::ostream& sink) const; int cmp(ID) const { return 0; } };
 

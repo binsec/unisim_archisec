@@ -32,8 +32,8 @@
  * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
  */
 
-#ifndef __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_AES_HH__
-#define __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_AES_HH__
+#ifndef __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_BMI_HH__
+#define __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_BMI_HH__
 
 #include <inttypes.h>
 
@@ -44,18 +44,15 @@ namespace processor {
 namespace intel {
 
   template <class ARCH>
-  struct AES
+  struct BMI
   {
-    typedef typename ARCH::u128_t aes128;
-
     struct Unimplemented {};
 
-    static aes128 dec         (aes128, aes128)  { throw Unimplemented(); return aes128(); }
-    static aes128 declast     (aes128, aes128)  { throw Unimplemented(); return aes128(); }
-    static aes128 enc         (aes128, aes128)  { throw Unimplemented(); return aes128(); }
-    static aes128 enclast     (aes128, aes128)  { throw Unimplemented(); return aes128(); }
-    static aes128 imc         (aes128)          { throw Unimplemented(); return aes128(); }
-    static aes128 keygenassist(aes128, uint8_t) { throw Unimplemented(); return aes128(); }
+    template <class OP>
+    static OP pdep(OP, OP) { throw Unimplemented(); return OP();  }
+
+    template <class OP>
+    static OP pext(OP, OP) { throw Unimplemented(); return OP();  }
   };
 
 } // end of namespace intel
@@ -64,4 +61,4 @@ namespace intel {
 } // end of namespace component
 } // end of namespace unisim
 
-#endif // __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_AES_HH__
+#endif // __UNISIM_COMPONENT_CXX_PROCESSOR_INTEL_BMI_HH__

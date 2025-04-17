@@ -69,7 +69,7 @@ namespace arch64 {
       int cmp(CRBIT rhs) const { return int(bit) - int(rhs.bit); }
       unsigned bit;
     };
-    
+
     struct BitRead : public Path::Source, public unisim::util::symbolic::binsec::RegRead<CRBIT>
     {
       BitRead( Path& path, CRBIT bit ) : Path::Source(path), unisim::util::symbolic::binsec::RegRead<CRBIT>(bit) {}
@@ -110,7 +110,7 @@ namespace arch64 {
   {
     bool complete = path->close();
     /* TODO: branch_type */
-    path->add_sink( Expr( new unisim::util::symbolic::binsec::Branch( next_instruction_address.expr ) ) );
+    path->add_sink( new unisim::util::symbolic::binsec::Branch( next_instruction_address.expr ) );
 
     for (IRegID reg; reg.next();)
       if (regvalues[reg.idx()].expr != ref.regvalues[reg.idx()].expr)

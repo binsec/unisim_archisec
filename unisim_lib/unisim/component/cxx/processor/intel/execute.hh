@@ -142,7 +142,7 @@ namespace intel {
     arch.flagwrite( ARCH::FLAG::OF, bit_t( false ) );
     arch.flagwrite( ARCH::FLAG::CF, bit_t( false ) );
 
-    arch.flagwrite( ARCH::FLAG::AF, bit_t(0) ); /*:TODO:*/
+    arch.flagwrite( ARCH::FLAG::AF, bit_t( false ), bit_t( false ) );
 
     eval_PSZ( arch, res );
 
@@ -159,7 +159,7 @@ namespace intel {
     arch.flagwrite( ARCH::FLAG::OF, bit_t( false ) );
     arch.flagwrite( ARCH::FLAG::CF, bit_t( false ) );
 
-    arch.flagwrite( ARCH::FLAG::AF, bit_t(0) ); /*:TODO:*/
+    arch.flagwrite( ARCH::FLAG::AF, bit_t( false ), bit_t( false ) );
 
     eval_PSZ( arch, res );
 
@@ -176,7 +176,7 @@ namespace intel {
     arch.flagwrite( ARCH::FLAG::OF, bit_t( false ) );
     arch.flagwrite( ARCH::FLAG::CF, bit_t( false ) );
 
-    arch.flagwrite( ARCH::FLAG::AF, bit_t(0) ); /*:TODO:*/
+    arch.flagwrite( ARCH::FLAG::AF, bit_t( false ), bit_t( false ) );
 
     eval_PSZ( arch, res );
 

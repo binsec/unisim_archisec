@@ -44,6 +44,7 @@
 #include <unisim/util/symbolic/vector/vector.hh>
 #include <unisim/util/symbolic/binsec/binsec.hh>
 #include <unisim/util/symbolic/symbolic.hh>
+#include <unisim/util/numeric/numeric.hh>
 
 namespace unisim {
 namespace component {
@@ -305,12 +306,40 @@ struct ProcessorBase
     FRegID( char const* _code ) : code(end) { init( _code ); }
   };
 
-  static u128_t aesdec         ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
-  static u128_t aesdeclast     ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
-  static u128_t aesenc         ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
-  static u128_t aesenclast     ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
-  static u128_t aesimc         ( u128_t src )               { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src.expr}) ); }
-  static u128_t aeskeygenassist( u128_t src, uint8_t im )   { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src.expr, u8_t(im).expr}) ); }
+  struct aes
+  {
+    static u128_t dec         ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
+    static u128_t declast     ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
+    static u128_t enc         ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
+    static u128_t enclast     ( u128_t src1, u128_t src2 ) { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src1.expr, src2.expr}) ); }
+    static u128_t imc         ( u128_t src )               { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src.expr}) ); }
+    static u128_t keygenassist( u128_t src, uint8_t im )   { return Expr( new unisim::util::symbolic::binsec::Opaque<uint128_t>({src.expr, u8_t(im).expr}) ); }
+  };
+
+  struct bmi {
+    template <class OP>
+    static OP pdep( OP src1, OP src2 ) {
+      enum { opsz = atpinfo<ProcessorBase,OP>::bitsize };
+      OP res = OP(0), mask = src2, tmp = src1;
+      u8_t k = u8_t(0);
+      for ( unsigned idx = 0; idx < opsz; idx += 1 ) {
+        res |= (((tmp >> k) & (mask >> u8_t(idx))) & OP(1)) << u8_t(idx);
+        k += u8_t(mask >> u8_t(idx)) & u8_t(1);
+      }
+      return res;
+    }
+    template <class OP>
+    static OP pext( OP src1, OP src2 ) {
+      enum { opsz = atpinfo<ProcessorBase,OP>::bitsize };
+      OP res = OP(0), mask = src2, tmp = src1 & mask;
+      u8_t k = u8_t(0);
+      for ( unsigned idx = 0; idx < opsz; idx += 1 ) {
+        res |= ((tmp >> u8_t(idx)) & OP(1)) << k;
+        k += u8_t(mask >> u8_t(idx)) & u8_t(1);
+      }
+      return res;
+    }
+  };
 };
 
 template <class MODE>
@@ -530,8 +559,7 @@ struct Processor : public ProcessorBase
   template <class VR, class ELEM>
   struct VmmIndirectRead : public VmmIndirectReadBase
   {
-    typedef unisim::util::symbolic::TypeInfo<typename ELEM::value_type> traits;
-    enum { elemcount = VR::SIZE / traits::BITSIZE };
+    enum { elemsize = unisim::util::numeric::Numeric<ELEM>::bitsize, elemcount = VR::SIZE / elemsize };
 
     VmmIndirectRead( ELEM const* elems, u8_t const& _index)
       : VmmIndirectReadBase(_index.expr)
@@ -559,7 +587,7 @@ struct Processor : public ProcessorBase
         sink << "(if";
         ASExprNode::GenerateCode( GetSub(elemcount), sink, scope );
         sink << " = "
-             << unisim::util::symbolic::binsec::dbx(traits::BITSIZE/8, i)
+             << unisim::util::symbolic::binsec::dbx(elemsize/8, i)
              << " then ";
         ASExprNode::GenerateCode( GetSub(i), sink, scope );
         sink << " else ";
@@ -568,7 +596,7 @@ struct Processor : public ProcessorBase
       for (int i = 0; i < elemcount - 1; i += 1) {
         sink << ')';
       }
-      return traits::BITSIZE;
+      return elemsize;
     }
 
     virtual int cmp( ExprNode const& brhs ) const override { return compare( dynamic_cast<this_type const&>(brhs) ); }
@@ -600,11 +628,11 @@ struct Processor : public ProcessorBase
     elems[sub] = e;
   }
 
-  template <class VR, class ELEM>
-  ELEM vmm_read( VR const& vr, RMOp const& rmop, unsigned sub, ELEM const& e )
+  template <class VR, class SUB, class ELEM>
+  ELEM vmm_read( VR const& vr, RMOp const& rmop, SUB sub, ELEM const& e )
   {
     if (not rmop.ismem()) return vmm_read( vr, rmop.ereg(), sub, e );
-    return vmm_memread( rmop->segment, rmop->effective_address( *this ) + addr_t(sub*VUConfig::template TypeInfo<ELEM>::bytecount), e );
+    return vmm_memread( rmop->segment, rmop->effective_address( *this ) + addr_t(sub)*addr_t(VUConfig::template TypeInfo<ELEM>::bytecount), e );
   }
 
   template <class VR, class ELEM>
@@ -833,7 +861,7 @@ Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos ) const
     {
       // requested read is a concatenation of multiple source values
       Expr concat = regvalues[reg][pos];
-      for (unsigned idx = 1; ++idx < size;)
+      for (unsigned idx = 1; idx < size; idx += 1)
         {
           if (not regvalues[reg][pos+idx].node)
             continue;

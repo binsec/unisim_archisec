@@ -45,7 +45,7 @@ struct AESDec : public Op3V<ARCH,VR>
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::u128_t u128_t;
-    arch.vmm_write( VR(), gn, 0, ARCH::aesdec( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
+    arch.vmm_write( VR(), gn, 0, ARCH::aes::dec( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
   }
 };
 
@@ -79,7 +79,7 @@ struct AESDecLast : public Op3V<ARCH,VR>
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::u128_t u128_t;
-    arch.vmm_write( VR(), gn, 0, ARCH::aesdeclast( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
+    arch.vmm_write( VR(), gn, 0, ARCH::aes::declast( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
   }
 };
 
@@ -113,7 +113,7 @@ struct AESEnc : public Op3V<ARCH,VR>
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::u128_t u128_t;
-    arch.vmm_write( VR(), gn, 0, ARCH::aesenc( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
+    arch.vmm_write( VR(), gn, 0, ARCH::aes::enc( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
   }
 };
 
@@ -147,7 +147,7 @@ struct AESEncLast : public Op3V<ARCH,VR>
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::u128_t u128_t;
-    arch.vmm_write( VR(), gn, 0, ARCH::aesenclast( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
+    arch.vmm_write( VR(), gn, 0, ARCH::aes::enclast( arch.vmm_read( VR(), vn, 0, u128_t() ), arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
   }
 };
 
@@ -178,7 +178,7 @@ struct AESImc : public Operation<ARCH>
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::u128_t u128_t;
-    arch.vmm_write( VR(), gn, 0, ARCH::aesimc( arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
+    arch.vmm_write( VR(), gn, 0, ARCH::aes::imc( arch.vmm_read( VR(), rm, 0, u128_t() ) ) );
   }
 
   RMOp<ARCH> rm; uint8_t gn;
@@ -211,7 +211,7 @@ struct AESKeyGenAssist : public Operation<ARCH>
   void execute( ARCH& arch ) const
   {
     typedef typename ARCH::u128_t u128_t;
-    arch.vmm_write( VR(), gn, 0, ARCH::aeskeygenassist( arch.vmm_read( VR(), rm, 0, u128_t() ), im ) );
+    arch.vmm_write( VR(), gn, 0, ARCH::aes::keygenassist( arch.vmm_read( VR(), rm, 0, u128_t() ), im ) );
   }
 
   RMOp<ARCH> rm; uint8_t gn, im;

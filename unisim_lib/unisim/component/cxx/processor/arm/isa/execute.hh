@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2023,
+ *  Copyright (c) 2013,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -39,9 +39,11 @@
 #include <unisim/component/cxx/processor/arm/isa/constants.hh>
 #include <unisim/util/truth_table/truth_table.hh>
 #include <unisim/util/arithmetic/arithmetic.hh>
+#include <unisim/util/numeric/numeric.hh>
 #include <inttypes.h>
 #include <stdexcept>
 #include <cmath>
+
 namespace unisim {
 namespace component {
 namespace cxx {
@@ -358,17 +360,17 @@ namespace arm {
     int32_t  m_dir, m_reg;
   };
 
-  template <typename T> struct OverShift { static int8_t const size = std::numeric_limits<T>::digits + std::numeric_limits<T>::is_signed; };
-
   template <class ARCH, class OP, class SH>
   OP NeonSHL( ARCH& core, OP op, SH sh, bool round = false, bool sat = false)
   {
-    if (core.Test(sh >= SH(OverShift<OP>::size)))
+    enum { op_bitsize = unisim::util::numeric::Numeric<OP>::bitsize };
+
+    if (core.Test(sh >= SH(op_bitsize)))
       {
         if (sat && core.Test(op != OP(0)))
           {
             core.SetQC();
-            return (std::numeric_limits<OP>::is_signed && core.Test(op < OP(0))) ? std::numeric_limits<OP>::min() : std::numeric_limits<OP>::max();
+            return (unisim::util::numeric::Numeric<OP>::is_signed && core.Test(op < OP(0))) ? unisim::util::numeric::Integers<OP>::min() : unisim::util::numeric::Integers<OP>::max();
           }
 
         return OP(0);
@@ -380,32 +382,32 @@ namespace arm {
         if (sat && core.Test((res >> sh) != op))
           {
             core.SetQC();
-            return (std::numeric_limits<OP>::is_signed && core.Test(op < OP(0))) ? std::numeric_limits<OP>::min() : std::numeric_limits<OP>::max();
+            return (unisim::util::numeric::Numeric<OP>::is_signed && core.Test(op < OP(0))) ? unisim::util::numeric::Integers<OP>::min() : unisim::util::numeric::Integers<OP>::max();
           }
 
         return res;
       }
 
-    if (std::numeric_limits<OP>::is_signed)
+    if (unisim::util::numeric::Numeric<OP>::is_signed)
       {
-        if (core.Test(sh <= SH(-OverShift<OP>::size)))
+        if (core.Test(sh <= SH(-op_bitsize)))
           {
             if (round)
               return OP(0);
             else
-              return op >> (OverShift<OP>::size-1);
+              return op >> (op_bitsize-1);
           }
       }
     else
       {
         if (round)
           {
-            if (core.Test(sh <= SH(-OverShift<OP>::size - 1)))
+            if (core.Test(sh <= SH(-op_bitsize - 1)))
               return OP(0);
           }
         else
           {
-            if (core.Test(sh <= SH(-OverShift<OP>::size)))
+            if (core.Test(sh <= SH(-op_bitsize)))
               return OP(0);
           }
       }

@@ -232,7 +232,7 @@ namespace binsec {
   {
     typedef RegWrite<RID> this_type;
     typedef RegWriteBase Super;
-    RegWrite( RID _id, Expr const& _value ) : Super(_value, TypeInfo<typename RID::value_type>::BITSIZE), id(_id) {}
+    RegWrite( RID _id, Expr const& _value ) : Super(_value, util::numeric::Numeric<typename RID::value_type>::bitsize), id(_id) {}
     RegWrite( RID _id, int slice_base, int slice_size, Expr const& _value ) : Super(_value, RID::GetType().bitsize, slice_base, slice_size), id(_id) {}
     virtual this_type* Mutate() const override { return new this_type( *this ); }
     virtual void GetRegName( std::ostream& sink ) const override { id.Repr(sink); }

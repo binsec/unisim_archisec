@@ -32,4 +32,4 @@
 (*  POSSIBILITY OF SUCH DAMAGE.                                               *)
 (******************************************************************************)
 
-external decode : addr:int64 -> int32 -> string = "aarch64dba_decode"
+include Unisim_archisec.Aarch64

@@ -43,7 +43,8 @@
 #include <caml/alloc.h>
 #include <caml/fail.h>
 
-extern "C" value ppc64dba_decode(value vaddr, value vopcode) {
+extern "C" __attribute__ ((visibility ("default")))
+value ppc64dba_decode(value vaddr, value vopcode) {
   std::stringstream s;
   unisim::component::cxx::processor::powerpc::dba::arch64::Decoder decoder;
 

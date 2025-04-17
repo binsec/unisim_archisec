@@ -2,7 +2,7 @@
 (generate_opam_files true)
 
 (name unisim_archisec)
-(version "0.0.10")
+(version "0.0.11")
 (maintainers "BINSEC <binsec@saxifrage.saclay.cea.fr>")
 (authors
   "Frédéric Recoules"

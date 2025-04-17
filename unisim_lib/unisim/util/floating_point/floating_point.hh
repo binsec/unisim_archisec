@@ -537,6 +537,8 @@ uint_fast8_t FloatingPointStatusAndControl<FLOAT>::roundingMode()
 	return round_near_even;
 }
 
+#ifndef EMSCRIPTEN
+
 template <typename FLOAT>
 void FloatingPointStatusAndControl<FLOAT>::exceptionFlags( uint_fast8_t eflags )
 {
@@ -559,6 +561,8 @@ uint_fast8_t FloatingPointStatusAndControl<FLOAT>::exceptionFlags()
 	     | ( ( ( excepts & FE_DIVBYZERO ) == FE_DIVBYZERO ) ? flag_infinite  : 0)
 	     | ( ( ( excepts & FE_INVALID   ) == FE_INVALID   ) ? flag_invalid   : 0);
 }
+
+#endif
 
 template <typename FLOAT>
 void FloatingPointStatusAndControl<FLOAT>::extF80_roundingPrecision( uint_fast8_t rp ) {}

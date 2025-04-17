@@ -201,14 +201,14 @@ struct Processor : public unisim::component::cxx::processor::sparc::isa::sv8::Ar
     if (branch_addr.expr.node)
       {
         if (branch_type == B_CALL)
-          path->add_sink( Expr( new unisim::util::symbolic::binsec::Call<uint32_t>( branch_addr.expr, linear_nia ) ) );
+          path->add_sink( new unisim::util::symbolic::binsec::Call<uint32_t>( branch_addr.expr, linear_nia ) );
         else
-          path->add_sink( Expr( new unisim::util::symbolic::binsec::Branch( branch_addr.expr ) ) );
+          path->add_sink( new unisim::util::symbolic::binsec::Branch( branch_addr.expr ) );
       }
 
     if (unpredictable)
       {
-        path->add_sink( Expr( new unisim::util::symbolic::binsec::AssertFalse() ) );
+        path->add_sink( new unisim::util::symbolic::binsec::AssertFalse() );
         return complete;
       }
 

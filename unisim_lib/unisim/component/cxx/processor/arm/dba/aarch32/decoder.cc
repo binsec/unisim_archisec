@@ -422,19 +422,22 @@ public:
 
   U32  GetGPR( uint32_t id ) { return reg_values[id]; }
 
-  // TODO: interworking branches are not correctly handled
   void SetGPR_mem( uint32_t id, U32 const& value )
   {
     if (id != 15)
       reg_values[id] = value;
     else
-      SetNIA( value, B_JMP );
+      BranchExchange( value, B_JMP );
   }
-  void SetGPR( uint32_t id, U32 const& value ) {
+
+  void SetGPR( uint32_t id, U32 const& value )
+  {
     if (id != 15)
       reg_values[id] = value;
+    else if (cpsr.GetT())
+      Branch( value, B_JMP );
     else
-      SetNIA( value, B_JMP );
+      BranchExchange( value, B_JMP );
   }
 
   void SetGPR_usr( uint32_t id, U32 const& value ) { /* system mode */ throw Unimplemented(); }
@@ -747,7 +750,13 @@ public:
 
   void Branch( U32 const& target, branch_type_t branch_type )
   {
-    SetNIA( target & U32(this->cpsr.GetT() ? -2 : -4), branch_type );
+    U32 align;
+    if (cpsr.nthumb.good())
+      align = U32(-2) << U32(not BOOL(cpsr.nthumb));
+    else
+      align = U32(cpsr.GetT() ? -2 : -4);
+
+    SetNIA( target & align, branch_type );
   }
   // void BranchExchange( U32 const& target, branch_type_t branch_type )
   // {

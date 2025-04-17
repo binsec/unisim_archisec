@@ -1,3 +1,9 @@
+## 0.0.11 (2025-07-05)
+
+- add several AMD64 instructions
+- bug fixes and code refactoring
+  (plugin mode should no longer crash)
+
 ## 0.0.10 (2025-02-17)
 
 - add SPARCv8 decoder

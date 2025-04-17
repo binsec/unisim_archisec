@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016-2023,
+ *  Copyright (c) 2016,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -39,7 +39,6 @@
 #include <inttypes.h>
 #include <unisim/component/cxx/processor/arm/isa/constants.hh>
 #include <unisim/component/cxx/processor/arm/isa/execute.hh>
-#include <sstream>
 
 #define DEBUG_FP 0
 
@@ -57,7 +56,7 @@ UnsignedMultiplyHigh64( ARCH&, typename ARCH::U64 opl, typename ARCH::U64 opr )
 {
   typedef typename ARCH::U32 U32;
   typedef typename ARCH::U64 U64;
-  
+
   U64 lhi = U64(opl >> 32), llo = U64(U32(opl)), rhi = U64(opr >> 32), rlo = U64(U32(opr));
   U64 hihi( lhi*rhi ), hilo( lhi*rlo), lohi( llo*rhi ), lolo( llo*rlo );
   return (((lolo >> 32) + U64(U32(hilo)) + U64(U32(lohi))) >> 32) + (hilo >> 32) + (lohi >> 32) + hihi;
@@ -76,7 +75,7 @@ SignedMultiplyHigh64( ARCH&, typename ARCH::S64 opl, typename ARCH::S64 opr )
       l[idx] = U32(opl); opl >>= 32;
       r[idx] = U32(opr); opr >>= 32;
     }
-  
+
   U64 res(0), sum(0);
   for (unsigned idx = 0; idx < 4; ++idx)
     {
@@ -99,60 +98,60 @@ template <typename OUT, unsigned S, typename IN>
 OUT PolyMod2(IN value, uint32_t _poly)
 {
   IN poly(_poly);
-  
+
   for (unsigned bit = 0; bit < S; ++bit)
     value = (value >> 1) ^ poly*(value & IN(1));
-  
+
   return OUT(value);
 }
-  
+
   template <class ARCH, typename T>
   T Abs( ARCH& arch, T value, bool sat = false)
   {
-    if (sat && arch.Test(value == std::numeric_limits<T>::min()))
+    if (unisim::util::numeric::Numeric<T>::is_signed and sat and arch.Test(value == unisim::util::numeric::Integers<T>::min()))
       {
         arch.SetQC();
-        return std::numeric_limits<T>::max();
+        return unisim::util::numeric::Integers<T>::max();
       }
-    else
-      {
-        return arch.Test(value >= T()) ? value : -value;
-      }
+    return arch.Test(value < T(0)) ? -value : value;
   }
 
   template <class ARCH, typename T>
   T Neg( ARCH& arch, T value, bool sat = false)
   {
-    if (std::numeric_limits<T>::is_signed && sat)
+    if (unisim::util::numeric::Numeric<T>::is_signed and sat and arch.Test(value == unisim::util::numeric::Integers<T>::min()))
       {
-        T res((std::numeric_limits<T>::is_signed && arch.Test(value < T(0))) ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min());
-        if (arch.Test(value == std::numeric_limits<T>::min())) arch.SetQC(); else res = -value;
-        return res;
+        arch.SetQC();
+        return unisim::util::numeric::Integers<T>::max();
       }
-    else
-      {
-        return -value;
-      }
+    return -value;
   }
 
   template <typename DST, class ARCH, typename SRC>
   DST SatNarrow( ARCH& core, SRC src )
   {
-    if (std::numeric_limits<SRC>::is_signed)
+    enum {
+      src_bitsize = unisim::util::numeric::Numeric<SRC>::bitsize,
+      src_is_signed = unisim::util::numeric::Numeric<SRC>::is_signed,
+      dst_bitsize = unisim::util::numeric::Numeric<DST>::bitsize,
+      dst_is_signed = unisim::util::numeric::Numeric<DST>::is_signed
+    };
+
+    if (src_is_signed)
       {
-        if (std::numeric_limits<DST>::is_signed)
+        if (dst_is_signed)
           {
-            if (OverShift<DST>::size < OverShift<SRC>::size)
+            if (dst_bitsize < src_bitsize)
               {
-                if (core.Test(src < SRC(std::numeric_limits<DST>::min())))
+                if (core.Test(src < SRC(unisim::util::numeric::Integers<DST>::min())))
                   {
                     core.SetQC();
-                    return std::numeric_limits<DST>::min();
+                    return unisim::util::numeric::Integers<DST>::min();
                   }
-                else if(core.Test(src > SRC(std::numeric_limits<DST>::max())))
+                else if(core.Test(src > SRC(unisim::util::numeric::Integers<DST>::max())))
                   {
                     core.SetQC();
-                    return std::numeric_limits<DST>::max();
+                    return unisim::util::numeric::Integers<DST>::max();
                   }
               }
           }
@@ -161,51 +160,51 @@ OUT PolyMod2(IN value, uint32_t _poly)
             if (core.Test(src < SRC(0)))
               {
                 core.SetQC();
-                return std::numeric_limits<DST>::min();
+                return unisim::util::numeric::Integers<DST>::min();
               }
-            else if(OverShift<DST>::size < (OverShift<SRC>::size - 1) )
+            else if(dst_bitsize < (src_bitsize - 1) )
               {
-                if(core.Test(src > SRC(std::numeric_limits<DST>::max())))
+                if(core.Test(src > SRC(unisim::util::numeric::Integers<DST>::max())))
                   {
                     core.SetQC();
-                    return std::numeric_limits<DST>::max();
+                    return unisim::util::numeric::Integers<DST>::max();
                   }
               }
           }
       }
     else
       {
-        if (std::numeric_limits<DST>::is_signed)
+        if (dst_is_signed)
           {
-            if (OverShift<DST>::size < (OverShift<SRC>::size - 1))
+            if (dst_bitsize < (src_bitsize - 1))
               {
                 core.SetQC();
-                return std::numeric_limits<DST>::max();
+                return unisim::util::numeric::Integers<DST>::max();
               }
           }
         else
           {
-            if (OverShift<DST>::size < OverShift<SRC>::size )
+            if (dst_bitsize < src_bitsize )
               {
-                if(core.Test(src > SRC(std::numeric_limits<DST>::max())))
+                if(core.Test(src > SRC(unisim::util::numeric::Integers<DST>::max())))
                   {
                     core.SetQC();
-                    return std::numeric_limits<DST>::max();
+                    return unisim::util::numeric::Integers<DST>::max();
                   }
               }
           }
       }
-      
+
     return DST(src);
   }
-  
+
   template <class ARCH, typename OP>
   OP Div( ARCH& arch, OP op1, OP op2)
   {
     OP const zero(0);
     OP res(
       arch.Test( op2 == zero ) ? zero
-                               : ( ( std::numeric_limits<OP>::is_signed and arch.Test( ( op1 == std::numeric_limits<OP>::min() ) and ( op2 == OP(-1) ) ) ) ? std::numeric_limits<OP>::min()
+                               : ( ( unisim::util::numeric::Numeric<OP>::is_signed and arch.Test( ( op1 == unisim::util::numeric::Integers<OP>::min() ) and ( op2 == OP(-1) ) ) ) ? unisim::util::numeric::Integers<OP>::min()
                                                                                                                                                            : (op1 / op2 ) )
     );
 
@@ -215,12 +214,12 @@ OUT PolyMod2(IN value, uint32_t _poly)
   template <class ARCH, typename OP, typename OP2>
   OP SatAdd( ARCH& arch, OP op1, OP2 op2)
   {
-    if ( std::numeric_limits<OP>::is_signed )
+    if ( unisim::util::numeric::Numeric<OP>::is_signed )
       {
-        if ( std::numeric_limits<OP2>::is_signed )
+        if ( unisim::util::numeric::Numeric<OP2>::is_signed )
           {
-            OP res( arch.Test(op1 <= OP(0)) ? std::numeric_limits<OP>::min() : std::numeric_limits<OP>::max() ), comp(res - op1);
-            
+            OP res( arch.Test(op1 <= OP(0)) ? unisim::util::numeric::Integers<OP>::min() : unisim::util::numeric::Integers<OP>::max() ), comp(res - op1);
+
             if (arch.Test(op1 <= OP(0)))
               {
                 if (arch.Test(OP(op2) < comp)) arch.SetQC(); else res = op1 + OP(op2);
@@ -229,24 +228,24 @@ OUT PolyMod2(IN value, uint32_t _poly)
               {
                 if (arch.Test(OP(op2) > comp)) arch.SetQC(); else res = op1 + OP(op2);
               }
-            
+
             return res;
           }
         else
           {
-            OP res( std::numeric_limits<OP>::max() ), comp(res - op1);
-            
+            OP res( unisim::util::numeric::Integers<OP>::max() ), comp(res - op1);
+
             if (arch.Test(op2 > OP2(comp))) arch.SetQC(); else res = op1 + OP(op2);
-            
+
             return res;
           }
       }
     else
       {
-        if( std::numeric_limits<OP2>::is_signed )
+        if( unisim::util::numeric::Numeric<OP2>::is_signed )
           {
-            OP res( arch.Test(op2 < OP2(0)) ? std::numeric_limits<OP>::min() : std::numeric_limits<OP>::max() );
-            
+            OP res( arch.Test(op2 < OP2(0)) ? unisim::util::numeric::Integers<OP>::min() : unisim::util::numeric::Integers<OP>::max() );
+
             if (arch.Test(op2 < OP2(0)))
               {
                 if (arch.Test(OP(-op2) > op1)) arch.SetQC(); else res = op1 - OP(-op2);
@@ -255,15 +254,15 @@ OUT PolyMod2(IN value, uint32_t _poly)
               {
                 if (arch.Test(OP(op2) > (res - op1))) arch.SetQC(); else res = op1 + OP(op2);
               }
-              
+
             return res;
           }
         else
           {
-            OP res( std::numeric_limits<OP>::max() ), comp(res - op1);
-            
+            OP res( unisim::util::numeric::Integers<OP>::max() ), comp(res - op1);
+
             if (arch.Test(OP(op2) > comp)) arch.SetQC(); else res = op1 + OP(op2);
-            
+
             return res;
           }
       }
@@ -272,10 +271,10 @@ OUT PolyMod2(IN value, uint32_t _poly)
   template <class ARCH, typename OP>
   OP SatSub( ARCH& arch, OP op1, OP op2)
   {
-    if ( std::numeric_limits<OP>::is_signed )
+    if ( unisim::util::numeric::Numeric<OP>::is_signed )
       {
-        OP res( arch.Test(op2 < OP(0)) ? std::numeric_limits<OP>::max() : std::numeric_limits<OP>::min() ), comp(res + op2);
-        
+        OP res( arch.Test(op2 < OP(0)) ? unisim::util::numeric::Integers<OP>::max() : unisim::util::numeric::Integers<OP>::min() ), comp(res + op2);
+
         if (arch.Test(op2 < OP(0)))
           {
             if (arch.Test(op1 > comp)) arch.SetQC(); else res = op1 - op2;
@@ -284,19 +283,19 @@ OUT PolyMod2(IN value, uint32_t _poly)
           {
             if (arch.Test(op1 < comp)) arch.SetQC(); else res = op1 - op2;
           }
-        
+
         return res;
       }
     else
       {
         OP res( 0 );
-        
+
         if (arch.Test(op2 > op1)) arch.SetQC(); else res = op1 - op2;
-        
+
         return res;
       }
   }
-   
+
   template <class ARCH, typename FLOAT>
   FLOAT FPNaN( ARCH& arch, FLOAT value )
   {
@@ -313,10 +312,10 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #if DEBUG_FP
     std::cerr << "quiet NaN: " << value << " (0x" << std::hex << ToPacked( value ) << std::dec << ") -> " << res << " (0x" << std::hex << ToPacked( res ) << std::dec << ")" << std::endl;
 #endif
-    
+
     return res;
   }
-  
+
   template <class ARCH, unsigned posT>
   void FPProcessException( ARCH& arch, unisim::util::arithmetic::BitField<posT,1> const& rf )
   {
@@ -335,7 +334,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     }
 #endif
   }
-    
+
   template <typename operT>
   struct OutNaN
   {
@@ -345,12 +344,12 @@ OUT PolyMod2(IN value, uint32_t _poly)
     operator bool () const { return invalid; }
     operator operT () const { return result; }
   };
-  
+
   template <typename ARCH, typename operT>
   OutNaN<operT> FPProcessNaNs(ARCH& arch, std::initializer_list<operT> l, bool fpexc)
   {
     OutNaN<operT> nan = {operT(), false};
-    
+
     for (auto val : l)
       {
         if ( not arch.Test( IsNaN( val )) )
@@ -365,14 +364,14 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
                 FPProcessException( arch, IOC );
               }
-              
+
             return {FPNaN( arch, val ), true};
           }
 
         if (not nan)
           nan = {FPNaN( arch, val ), true};
       }
-    
+
     return nan;
   }
 
@@ -380,7 +379,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
   OutNaN<operT> FPProcessSNaNs(ARCH& arch, std::initializer_list<operT> l, bool fpexc)
   {
     OutNaN<operT> nan = {operT(), false};
-    
+
     for (auto val : l)
       {
         if (arch.Test( IsSignaling( val ) ))
@@ -392,11 +391,11 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
                 FPProcessException( arch, IOC );
               }
-            
+
             return {FPNaN( arch, val ), true};
           }
       }
-    
+
     return nan;
   }
 
@@ -404,7 +403,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
   OutNaN<operT> FPProcessNaNsSignaling(ARCH& arch, std::initializer_list<operT> l, bool fpexc)
   {
     OutNaN<operT> nan = {operT(), false};
-    
+
     for (auto val : l)
       {
         if ( arch.Test( IsNaN( val )) )
@@ -416,19 +415,19 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
                 FPProcessException( arch, IOC );
               }
-            
+
             return {FPNaN( arch, val ), true};
           }
       }
-    
+
     return nan;
   }
-  
+
   struct FPRounding
   {
     enum Code {TIEEVEN, POSINF, NEGINF, ZERO, TIEAWAY, ODD} code;
   };
-  
+
   struct NearestTieEven
   {
     template <typename T> static T roundint(T op, bool exact) { return RoundToInt(op, round_near_even, exact); }
@@ -459,11 +458,11 @@ OUT PolyMod2(IN value, uint32_t _poly)
     template <typename T> static T roundint(T op, bool exact) { return RoundToInt(op, round_odd, exact); }
     template <typename INTEGER, typename T> static INTEGER toint(T op, bool exact) { return ToInt<INTEGER>(op, round_odd, exact); }
   };
-  
+
   struct RoundingMode
   {
     FPRounding::Code rmode;
-    
+
     template <typename ARCH> RoundingMode( ARCH& arch )
     {
       typedef typename ARCH::U32 U32;
@@ -475,7 +474,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
       else if ( arch.Test( raw_rmode == U32(FPRounding::ZERO) ) ) rmode = FPRounding::ZERO;
       else throw Bad();
     }
-    
+
     // RoundingMode( FPRounding::Code _mode ) : rmode(_mode) {}
 
     template <typename T> T roundint(T op, bool exact)
@@ -494,7 +493,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
         }
       return op;
     }
-    
+
     template <typename INTEGER, typename T> INTEGER toint(T op, bool exact)
     {
       switch (rmode)
@@ -508,7 +507,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
         }
       return INTEGER();
     }
-    
+
     unsigned roundingMode()
     {
       switch (rmode)
@@ -528,13 +527,13 @@ OUT PolyMod2(IN value, uint32_t _poly)
   struct FlushToZero
   {
     unsigned ftz;
-    
+
      template <typename ARCH> FlushToZero( ARCH& arch )
       : ftz( ( (  std::is_same<FLOAT, typename ARCH::F16>::value && arch.Test( FZ16.Get( arch.FPCR() ) != typename ARCH::U32(0) ) ) ||
                ( !std::is_same<FLOAT, typename ARCH::F16>::value && arch.Test( FZ.Get  ( arch.FPCR() ) != typename ARCH::U32(0) ) ) ) ? ftz_beforeRounding : ftz_never )
     {
     }
-    
+
     unsigned flushToZero() const { return ftz; }
   };
 
@@ -581,7 +580,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
         FPProcessException( arch, IOC );
       }
   }
-  
+
   template <typename ARCH, typename FLOAT>
   FLOAT FPProcessDenormalInput(ARCH& arch, FLOAT op)
   {
@@ -618,10 +617,10 @@ OUT PolyMod2(IN value, uint32_t _poly)
 
         return res;
       }
-      
+
     return op;
   }
-  
+
   template <typename ARCH, typename FLOAT>
   FLOAT FPProcessDenormalOutput(ARCH& arch, FLOAT op)
   {
@@ -647,14 +646,14 @@ OUT PolyMod2(IN value, uint32_t _poly)
         )
       {
         FloatingPointStatusAndControl<FLOAT>::exceptionFlags( (FloatingPointStatusAndControl<FLOAT>::exceptionFlags() & ~flag_inexact) | (arch.Test(is_zero) ? 0 : flag_underflow ) );
-        
+
         FLOAT res = Zeroes( op );
 #if DEBUG_FP
         std::cerr << "flush-to-zero (output): " << op << " (0x" << std::hex << ToPacked(op) << std::dec << ") -> " << res << " (0x" << std::hex << ToPacked( res ) << std::dec << ")" << std::endl;
 #endif
         return res;
       }
-      
+
     return op;
   }
 
@@ -668,11 +667,11 @@ OUT PolyMod2(IN value, uint32_t _poly)
         {
           AlternativeHalfPrecisionFormatUnsupported() : std::runtime_error("Alternative half-precision format is unsupported") {}
         };
-        
+
         throw AlternativeHalfPrecisionFormatUnsupported();
       }
   }
-  
+
   template <typename ARCH, typename operT> operT FPRound( ARCH& arch, operT op )
   {
 #if DEBUG_FP
@@ -681,7 +680,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     operT res = FPProcessDenormalOutput( arch, op );
 
     FPProcessExceptionFlags( arch, FloatingPointStatusAndControl<operT>::exceptionFlags() );
-    
+
     return arch.Test( IsNaN( res ) ) ? FAbs( FPNaN( arch, res ) ) : res;
   }
 
@@ -695,7 +694,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     std::cerr << "FPCR=0x" << std::hex << arch.FPCR() << std::dec << std::endl;
 #endif
     FLOAT _op = FPProcessDenormalInput( arch, op );
-    
+
     if (auto nan = FPProcessNaNs(arch, {op}, /* fpexc */ true))
       return nan;
 
@@ -722,7 +721,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     FLOAT _op = FPProcessDenormalInput( arch, op );
 
     FPProcessNaNsSignaling(arch, {op}, /* fpexc */ true);
-    
+
     FloatingPointStatusAndControl<FLOAT>::exceptionFlags(0);
     INTEGER res = rmode.template toint<INTEGER>(_op, exact);
 #if DEBUG_FP
@@ -733,7 +732,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
 
     return res;
   }
-  
+
   template <typename INTEGER, typename ARCH, typename FLOAT>
   INTEGER FPToFixedRoundTowardZero(ARCH& arch, FLOAT op, unsigned fbits, bool exact)
   {
@@ -747,10 +746,10 @@ OUT PolyMod2(IN value, uint32_t _poly)
      FLOAT _op = FPProcessDenormalInput( arch, op );
 
     FPProcessNaNsSignaling(arch, {op}, /* fpexc */ true);
-    
+
     FloatingPointStatusAndControl<FLOAT>::exceptionFlags(0);
     FloatingPointStatusAndControl<FLOAT>::roundingMode(round_minMag);
-    
+
     INTEGER res;
     if ( arch.Test( IsNaN( op ) ) )
       {
@@ -779,7 +778,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
 
     return res;
   }
-  
+
   template <typename FLOAT, typename ARCH, typename INTEGER>
   FLOAT IntToFP(ARCH& arch, INTEGER op)
   {
@@ -803,7 +802,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
 
     return res;
   }
-  
+
   template <typename FLOAT, typename ARCH, typename INTEGER>
   FLOAT FixedToFP(ARCH& arch, INTEGER op, unsigned fbits)
   {
@@ -829,7 +828,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     FLOAT res( F64(op) / scale );
     return FPRound(arch, res);
   }
-  
+
   template <typename DST, typename ARCH, typename SRC>
   DST FPConvert( ARCH& arch, SRC op )
   {
@@ -842,19 +841,19 @@ OUT PolyMod2(IN value, uint32_t _poly)
     std::cerr << "FPCR=0x" << std::hex << arch.FPCR() << std::dec << std::endl;
 #endif
     SRC _op = std::is_same<SRC, typename ARCH::F16>::value ? op : FPProcessDenormalInput( arch, op );
-    
+
     typedef typename ARCH::U32 U32;
     FloatingPointStatusAndControl<DST>::defaultNaN( arch.Test( DN.Get( arch.FPCR() ) != U32(0) ) );
     FloatingPointStatusAndControl<DST>::exceptionFlags(0);
     FloatingPointStatusAndControl<DST>::roundingMode( RoundingMode( arch ).roundingMode() );
     FloatingPointStatusAndControl<DST>::detectTininess( tininess_beforeRounding );
     FloatingPointStatusAndControl<DST>::flushToZero( (std::is_same<SRC, typename ARCH::F16>::value or std::is_same<DST, typename ARCH::F16>::value) ? ftz_never : FlushToZero<DST>( arch ).flushToZero() );
-    
+
     if (FPProcessNaNs(arch, {op}, /* fpexc */ true))
     {
       return FPNaN(arch, FConvert<DST>(op));
     }
-    
+
     DST _res = FConvert<DST>(_op);
     DST res = (std::is_same<SRC, typename ARCH::F16>::value or std::is_same<DST, typename ARCH::F16>::value) ? _res : FPProcessDenormalOutput( arch, _res );
 #if DEBUG_FP
@@ -876,19 +875,19 @@ OUT PolyMod2(IN value, uint32_t _poly)
     std::cerr << "FPCR=0x" << std::hex << arch.FPCR() << std::dec << std::endl;
 #endif
     SRC _op = std::is_same<SRC, typename ARCH::F16>::value ? op : FPProcessDenormalInput( arch, op );
-    
+
     typedef typename ARCH::U32 U32;
     FloatingPointStatusAndControl<DST>::defaultNaN( arch.Test( DN.Get( arch.FPCR() ) != U32(0) ) );
     FloatingPointStatusAndControl<DST>::exceptionFlags(0);
     FloatingPointStatusAndControl<DST>::roundingMode( round_odd );
     FloatingPointStatusAndControl<DST>::detectTininess( tininess_beforeRounding );
     FloatingPointStatusAndControl<DST>::flushToZero( (std::is_same<SRC, typename ARCH::F16>::value or std::is_same<DST, typename ARCH::F16>::value) ? ftz_never : FlushToZero<DST>( arch ).flushToZero() );
-    
+
     if (FPProcessNaNs(arch, {op}, /* fpexc */ true))
     {
       return FPNaN(arch, FConvert<DST>(op));
     }
-    
+
     DST _res = FConvert<DST>(_op);
     DST res = (std::is_same<SRC, typename ARCH::F16>::value or std::is_same<DST, typename ARCH::F16>::value) ? _res : FPProcessDenormalOutput( arch, _res);
 #if DEBUG_FP
@@ -897,7 +896,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     FPProcessExceptionFlags( arch, FloatingPointStatusAndControl<DST>::exceptionFlags() );
     return arch.Test( IsNaN( res ) ) ? FAbs( FPNaN( arch, res ) ) : res;
   }
-  
+
   template <typename operT, typename ARCH>
   operT FPSub( ARCH& arch, operT op1, operT op2 )
   {
@@ -1011,9 +1010,9 @@ OUT PolyMod2(IN value, uint32_t _poly)
     FloatingPointStatusAndControl<operT>::roundingMode( RoundingMode( arch ).roundingMode() );
     FloatingPointStatusAndControl<operT>::detectTininess( tininess_beforeRounding );
     FloatingPointStatusAndControl<operT>::flushToZero( FlushToZero<operT>( arch ).flushToZero() );
-    
+
     operT res;
-    
+
     if ( arch.Test( ( IsInf( _op1 ) && IsZero( _op2 ) ) || ( IsZero( _op1 ) && IsInf( _op2 ) ) ) )
       {
         res = FromUnpacked<operT>( { /* sign */ arch.Test(IsNeg(_op1) ^ IsNeg(_op2)), /* exp */ 1, /* frac */ { 0, 0 } } );
@@ -1022,10 +1021,10 @@ OUT PolyMod2(IN value, uint32_t _poly)
       {
         res = _op1 * _op2;
       }
-      
+
     return FPRound(arch, res );
   }
-  
+
   template <typename operT, typename ARCH>
   operT FPDiv( ARCH& arch, operT op1, operT op2 )
   {
@@ -1054,7 +1053,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     FloatingPointStatusAndControl<operT>::flushToZero( FlushToZero<operT>( arch ).flushToZero() );
     return FPRound(arch, _op1 / _op2 );
   }
-  
+
   template <typename operT, typename ARCH>
   operT FPMulAdd( ARCH& arch, operT op1, operT op2, operT op3 )
   {
@@ -1070,7 +1069,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     operT _op2 = FPProcessDenormalInput( arch, op2 );
     operT _op3 = FPProcessDenormalInput( arch, op3 );
     auto nan = FPProcessNaNs(arch, {op1,op2,op3}, /* fpexc */ true);
-      
+
     if ( arch.Test( IsNaN( op1 ) && !IsSignaling( op1 ) && // is quiet NaN
          ( ( IsInf( _op2 ) && IsZero( _op3 ) ) || ( IsZero( _op2 ) && IsInf( _op3 ) ) ) ) )
       {
@@ -1100,7 +1099,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     FloatingPointStatusAndControl<operT>::flushToZero( FlushToZero<operT>( arch ).flushToZero() );
     return FPRound(arch, FMulAdd(_op2, _op3, _op1 ) ); // (op2 * op3) + op1
   }
-  
+
   template <typename operT, typename ARCH>
   operT FPMin( ARCH& arch, operT op1, operT op2 )
   {
@@ -1156,7 +1155,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     operT res = FMinNumber(_op1, _op2);
     return arch.Test( IsNaN( res ) ) ? FPNaN( arch, res ) : res;
   }
-  
+
   template <typename operT, typename ARCH>
   operT FPMax( ARCH& arch, operT op1, operT op2 )
   {
@@ -1184,7 +1183,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     operT res  = FPRound( arch, FMax(_op1, _op2) );
     return res;
   }
-  
+
   template <typename operT, typename ARCH>
   operT FPMaxNumber( ARCH& arch, operT op1, operT op2 )
   {
@@ -1212,7 +1211,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     operT res = FMaxNumber(_op1, _op2);
     return arch.Test( IsNaN( res ) ) ? FPNaN( arch, res ) : res;
   }
-  
+
   template <typename operT, typename ARCH>
   void FPQuietCompare( ARCH& arch, operT op1, operT op2 )
   {
@@ -1224,12 +1223,12 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
     operT _op1 = FPProcessDenormalInput( arch, op1 );
     operT _op2 = FPProcessDenormalInput( arch, op2 );
-    
+
     BOOL n, z, c, v;
     if ( arch.Test( IsNaN( op1 ) || IsNaN( op2 ) ) )
       {
         n = BOOL(0); z = BOOL(0); c = BOOL(1); v = BOOL(1);
-        
+
         FPProcessSNaNs(arch, {op1, op2}, /* fpexc */ true);
       }
     else
@@ -1242,7 +1241,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
     arch.SetNZCV( n, z, c, v );
   }
-  
+
   template <typename operT, typename ARCH>
   void FPSignalingCompare( ARCH& arch, operT op1, operT op2 )
   {
@@ -1254,12 +1253,12 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
     operT _op1 = FPProcessDenormalInput( arch, op1 );
     operT _op2 = FPProcessDenormalInput( arch, op2 );
-    
+
     BOOL n, z, c, v;
     if ( arch.Test( IsNaN( op1 ) || IsNaN( op2 ) ) )
       {
         n = BOOL(0); z = BOOL(0); c = BOOL(1); v = BOOL(1);
-        
+
         FPProcessNaNsSignaling(arch, {op1, op2}, /* fpexc */ true);
       }
     else
@@ -1283,11 +1282,11 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
     operT _op1 = FPProcessDenormalInput( arch, op1 );
     operT _op2 = FPProcessDenormalInput( arch, op2 );
-    
+
     if ( arch.Test( IsNaN( op1 ) || IsNaN( op2 ) ) )
       {
         FPProcessSNaNs(arch, {op1, op2}, /* fpexc */ true);
-        
+
         return typename ARCH::BOOL();
       }
     else
@@ -1306,11 +1305,11 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
     operT _op1 = FPProcessDenormalInput( arch, op1 );
     operT _op2 = FPProcessDenormalInput( arch, op2 );
-    
+
     if ( arch.Test( IsNaN( op1 ) || IsNaN( op2 )  ) )
       {
         FPProcessNaNsSignaling(arch, {op1, op2}, /* fpexc */ true);
-        
+
         return typename ARCH::BOOL();
       }
     else
@@ -1329,11 +1328,11 @@ OUT PolyMod2(IN value, uint32_t _poly)
 #endif
     operT _op1 = FPProcessDenormalInput( arch, op1 );
     operT _op2 = FPProcessDenormalInput( arch, op2 );
-    
+
     if ( arch.Test( IsNaN( op1 ) || IsNaN( op2 ) ) )
       {
         FPProcessNaNsSignaling(arch, {op1, op2}, /* fpexc */ true);
-        
+
         return typename ARCH::BOOL();
       }
     else
@@ -1341,7 +1340,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
         return _op1 > _op2;
       }
   }
-  
+
   template <typename operT, typename ARCH>
   operT FPSqrt( ARCH& arch, operT op )
   {
@@ -1368,7 +1367,7 @@ OUT PolyMod2(IN value, uint32_t _poly)
     FloatingPointStatusAndControl<operT>::flushToZero( FlushToZero<operT>( arch ).flushToZero() );
     return FPRound(arch, FSqrt(_op) );
   }
-  
+
 } // end of namespace arm64
 } // end of namespace isa
 } // end of namespace arm

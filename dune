@@ -1,175 +1,167 @@
 (env
  (_
   (c_flags :standard -std=gnu14 -g0)
-  (cxx_flags :standard -std=gnu++14 -g0)))
+  (cxx_flags :standard -std=gnu++14 -g0 -fvisibility=hidden)))
+
+(include_subdirs unqualified)
 
 (subdir
- unisim_lib
- (library
-  (package unisim_archisec)
-  (name unisim_lib)
-  (foreign_stubs
-   (language cxx)
-   (names
-    f6-ppc64
-    f10-integer
-    f11-disasm
-    f12-symbolic
-    f13-vector
-    f14-binsec
-    f15-decoder
-    f16-floating_point
-    f17-disasm
-    f18-decoder
-    f19-disasm
-    f20-math
-    f21-arch
-    f22-decode
-    f23-decoder
-    f24-disasm
-    f25-arch
-    f26-decoder
-    f27-trap
-    f28-disasm
-    f29-decoder)
-   (flags :standard -I.)
-   (extra_deps
-    unisim/component/cxx/processor/arm/isa/thumb2/thumb.tcc
-    unisim/component/cxx/processor/arm/isa/thumb2/thumb.hh
-    unisim/component/cxx/processor/arm/isa/arm32/arm32.tcc
-    unisim/component/cxx/processor/arm/isa/arm32/arm32.hh
-    unisim/component/cxx/processor/arm/dba/arm64/arm64.tcc
-    unisim/component/cxx/processor/arm/dba/arm64/arm64.hh
-    unisim/component/cxx/processor/powerpc/dba/ppc64/ppc64.cc
-    unisim/component/cxx/processor/powerpc/dba/ppc64/ppc64.hh
-    unisim/component/cxx/processor/sparc/dba/sv8/sparc.tcc
-    unisim/component/cxx/processor/sparc/dba/sv8/sparc.hh
-    unisim/util/arithmetic/integer.cc
-    unisim/component/cxx/processor/arm/isa/disasm.cc
-    unisim/util/symbolic/symbolic.cc
-    unisim/util/symbolic/vector/vector.cc
-    unisim/util/symbolic/binsec/binsec.cc
-    unisim/component/cxx/processor/arm/dba/aarch32/decoder.cc
-    unisim/util/floating_point/floating_point.cc
-    unisim/component/cxx/processor/arm/isa/arm64/disasm.cc
-    unisim/component/cxx/processor/arm/dba/aarch64/decoder.cc
-    unisim/component/cxx/processor/intel/disasm.cc
-    unisim/component/cxx/processor/intel/math.cc
-    unisim/component/cxx/processor/intel/dba/arch.cc
-    unisim/component/cxx/processor/intel/dba/decode.cc
-    unisim/component/cxx/processor/intel/dba/decoder.cc
-    unisim/component/cxx/processor/powerpc/isa/disasm.cc
-    unisim/component/cxx/processor/powerpc/dba/arch64/arch.cc
-    unisim/component/cxx/processor/powerpc/dba/arch64/decoder.cc
-    unisim/component/cxx/processor/sparc/trap.cc
-    unisim/component/cxx/processor/sparc/isa/sv8/disasm.cc
-    unisim/component/cxx/processor/sparc/dba/arch32/decoder.cc
-    unisim/util/inlining/inlining.hh
-    unisim/util/arithmetic/arithmetic.hh
-    unisim/util/arithmetic/bitfield.hh
-    unisim/util/arithmetic/integer.hh
-    unisim/util/identifier/identifier.hh
-    unisim/util/truth_table/truth_table.hh
-    unisim/component/cxx/processor/arm/isa/constants.hh
-    unisim/component/cxx/processor/arm/isa/decode.hh
-    unisim/component/cxx/processor/arm/isa/disasm.hh
-    unisim/component/cxx/processor/arm/isa/execute.hh
-    unisim/component/cxx/processor/arm/isa/models.hh
-    unisim/util/endian/endian.hh
-    unisim/util/likely/likely.hh
-    unisim/util/symbolic/symbolic.hh
-    unisim/util/symbolic/vector/vector.hh
-    unisim/util/symbolic/binsec/binsec.hh
-    unisim/component/cxx/processor/arm/dba/aarch32/decoder.hh
-    unisim/util/floating_point/floating_point.hh
-    unisim/component/cxx/processor/arm/isa/arm64/decode.hh
-    unisim/component/cxx/processor/arm/isa/arm64/disasm.hh
-    unisim/component/cxx/processor/arm/isa/arm64/execute.hh
-    unisim/component/cxx/vector/vector.hh
-    unisim/component/cxx/processor/arm/regs64/cpu.hh
-    unisim/component/cxx/processor/arm/dba/aarch64/decoder.hh
-    unisim/component/cxx/processor/intel/aes.hh
-    unisim/component/cxx/processor/intel/disasm.hh
-    unisim/component/cxx/processor/intel/execute.hh
-    unisim/component/cxx/processor/intel/math.hh
-    unisim/component/cxx/processor/intel/modrm.hh
-    unisim/component/cxx/processor/intel/segments.hh
-    unisim/component/cxx/processor/intel/tmp.hh
-    unisim/component/cxx/processor/intel/types.hh
-    unisim/component/cxx/processor/intel/vectorbank.hh
-    unisim/component/cxx/processor/intel/isa/aes.hh
-    unisim/component/cxx/processor/intel/isa/branch.hh
-    unisim/component/cxx/processor/intel/isa/floatingpoint.hh
-    unisim/component/cxx/processor/intel/isa/integer.hh
-    unisim/component/cxx/processor/intel/isa/intel.hh
-    unisim/component/cxx/processor/intel/isa/move.hh
-    unisim/component/cxx/processor/intel/isa/simd.hh
-    unisim/component/cxx/processor/intel/isa/special.hh
-    unisim/component/cxx/processor/intel/isa/string.hh
-    unisim/component/cxx/processor/intel/dba/arch.hh
-    unisim/component/cxx/processor/intel/dba/decoder.hh
-    unisim/component/cxx/processor/powerpc/dba/types.hh
-    unisim/component/cxx/processor/powerpc/isa/disasm.hh
-    unisim/component/cxx/processor/powerpc/isa/book_i/fixed_point/integer.hh
-    unisim/component/cxx/processor/powerpc/isa/book_i/floating_point/floating.hh
-    unisim/component/cxx/processor/powerpc/dba/arch64/arch.hh
-    unisim/component/cxx/processor/powerpc/dba/arch64/decoder.hh
-    unisim/component/cxx/processor/sparc/asi.hh
-    unisim/component/cxx/processor/sparc/trap.hh
-    unisim/component/cxx/processor/sparc/isa/sv8/arch.hh
-    unisim/component/cxx/processor/sparc/isa/sv8/disasm.hh
-    unisim/component/cxx/processor/sparc/dba/arch32/decoder.hh
-    unisim/component/cxx/processor/intel/isa/intel.tcc))))
+ unisim_lib/unisim
+ (include_subdirs no))
+
+(library
+ (public_name unisim_archisec)
+ (name unisim_archisec)
+ (modules unisim_archisec)
+ (foreign_stubs
+  (language cxx)
+  (names
+   f6-ppc64
+   f10-integer
+   f11-disasm
+   f12-symbolic
+   f13-vector
+   f14-binsec
+   f15-decoder
+   f16-floating_point
+   f17-disasm
+   f18-decoder
+   f19-disasm
+   f20-math
+   f21-arch
+   f22-decode
+   f23-decoder
+   f24-disasm
+   f25-arch
+   f26-decoder
+   f27-trap
+   f28-disasm
+   f29-decoder
+   arm32dba
+   aarch64dba
+   amd64dba
+   ppc64dba
+   sparcdba)
+  (flags :standard -Iunisim_lib)
+  (extra_deps
+   unisim_lib/unisim/component/cxx/processor/arm/isa/thumb2/thumb.tcc
+   unisim_lib/unisim/component/cxx/processor/arm/isa/thumb2/thumb.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/arm32/arm32.tcc
+   unisim_lib/unisim/component/cxx/processor/arm/isa/arm32/arm32.hh
+   unisim_lib/unisim/component/cxx/processor/arm/dba/arm64/arm64.tcc
+   unisim_lib/unisim/component/cxx/processor/arm/dba/arm64/arm64.hh
+   unisim_lib/unisim/component/cxx/processor/powerpc/dba/ppc64/ppc64.cc
+   unisim_lib/unisim/component/cxx/processor/powerpc/dba/ppc64/ppc64.hh
+   unisim_lib/unisim/component/cxx/processor/sparc/dba/sv8/sparc.tcc
+   unisim_lib/unisim/component/cxx/processor/sparc/dba/sv8/sparc.hh
+   unisim_lib/unisim/util/arithmetic/integer.cc
+   unisim_lib/unisim/component/cxx/processor/arm/isa/disasm.cc
+   unisim_lib/unisim/util/symbolic/symbolic.cc
+   unisim_lib/unisim/util/symbolic/vector/vector.cc
+   unisim_lib/unisim/util/symbolic/binsec/binsec.cc
+   unisim_lib/unisim/component/cxx/processor/arm/dba/aarch32/decoder.cc
+   unisim_lib/unisim/util/floating_point/floating_point.cc
+   unisim_lib/unisim/component/cxx/processor/arm/isa/arm64/disasm.cc
+   unisim_lib/unisim/component/cxx/processor/arm/dba/aarch64/decoder.cc
+   unisim_lib/unisim/component/cxx/processor/intel/disasm.cc
+   unisim_lib/unisim/component/cxx/processor/intel/math.cc
+   unisim_lib/unisim/component/cxx/processor/intel/dba/arch.cc
+   unisim_lib/unisim/component/cxx/processor/intel/dba/decode.cc
+   unisim_lib/unisim/component/cxx/processor/intel/dba/decoder.cc
+   unisim_lib/unisim/component/cxx/processor/powerpc/isa/disasm.cc
+   unisim_lib/unisim/component/cxx/processor/powerpc/dba/arch64/arch.cc
+   unisim_lib/unisim/component/cxx/processor/powerpc/dba/arch64/decoder.cc
+   unisim_lib/unisim/component/cxx/processor/sparc/trap.cc
+   unisim_lib/unisim/component/cxx/processor/sparc/isa/sv8/disasm.cc
+   unisim_lib/unisim/component/cxx/processor/sparc/dba/arch32/decoder.cc
+   unisim_lib/unisim/util/inlining/inlining.hh
+   unisim_lib/unisim/util/arithmetic/arithmetic.hh
+   unisim_lib/unisim/util/arithmetic/bitfield.hh
+   unisim_lib/unisim/util/arithmetic/integer.hh
+   unisim_lib/unisim/util/identifier/identifier.hh
+   unisim_lib/unisim/util/numeric/numeric.hh
+   unisim_lib/unisim/util/truth_table/truth_table.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/constants.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/decode.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/disasm.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/execute.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/models.hh
+   unisim_lib/unisim/util/endian/endian.hh
+   unisim_lib/unisim/util/likely/likely.hh
+   unisim_lib/unisim/util/symbolic/symbolic.hh
+   unisim_lib/unisim/util/symbolic/vector/vector.hh
+   unisim_lib/unisim/util/symbolic/binsec/binsec.hh
+   unisim_lib/unisim/component/cxx/processor/arm/dba/aarch32/decoder.hh
+   unisim_lib/unisim/util/floating_point/floating_point.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/arm64/decode.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/arm64/disasm.hh
+   unisim_lib/unisim/component/cxx/processor/arm/isa/arm64/execute.hh
+   unisim_lib/unisim/component/cxx/vector/vector.hh
+   unisim_lib/unisim/component/cxx/processor/arm/regs64/cpu.hh
+   unisim_lib/unisim/component/cxx/processor/arm/dba/aarch64/decoder.hh
+   unisim_lib/unisim/component/cxx/processor/intel/aes.hh
+   unisim_lib/unisim/component/cxx/processor/intel/bmi.hh
+   unisim_lib/unisim/component/cxx/processor/intel/disasm.hh
+   unisim_lib/unisim/component/cxx/processor/intel/execute.hh
+   unisim_lib/unisim/component/cxx/processor/intel/math.hh
+   unisim_lib/unisim/component/cxx/processor/intel/modrm.hh
+   unisim_lib/unisim/component/cxx/processor/intel/segments.hh
+   unisim_lib/unisim/component/cxx/processor/intel/tmp.hh
+   unisim_lib/unisim/component/cxx/processor/intel/types.hh
+   unisim_lib/unisim/component/cxx/processor/intel/vectorbank.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/aes.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/branch.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/floatingpoint.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/integer.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/intel.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/move.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/simd.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/special.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/string.hh
+   unisim_lib/unisim/component/cxx/processor/intel/dba/arch.hh
+   unisim_lib/unisim/component/cxx/processor/intel/dba/decoder.hh
+   unisim_lib/unisim/component/cxx/processor/powerpc/dba/types.hh
+   unisim_lib/unisim/component/cxx/processor/powerpc/isa/disasm.hh
+   unisim_lib/unisim/component/cxx/processor/powerpc/isa/book_i/fixed_point/integer.hh
+   unisim_lib/unisim/component/cxx/processor/powerpc/isa/book_i/floating_point/floating.hh
+   unisim_lib/unisim/component/cxx/processor/powerpc/dba/arch64/arch.hh
+   unisim_lib/unisim/component/cxx/processor/powerpc/dba/arch64/decoder.hh
+   unisim_lib/unisim/component/cxx/processor/sparc/asi.hh
+   unisim_lib/unisim/component/cxx/processor/sparc/trap.hh
+   unisim_lib/unisim/component/cxx/processor/sparc/isa/sv8/arch.hh
+   unisim_lib/unisim/component/cxx/processor/sparc/isa/sv8/disasm.hh
+   unisim_lib/unisim/component/cxx/processor/sparc/dba/arch32/decoder.hh
+   unisim_lib/unisim/component/cxx/processor/intel/isa/intel.tcc)))
 
 (library
  (public_name unisim_archisec.arm32dba)
  (name arm32dba)
  (modules arm32dba)
- (foreign_stubs
-  (language cxx)
-  (names arm32dba)
-  (flags :standard -I.))
- (libraries unisim_lib))
+ (libraries unisim_archisec))
 
 (library
  (public_name unisim_archisec.aarch64dba)
  (name aarch64dba)
  (modules aarch64dba)
- (foreign_stubs
-  (language cxx)
-  (names aarch64dba)
-  (flags :standard -I.))
- (libraries unisim_lib))
+ (libraries unisim_archisec))
 
 (library
  (public_name unisim_archisec.ppc64dba)
  (name ppc64dba)
  (modules ppc64dba)
- (foreign_stubs
-  (language cxx)
-  (names ppc64dba)
-  (flags :standard -I.))
- (libraries unisim_lib))
+ (libraries unisim_archisec))
 
 (library
  (public_name unisim_archisec.amd64dba)
  (name amd64dba)
  (modules amd64dba)
- (foreign_stubs
-  (language cxx)
-  (names amd64dba)
-  (flags :standard -I.))
- (libraries unisim_lib))
+ (libraries unisim_archisec))
 
 (library
  (public_name unisim_archisec.sparcdba)
  (name sparcdba)
  (modules sparcdba)
- (foreign_stubs
-  (language cxx)
-  (names sparcdba)
-  (flags :standard -I.))
- (libraries unisim_lib))
+ (libraries unisim_archisec))
 
 (test
  (name unittest)

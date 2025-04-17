@@ -37,6 +37,7 @@
 
 #include <unisim/util/arithmetic/arithmetic.hh>
 #include <unisim/util/arithmetic/integer.hh>
+#include <unisim/util/numeric/numeric.hh>
 #include <unisim/util/identifier/identifier.hh>
 #include <stdexcept>
 #include <set>
@@ -169,7 +170,7 @@ namespace symbolic {
   template <typename VALUE_TYPE>
   struct TypeInfo
   {
-    enum { BITSIZE = 8*sizeof(VALUE_TYPE), ENCODING = std::is_signed<VALUE_TYPE>::value ? ValueType::SIGNED : ValueType::UNSIGNED };
+    enum { ENCODING = unisim::util::numeric::Numeric<VALUE_TYPE>::is_signed ? ValueType::SIGNED : ValueType::UNSIGNED };
     static constexpr Op::Code rsh_op() { return std::is_signed<VALUE_TYPE>::value ? Op::Asr : Op::Lsr; }
     static constexpr Op::Code add_op() { return Op::Add; }
     static constexpr Op::Code sub_op() { return Op::Sub; }
@@ -182,10 +183,11 @@ namespace symbolic {
 
   template <> struct TypeInfo<bool>
   {
-    enum { BITSIZE = 1, ENCODING = ValueType::BOOL };
+    enum { ENCODING = ValueType::BOOL };
   };
   struct FloatTypeOps
   {
+    enum { ENCODING = ValueType::FLOAT };
     static constexpr Op::Code add_op() { return Op::FAdd; }
     static constexpr Op::Code sub_op() { return Op::FSub; }
     static constexpr Op::Code mul_op() { return Op::FMul; }
@@ -193,23 +195,14 @@ namespace symbolic {
     static constexpr Op::Code min_op() { return Op::FMin; }
     static constexpr Op::Code max_op() { return Op::FMax; }
   };
-  template <> struct TypeInfo<float> : public FloatTypeOps
-  {
-    enum { BITSIZE = 32, ENCODING = ValueType::FLOAT };
-  };
-  template <> struct TypeInfo<double> : public FloatTypeOps
-  {
-    enum { BITSIZE = 64, ENCODING = ValueType::FLOAT };
-  };
-  template <> struct TypeInfo<long double> : public FloatTypeOps
-  {
-    enum { BITSIZE = 80, ENCODING = ValueType::FLOAT };
-  };
+  template <> struct TypeInfo<float> : public FloatTypeOps {};
+  template <> struct TypeInfo<double> : public FloatTypeOps {};
+  template <> struct TypeInfo<long double> : public FloatTypeOps {};
 
   template <typename T>
   ValueType CValueType( T const& )
   {
-    return ValueType(ValueType::Code(TypeInfo<T>::ENCODING), TypeInfo<T>::BITSIZE);
+    return ValueType(ValueType::Code(TypeInfo<T>::ENCODING), unisim::util::numeric::Numeric<T>::bitsize);
   }
 
   ValueType CValueType(ValueType::Code encoding, unsigned bitsize);
@@ -713,6 +706,7 @@ namespace symbolic {
   struct SmartValue
   {
     typedef VALUE_TYPE value_type;
+    typedef unisim::util::numeric::Numeric<value_type> numeric_type;
     typedef SmartValue<value_type> this_type;
     typedef TypeInfo<value_type> info_type;
     static ValueType GetType() { return CValueType(value_type()); }
@@ -740,8 +734,8 @@ namespace symbolic {
       }
     }
 
-    static bool const is_signed = std::numeric_limits<value_type>::is_signed;
-    static bool const is_float = std::is_floating_point<value_type>::value;
+    static bool const is_signed = unisim::util::numeric::Numeric<value_type>::is_signed;
+    static bool const is_float = unisim::util::numeric::Numeric<value_type>::is_floating_point;
 
     this_type& operator = ( this_type const& other ) { expr = other.expr; return *this; }
 
@@ -1016,7 +1010,7 @@ namespace symbolic {
     template <typename ofpT, typename ifpT, class ARCH> static
     void FtoF( SmartValue<ofpT>& dst, SmartValue<ifpT> const& src, ARCH& arch, SmartValue<uint32_t> const& fpscr_val )
     {
-      dst = SmartValue<ofpT>( Expr( new FtoFNode( src.expr, TypeInfo<ifpT>::BITSIZE, TypeInfo<ofpT>::BITSIZE ) ) );
+      dst = SmartValue<ofpT>( Expr( new FtoFNode( src.expr, unisim::util::numeric::Numeric<ifpT>::bitsize, unisim::util::numeric::Numeric<ofpT>::bitsize ) ) );
     }
 
     struct FtoINodeBase : public ExprNode

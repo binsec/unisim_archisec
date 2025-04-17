@@ -41,6 +41,10 @@ let () =
   print_newline ();
   print_string @@ Amd64dba.decode ~m64:true ~addr:0x4000L "55";
   print_newline ();
+  print_string "Amd64dba.decode ~m64:true ~addr:0x4000L \"30c0\"";
+  print_newline ();
+  print_string @@ Amd64dba.decode ~m64:true ~addr:0x4000L "30c0";
+  print_newline ();
   print_string "Arm32dba.decode ~thumb:false ~addr:0x4000l 0xe2543210l";
   print_newline ();
   print_string @@ Arm32dba.decode ~thumb:false ~addr:0x4000l 0xe2543210l;

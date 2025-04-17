@@ -32,4 +32,28 @@
 (*  POSSIBILITY OF SUCH DAMAGE.                                               *)
 (******************************************************************************)
 
-include Unisim_archisec.Ppc64
+module Arm32 = struct
+  external decode :
+    thumb:bool -> bigendian:bool -> itstate:int -> addr:int32 -> int32 -> string
+    = "arm32dba_decode"
+
+  let decode ~thumb ?(bigendian = false) ?(itstate = 0) ~addr code =
+    decode ~thumb ~bigendian ~itstate ~addr code
+end
+
+module Aarch64 = struct
+  external decode : addr:int64 -> int32 -> string = "aarch64dba_decode"
+end
+
+module Amd64 = struct
+  external decode : m64:bool -> addr:int64 -> string -> string
+    = "amd64dba_decode"
+end
+
+module Ppc64 = struct
+  external decode : addr:int64 -> int32 -> string = "ppc64dba_decode"
+end
+
+module Sparc = struct
+  external decode : addr:int32 -> int32 -> int32 -> string = "sparcdba_decode"
+end

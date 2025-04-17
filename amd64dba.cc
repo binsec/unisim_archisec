@@ -38,10 +38,6 @@
 #include <sstream>
 #include <cstdint>
 
-namespace intel {
-  int decode(bool, uint64_t, std::vector<uint8_t>, std::ostream&);
-}
-
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
 #include <caml/fail.h>
@@ -57,7 +53,8 @@ uint8_t nibble_value(char n) {
     caml_invalid_argument("not a valid hexadecimal digit");
 }
 
-extern "C" value amd64dba_decode(value vmode, value vaddr, value vopcode) {
+extern "C" __attribute__ ((visibility ("default")))
+value amd64dba_decode(value vmode, value vaddr, value vopcode) {
   const char *opcode = String_val(vopcode);
   std::vector<uint8_t> code;
   for (int i = 0; opcode[i] != '\0'; i += 2) {

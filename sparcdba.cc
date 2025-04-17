@@ -43,7 +43,8 @@
 #include <caml/alloc.h>
 #include <caml/fail.h>
 
-extern "C" value sparcdba_decode(value vaddr, value vopcode, value vdelayslot) {
+extern "C" __attribute__ ((visibility ("default")))
+value sparcdba_decode(value vaddr, value vopcode, value vdelayslot) {
   std::stringstream s;
   unisim::component::cxx::processor::sparc::dba::arch32::Decoder decoder;
   decoder.process( s, Int32_val(vaddr),
