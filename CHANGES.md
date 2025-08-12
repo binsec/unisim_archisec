@@ -1,3 +1,9 @@
+## 0.0.12 (2025-08-12)
+
+- add a few AMD64 instructions
+- bug fixes and code refactoring
+  (DBA instructions order should now be stable across platforms)
+
 ## 0.0.11 (2025-07-05)
 
 - add several AMD64 instructions

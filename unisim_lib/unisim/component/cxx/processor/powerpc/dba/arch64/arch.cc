@@ -99,8 +99,8 @@ namespace arch64 {
 
     unisim::util::symbolic::shift_type pos = __builtin_ctz(maskval);
     Expr scratch = new BitRead( path, CRBIT(31^pos) );
-    scratch = unisim::util::symbolic::binsec::BitFilter::mksimple(scratch, 1, 0, 1, 32, false);
-    expr = unisim::util::symbolic::make_operation(unisim::util::symbolic::Op::Lsl, scratch, unisim::util::symbolic::make_const(pos));
+    scratch = unisim::util::symbolic::binsec::BitFilter::mksimple(scratch, 1, 0, 1, 32, false, false);
+    expr = unisim::util::symbolic::make_operation(unisim::util::symbolic::Op::Shl, scratch, unisim::util::symbolic::make_const(pos));
 
     return 0;
   }
@@ -124,8 +124,8 @@ namespace arch64 {
         for (unsigned idx = 32; idx-- > 0;)
           {
             Expr
-              new_crbit = unisim::util::symbolic::binsec::BitFilter::mksimple(cr.value.expr, 32, 31 ^ idx, 1, 1, false),
-              old_crbit = unisim::util::symbolic::binsec::BitFilter::mksimple(ref.cr.value.expr, 32, 31 ^ idx, 1, 1, false);
+              new_crbit = unisim::util::symbolic::binsec::BitFilter::mksimple(cr.value.expr, 32, 31 ^ idx, 1, 1, false, false),
+              old_crbit = unisim::util::symbolic::binsec::BitFilter::mksimple(ref.cr.value.expr, 32, 31 ^ idx, 1, 1, false, false);
 
             // unisim::util::symbolic::binsec::BitSimplify::Do(new_crbit);
             // unisim::util::symbolic::binsec::BitSimplify::Do(old_crbit);

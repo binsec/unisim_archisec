@@ -581,7 +581,7 @@ struct Processor : public ProcessorBase
 
     virtual ValueType GetType() const override { return ELEM::GetType(); }
 
-    virtual int GenCode(std::ostream& sink, unisim::util::symbolic::binsec::Scope& scope) const override
+    virtual ValueType GenCode(std::ostream& sink, unisim::util::symbolic::binsec::Scope& scope) const override
     {
       for (int i = 0; i < elemcount - 1; i += 1) {
         sink << "(if";
@@ -596,7 +596,7 @@ struct Processor : public ProcessorBase
       for (int i = 0; i < elemcount - 1; i += 1) {
         sink << ')';
       }
-      return elemsize;
+      return GetType();
     }
 
     virtual int cmp( ExprNode const& brhs ) const override { return compare( dynamic_cast<this_type const&>(brhs) ); }
@@ -843,6 +843,8 @@ ProcessorBase::Expr
 Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos ) const
 {
   using unisim::util::symbolic::make_const;
+  using unisim::util::symbolic::Op;
+  using unisim::util::symbolic::binsec::BitFilter;
 
   if (not regvalues[reg][pos].node)
     {
@@ -850,12 +852,12 @@ Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos ) const
       unsigned src = pos;
       do { src = src & (src-1); } while (not regvalues[reg][src].node);
       unsigned shift = 8*(pos - src);
-      return unisim::util::symbolic::binsec::BitFilter::mksimple( regvalues[reg][src], 8*GREGSIZE, shift, 8*size, 8*GREGSIZE, false );
+      return BitFilter::mksimple( regvalues[reg][src], 8*GREGSIZE, shift, 8*size, 8*GREGSIZE, false, false );
     }
   else if (not regvalues[reg][(pos|size)&(GREGSIZE-1)].node)
     {
       // requested read is in lower bits of a larger value
-      return unisim::util::symbolic::binsec::BitFilter::mksimple( regvalues[reg][pos], 8*GREGSIZE, 0, 8*size, 8*GREGSIZE, false );
+      return BitFilter::mksimple( regvalues[reg][pos], 8*GREGSIZE, 0, 8*size, 8*GREGSIZE, false, false );
     }
   else if ((size > 1) and (regvalues[reg][pos|(size >> 1)].node))
     {
@@ -865,7 +867,7 @@ Processor<MODE>::eregread( unsigned reg, unsigned size, unsigned pos ) const
         {
           if (not regvalues[reg][pos+idx].node)
             continue;
-          concat = make_operation( "Or", make_operation( "Lsl", regvalues[reg][idx], make_const( uint8_t(8*idx) ) ), concat );
+          concat = make_operation( Op::Or, make_operation( Op::Shl, regvalues[reg][idx], make_const( uint8_t(8*idx) ) ), concat );
         }
       return concat;
     }
@@ -963,7 +965,7 @@ Processor<MODE>::eregsinks( Processor<MODE> const& ref, unsigned reg ) const
             core.path->add_sink( newRegWrite( IRegID(reg), value ) );
           else
             {
-              value = unisim::util::symbolic::binsec::BitFilter::mksimple( value, 8*GREGSIZE, 0, 8*size, 8*size, false );
+              value = unisim::util::symbolic::binsec::BitFilter::mksimple( value, 8*GREGSIZE, 0, 8*size, 8*size, false, false );
               core.path->add_sink( newPartialRegWrite( IRegID(reg), 8*pos, 8*size, value ) );
             }
         }

@@ -76,15 +76,14 @@ namespace symbolic {
     enum Code
       {
         Xor, And, Or,
-        Ror, Rol, Lsl, Asr, Lsr,
-        Add, Sub, Mul, Div, Divu, Mod, Modu, Min, Max, Minu, Maxu,
+        Rol, Ror, Shl, Shr,
+        Add, Sub, Mul, Div, Mod, Min, Max,
         CMov, Inc, Dec,
         Tzero, Tnzero,
-        Teq, Tne, Tge, Tgt, Tle, Tlt, Tgeu, Tgtu, Tleu, Tltu,
+        Teq, Tne, Tle, Tgt, Tge, Tlt,
         BSwp, BSR, BSF, POPCNT, Not, Neg,
-        FAdd, FSub, FDiv, FMul,
-        FCmp, FSQB, FFZ, FNeg, FSqrt, FAbs, FDen, FMod, FPow,
-        FCeil, FFloor, FTrunc, FRound, FNear, FMax, FMin,
+        FCmp, FSQB, FFZ, FNeg, FSqrt, FAbs, FDen, FPow,
+        FCeil, FFloor, FTrunc, FRound, FNear,
         Cast, ReinterpretAs,
         end
       } code;
@@ -99,20 +98,15 @@ namespace symbolic {
         case    Add: return "Add";
         case    Sub: return "Sub";
         case    Div: return "Div";
-        case   Divu: return "Divu";
         case    Mod: return "Mod";
-        case   Modu: return "Modu";
         case    Mul: return "Mul";
         case    Min: return "Min";
         case    Max: return "Max";
-        case   Minu: return "Minu";
-        case   Maxu: return "Maxu";
         case   CMov: return "CMov";
         case    Ror: return "Ror";
         case    Rol: return "Rol";
-        case    Lsl: return "Lsl";
-        case    Asr: return "Asr";
-        case    Lsr: return "Lsr";
+        case    Shl: return "Shl";
+        case    Shr: return "Shr";
         case    Inc: return "Inc";
         case    Dec: return "Dec";
         case  Tzero: return "Tzero";
@@ -123,10 +117,6 @@ namespace symbolic {
         case    Tgt: return "Tgt";
         case    Tle: return "Tle";
         case    Tlt: return "Tlt";
-        case   Tgeu: return "Tgeu";
-        case   Tgtu: return "Tgtu";
-        case   Tleu: return "Tleu";
-        case   Tltu: return "Tltu";
         case   FCmp: return "FCmp";
         case   BSwp: return "BSwp";
         case    BSR: return "BSR";
@@ -134,25 +124,18 @@ namespace symbolic {
         case POPCNT: return "POPCNT";
         case    Not: return "Not";
         case    Neg: return "Neg";
-        case   FAdd: return "FAdd";
-        case   FSub: return "FSub";
-        case   FMul: return "FMul";
-        case   FDiv: return "FDiv";
         case   FSQB: return "FSQB";
         case    FFZ: return "FFZ";
         case   FNeg: return "FNeg";
         case  FSqrt: return "FSqrt";
         case   FAbs: return "FAbs";
         case   FDen: return "FDen";
-        case   FMod: return "FMod";
         case   FPow: return "FPow";
         case FFloor: return "FFloor";
         case  FCeil: return "FCeil";
         case FRound: return "FRound";
         case FTrunc: return "FTrunc";
         case  FNear: return "FNear";
-        case   FMax: return "FMax";
-        case   FMin: return "FMin";
         case   Cast: return "Cast";
         case ReinterpretAs: return "ReinterpretAs";
         case    end: break;
@@ -162,7 +145,7 @@ namespace symbolic {
 
     Op() : code(end) {}
     Op( Code _code ) : code(_code) {}
-    Op( char const* _code ) : code(end) { init( _code ); }
+    //    Op( char const* _code ) : code(end) { init( _code ); }
   };
 
   // TODO: Use c++-20 concepts and requirements ASAP.
@@ -171,14 +154,6 @@ namespace symbolic {
   struct TypeInfo
   {
     enum { ENCODING = unisim::util::numeric::Numeric<VALUE_TYPE>::is_signed ? ValueType::SIGNED : ValueType::UNSIGNED };
-    static constexpr Op::Code rsh_op() { return std::is_signed<VALUE_TYPE>::value ? Op::Asr : Op::Lsr; }
-    static constexpr Op::Code add_op() { return Op::Add; }
-    static constexpr Op::Code sub_op() { return Op::Sub; }
-    static constexpr Op::Code mul_op() { return Op::Mul; }
-    static constexpr Op::Code div_op() { return std::is_signed<VALUE_TYPE>::value ? Op::Div : Op::Divu; }
-    static constexpr Op::Code mod_op() { return std::is_signed<VALUE_TYPE>::value ? Op::Mod : Op::Modu; }
-    static constexpr Op::Code min_op() { return std::is_signed<VALUE_TYPE>::value ? Op::Min : Op::Minu; }
-    static constexpr Op::Code max_op() { return std::is_signed<VALUE_TYPE>::value ? Op::Max : Op::Maxu; }
   };
 
   template <> struct TypeInfo<bool>
@@ -188,12 +163,6 @@ namespace symbolic {
   struct FloatTypeOps
   {
     enum { ENCODING = ValueType::FLOAT };
-    static constexpr Op::Code add_op() { return Op::FAdd; }
-    static constexpr Op::Code sub_op() { return Op::FSub; }
-    static constexpr Op::Code mul_op() { return Op::FMul; }
-    static constexpr Op::Code div_op() { return Op::FDiv; }
-    static constexpr Op::Code min_op() { return Op::FMin; }
-    static constexpr Op::Code max_op() { return Op::FMax; }
   };
   template <> struct TypeInfo<float> : public FloatTypeOps {};
   template <> struct TypeInfo<double> : public FloatTypeOps {};
@@ -346,6 +315,9 @@ namespace symbolic {
   VALUE_TYPE EvalRotateLeft( VALUE_TYPE v, shift_type shift ) { throw std::logic_error( "No RotateLeft for this type" ); }
   uint32_t   EvalRotateLeft( uint32_t v, shift_type shift );
 
+  // ReinterpretAs is not a C cast. It works exclusively with encoding
+  // bits and is primarily intended for simple constant construction
+  // of dynamic primitive types (mostly integers and boolean).
   template <typename VALUE_TYPE>
   VALUE_TYPE EvalReinterpretAs( VALUE_TYPE res, ConstNodeBase const* cst )
   {
@@ -374,6 +346,17 @@ namespace symbolic {
     return res;
   }
 
+  /* Expression simplification is based on a visitor abstract class,
+   * called Evaluator. The visitor abstract class allows extending the
+   * simplification process beyond simple constant propagation. The
+   * virtual `simplify` method operates in-place on the `Expr`
+   * argument (the second) and replaces it with a simplified
+   * expression if possible. The first `unsigned` arguments gives the
+   * position of this expression in the parent expression and the
+   * `Evaluator` object may carry additional simplifcation information
+   * regarding current simplification, such as bits or domain
+   * relevance to the parent expression.
+   */
   struct Evaluator
   {
     struct Failure {};
@@ -411,8 +394,12 @@ namespace symbolic {
       /* First compare actual types */
       const std::type_info* til = &typeid(*node);
       const std::type_info* tir = &typeid(*rhs.node);
+#if 0
       if (til < tir) return -1;
       if (til > tir) return +1;
+#else
+      if (til != tir) return strcmp(til->name(), tir->name());
+#endif
 
       /* Same types, call derived comparator */
       if (int delta = node->cmp( *rhs.node ))
@@ -454,20 +441,20 @@ namespace symbolic {
       switch (op.code)
         {
         case Op::BSwp: case Op::Not: case Op::Neg:  case Op::BSR:   case Op::BSF:  case Op::POPCNT:
-        case Op::FSQB: case Op::FFZ: case Op::FNeg: case Op::FSqrt: case Op::FAbs: case Op::FMod: case Op::FPow:
+        case Op::FSQB: case Op::FFZ: case Op::FNeg: case Op::FSqrt: case Op::FAbs: case Op::FPow:
         case Op::FFloor: case Op::FCeil: case Op::FTrunc: case Op::FRound: case Op::FNear:
-        case Op::FMax: case Op::FMin: case Op::FAdd: case Op::FSub: case Op::FMul: case Op::FDiv:
         case Op::Xor:  case Op::And: case Op::Or:
-        case Op::Lsl:  case Op::Lsr: case Op::Asr:  case Op::Ror:   case Op::Rol:
-        case Op::Add:  case Op::Sub: case Op::Min:  case Op::Max: case Op::Minu:  case Op::Maxu: case Op::CMov:
-        case Op::Mul:  case Op::Div: case Op::Mod: case Op::Divu: case Op::Modu:
+        case Op::Shl:  case Op::Shr: case Op::Ror:   case Op::Rol:
+        case Op::Add:  case Op::Sub: case Op::Min:  case Op::Max: case Op::CMov:
+        case Op::Mul:  case Op::Div: case Op::Mod:
         case Op::ReinterpretAs: case Op::Inc: case Op::Dec:
 
           return GetSub(0)->GetType();
 
         case Op::FDen: case Op::Tzero: case Op::Tnzero:
-        case Op::Teq: case Op::Tne:  case Op::Tleu: case Op::Tle:  case Op::Tltu:
-        case Op::Tlt: case Op::Tgeu: case Op::Tge:  case Op::Tgtu: case Op::Tgt:
+        case Op::Teq: case Op::Tne:
+        case Op::Tle: case Op::Tgt:
+        case Op::Tge: case Op::Tlt:
           return CValueType(bool());
 
         case Op::FCmp:
@@ -510,27 +497,19 @@ namespace symbolic {
         case Op::BSR:    return new this_type( EvalBitScanReverse( value ) );
         case Op::BSF:    return new this_type( EvalBitScanForward( value ) );
         case Op::POPCNT: return new this_type( EvalPopCount( value ) );
-        case Op::Min:
-        case Op::Minu:   return new this_type( std::min( value, GetValue( args[1] ) ) );
-        case Op::Max:
-        case Op::Maxu:   return new this_type( std::max( value, GetValue( args[1] ) ) );
+        case Op::Min:    return new this_type( std::min( value, GetValue( args[1] ) ) );
+        case Op::Max:    return new this_type( std::max( value, GetValue( args[1] ) ) );
         case Op::Xor:    return new this_type( EvalXor( value, GetValue( args[1] ) ) );
         case Op::And:    return new this_type( EvalAnd( value, GetValue( args[1] ) ) );
         case Op::Or:     return new this_type( EvalOr( value, GetValue( args[1] ) ) );
         case Op::CMov:   return new this_type( dynamic_cast<ConstNode<bool> const&>(*args[2]).value ? value : GetValue( args[1] ) );
-        case Op::Lsl:    return new this_type( EvalSHL( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
-        case Op::Lsr:
-        case Op::Asr:    return new this_type( EvalSHR( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
-        case Op::FAdd:
+        case Op::Shl:    return new this_type( EvalSHL( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
+        case Op::Shr:    return new this_type( EvalSHR( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
         case Op::Add:    return new this_type( value + GetValue( args[1] ) );
-        case Op::FSub:
         case Op::Sub:    return new this_type( value - GetValue( args[1] ) );
-        case Op::FMul:
         case Op::Mul:    return new this_type( EvalMul( value, GetValue( args[1] ) ) );
-        case Op::FDiv: case Op::Divu:
-        case Op::Div:   return new this_type( value / GetValue( args[1] ) );
-        case Op::Mod:
-        case Op::Modu:   return new this_type( EvalMod( value, GetValue( args[1] ) ) );
+        case Op::Div:    return new this_type( value / GetValue( args[1] ) );
+        case Op::Mod:    return new this_type( EvalMod( value, GetValue( args[1] ) ) );
         case Op::Inc:    return new this_type( EvalInc( value ) );
         case Op::Dec:    return new this_type( EvalDec( value ) );
 
@@ -538,13 +517,9 @@ namespace symbolic {
         case Op::Tzero:  return new ConstNode   <bool>   ( value == VALUE_TYPE() );
         case Op::Teq:    return new ConstNode   <bool>   ( value == GetValue( args[1] ) );
         case Op::Tne:    return new ConstNode   <bool>   ( value != GetValue( args[1] ) );
-        case Op::Tleu:
         case Op::Tle:    return new ConstNode   <bool>   ( value <= GetValue( args[1] ) );
-        case Op::Tltu:
         case Op::Tlt:    return new ConstNode   <bool>   ( value <  GetValue( args[1] ) );
-        case Op::Tgeu:
         case Op::Tge:    return new ConstNode   <bool>   ( value >= GetValue( args[1] ) );
-        case Op::Tgtu:
         case Op::Tgt:    return new ConstNode   <bool>   ( value >  GetValue( args[1] ) );
         case Op::Ror:    return new this_type( EvalRotateRight( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
         case Op::Rol:    return new this_type( EvalRotateLeft( value, dynamic_cast<ConstNode<shift_type> const&>(*args[1]).value ) );
@@ -557,15 +532,12 @@ namespace symbolic {
         case Op::FAbs:   break;
         case Op::FDen:   break;
         case Op::FCmp:   break;
-        case Op::FMod:   break;
         case Op::FPow:   break;
         case Op::FFloor: break;
         case Op::FCeil: break;
         case Op::FTrunc: break;
         case Op::FRound: break;
         case Op::FNear: break;
-        case Op::FMax: break;
-        case Op::FMin: break;
 
         case Op::Cast: /* Should have been handled elsewhere */
         case Op::end:
@@ -740,50 +712,50 @@ namespace symbolic {
     this_type& operator = ( this_type const& other ) { expr = other.expr; return *this; }
 
     template <typename SHT>
-    this_type operator << ( SHT sh ) const { return this_type( make_operation( Op::Lsl, expr, make_const<shift_type>(sh) ) ); }
+    this_type operator << ( SHT sh ) const { return this_type( make_operation( Op::Shl, expr, make_const<shift_type>(sh) ) ); }
     template <typename SHT>
-    this_type operator >> ( SHT sh ) const { return this_type( make_operation( info_type::rsh_op(), expr, make_const<shift_type>(sh) ) ); }
+    this_type operator >> ( SHT sh ) const { return this_type( make_operation( Op::Shr, expr, make_const<shift_type>(sh) ) ); }
     template <typename SHT>
-    this_type& operator <<= ( SHT sh ) { expr = make_operation( Op::Lsl, expr, make_const<shift_type>(sh) ); return *this; }
+    this_type& operator <<= ( SHT sh ) { expr = make_operation( Op::Shl, expr, make_const<shift_type>(sh) ); return *this; }
     template <typename SHT>
-    this_type& operator >>= ( SHT sh ) { expr = make_operation( info_type::rsh_op(), expr, make_const<shift_type>(sh) ); return *this; }
+    this_type& operator >>= ( SHT sh ) { expr = make_operation( Op::Shr, expr, make_const<shift_type>(sh) ); return *this; }
 
     template <typename SHT>
-    this_type operator << ( SmartValue<SHT> const& sh ) const { return this_type( make_operation( Op::Lsl, expr, SmartValue<shift_type>(sh).expr ) ); }
+    this_type operator << ( SmartValue<SHT> const& sh ) const { return this_type( make_operation( Op::Shl, expr, SmartValue<shift_type>(sh).expr ) ); }
     template <typename SHT>
-    this_type operator >> ( SmartValue<SHT> const& sh ) const { return this_type( make_operation( info_type::rsh_op(), expr, SmartValue<shift_type>(sh).expr ) ); }
+    this_type operator >> ( SmartValue<SHT> const& sh ) const { return this_type( make_operation( Op::Shr, expr, SmartValue<shift_type>(sh).expr ) ); }
     template <typename SHT>
-    this_type& operator <<= ( SmartValue<SHT> const& sh ) { expr = make_operation( Op::Lsl, expr, SmartValue<shift_type>(sh).expr ); return *this; }
+    this_type& operator <<= ( SmartValue<SHT> const& sh ) { expr = make_operation( Op::Shl, expr, SmartValue<shift_type>(sh).expr ); return *this; }
     template <typename SHT>
-    this_type& operator >>= ( SmartValue<SHT> const& sh ) { expr = make_operation( info_type::rsh_op(), expr, SmartValue<shift_type>(sh).expr ); return *this; }
+    this_type& operator >>= ( SmartValue<SHT> const& sh ) { expr = make_operation( Op::Shr, expr, SmartValue<shift_type>(sh).expr ); return *this; }
 
     this_type operator - () const { return this_type( make_operation( Op::Neg, expr ) ); }
     this_type operator ~ () const { return this_type( make_operation( Op::Not, expr ) ); }
 
-    this_type& operator += ( this_type const& other ) { expr = make_operation( info_type::add_op(), expr, other.expr ); return *this; }
-    this_type& operator -= ( this_type const& other ) { expr = make_operation( info_type::sub_op(), expr, other.expr ); return *this; }
-    this_type& operator *= ( this_type const& other ) { expr = make_operation( info_type::mul_op(), expr, other.expr ); return *this; }
-    this_type& operator /= ( this_type const& other ) { expr = make_operation( info_type::div_op(), expr, other.expr ); return *this; }
-    this_type& operator %= ( this_type const& other ) { expr = make_operation( info_type::mod_op(), expr, other.expr ); return *this; }
+    this_type& operator += ( this_type const& other ) { expr = make_operation( Op::Add, expr, other.expr ); return *this; }
+    this_type& operator -= ( this_type const& other ) { expr = make_operation( Op::Sub, expr, other.expr ); return *this; }
+    this_type& operator *= ( this_type const& other ) { expr = make_operation( Op::Mul, expr, other.expr ); return *this; }
+    this_type& operator /= ( this_type const& other ) { expr = make_operation( Op::Div, expr, other.expr ); return *this; }
+    this_type& operator %= ( this_type const& other ) { expr = make_operation( Op::Mod, expr, other.expr ); return *this; }
     this_type& operator ^= ( this_type const& other ) { expr = make_operation( Op::Xor, expr, other.expr ); return *this; }
     this_type& operator &= ( this_type const& other ) { expr = make_operation( Op::And, expr, other.expr ); return *this; }
     this_type& operator |= ( this_type const& other ) { expr =  make_operation( Op::Or, expr, other.expr ); return *this; }
 
-    this_type operator + ( this_type const& other ) const { return this_type( make_operation( info_type::add_op(), expr, other.expr ) ); }
-    this_type operator - ( this_type const& other ) const { return this_type( make_operation( info_type::sub_op(), expr, other.expr ) ); }
-    this_type operator * ( this_type const& other ) const { return this_type( make_operation( info_type::mul_op(), expr, other.expr ) ); }
-    this_type operator / ( this_type const& other ) const { return this_type( make_operation( info_type::div_op(), expr, other.expr ) ); }
-    this_type operator % ( this_type const& other ) const { return this_type( make_operation( info_type::mod_op(), expr, other.expr ) ); }
+    this_type operator + ( this_type const& other ) const { return this_type( make_operation( Op::Add, expr, other.expr ) ); }
+    this_type operator - ( this_type const& other ) const { return this_type( make_operation( Op::Sub, expr, other.expr ) ); }
+    this_type operator * ( this_type const& other ) const { return this_type( make_operation( Op::Mul, expr, other.expr ) ); }
+    this_type operator / ( this_type const& other ) const { return this_type( make_operation( Op::Div, expr, other.expr ) ); }
+    this_type operator % ( this_type const& other ) const { return this_type( make_operation( Op::Mod, expr, other.expr ) ); }
     this_type operator ^ ( this_type const& other ) const { return this_type( make_operation( Op::Xor, expr, other.expr ) ); }
     this_type operator & ( this_type const& other ) const { return this_type( make_operation( Op::And, expr, other.expr ) ); }
     this_type operator | ( this_type const& other ) const { return this_type( make_operation( Op::Or, expr, other.expr ) ); }
 
     SmartValue<bool> operator == ( this_type const& other ) const { return SmartValue<bool>( make_operation( Op::Teq, expr, other.expr ) ); }
     SmartValue<bool> operator != ( this_type const& other ) const { return SmartValue<bool>( make_operation( Op::Tne, expr, other.expr ) ); }
-    SmartValue<bool> operator <= ( this_type const& other ) const { return SmartValue<bool>( make_operation( is_signed ? Op::Tle : Op::Tleu, expr, other.expr ) ); }
-    SmartValue<bool> operator >= ( this_type const& other ) const { return SmartValue<bool>( make_operation( is_signed ? Op::Tge : Op::Tgeu, expr, other.expr ) ); }
-    SmartValue<bool> operator < ( this_type const& other ) const  { return SmartValue<bool>( make_operation( is_signed ? Op::Tlt : Op::Tltu, expr, other.expr ) ); }
-    SmartValue<bool> operator > ( this_type const& other ) const  { return SmartValue<bool>( make_operation( is_signed ? Op::Tgt : Op::Tgtu, expr, other.expr ) ); }
+    SmartValue<bool> operator <= ( this_type const& other ) const { return SmartValue<bool>( make_operation( Op::Tle, expr, other.expr ) ); }
+    SmartValue<bool> operator >= ( this_type const& other ) const { return SmartValue<bool>( make_operation( Op::Tge, expr, other.expr ) ); }
+    SmartValue<bool> operator < ( this_type const& other ) const  { return SmartValue<bool>( make_operation( Op::Tlt, expr, other.expr ) ); }
+    SmartValue<bool> operator > ( this_type const& other ) const  { return SmartValue<bool>( make_operation( Op::Tgt, expr, other.expr ) ); }
 
     SmartValue<bool> operator ! () const
     { return SmartValue<bool>( make_operation( Op::Not, SmartValue<bool>( *this ).expr ) ); }
@@ -795,8 +767,8 @@ namespace symbolic {
     { AssertBool<value_type>::check(); return SmartValue<bool>( Expr(  make_operation( Op::Or, expr, other.expr ) ) ); }
   };
 
-  template <typename T> SmartValue<T> Minimum( SmartValue<T> const& l, SmartValue<T> const& r ) { return SmartValue<T>( make_operation( TypeInfo<T>::min_op(), l.expr, r.expr ) ); }
-  template <typename T> SmartValue<T> Maximum( SmartValue<T> const& l, SmartValue<T> const& r ) { return SmartValue<T>( make_operation( TypeInfo<T>::max_op(), l.expr, r.expr ) ); }
+  template <typename T> SmartValue<T> Minimum( SmartValue<T> const& l, SmartValue<T> const& r ) { return SmartValue<T>( make_operation( Op::Min, l.expr, r.expr ) ); }
+  template <typename T> SmartValue<T> Maximum( SmartValue<T> const& l, SmartValue<T> const& r ) { return SmartValue<T>( make_operation( Op::Max, l.expr, r.expr ) ); }
 
   template <typename T> SmartValue<T> ConditionalMove(SmartValue<bool> cond, SmartValue<T> tval, SmartValue<T> fval) { return SmartValue<T>( make_operation( Op::CMov, tval.expr, fval.expr, cond.expr ) ); }
 
@@ -827,7 +799,7 @@ namespace symbolic {
   FTP power( FTP const& left, FTP const& right ) { return FTP( make_operation( Op::FPow, left.expr, right.expr ) ); }
 
   template <typename FTP>
-  FTP fmodulo( FTP const& left, FTP const& right ) { return FTP( make_operation( Op::FMod, left.expr, right.expr ) ); }
+  FTP fmodulo( FTP const& left, FTP const& right ) { return FTP( make_operation( Op::Mod, left.expr, right.expr ) ); }
 
   template <typename FTP>  FTP fabs( FTP const& value ) { return FTP( make_operation( Op::FAbs, value.expr ) ); }
   template <typename FTP>  FTP FAbs( FTP const& value ) { return fabs<FTP>( value ); }
@@ -837,8 +809,8 @@ namespace symbolic {
   template <typename FTP>  FTP round( FTP const& value ) { return FTP( make_operation( Op::FRound, value.expr ) ); }
   template <typename FTP>  FTP nearbyint( FTP const& value ) { return FTP( make_operation( Op::FNear, value.expr ) ); }
   template <typename FTP>  FTP sqrt( FTP const& value ) { return FTP( make_operation( Op::FSqrt, value.expr ) ); }
-  template <typename FTP>  FTP fmin( FTP const& l, FTP const& r ) { return FTP( make_operation( Op::FMin, l.expr, r.expr ) ); }
-  template <typename FTP>  FTP fmax( FTP const& l, FTP const& r ) { return FTP( make_operation( Op::FMax, l.expr, r.expr ) ); }
+  template <typename FTP>  FTP fmin( FTP const& l, FTP const& r ) { return FTP( make_operation( Op::Min, l.expr, r.expr ) ); }
+  template <typename FTP>  FTP fmax( FTP const& l, FTP const& r ) { return FTP( make_operation( Op::Max, l.expr, r.expr ) ); }
   template <typename FTP>  FTP FMax( FTP const& l, FTP const& r ) { return fmax<FTP>( l, r ); }
 
   struct FP
@@ -911,25 +883,25 @@ namespace symbolic {
     template <typename FLOAT, class ARCH> static
     void Add( FLOAT& acc, FLOAT const& op2, ARCH& arch, SmartValue<uint32_t> const& fpscr_val )
     {
-      acc = FLOAT( make_operation( Op::FAdd, acc.expr, op2.expr ) );
+      acc = FLOAT( make_operation( Op::Add, acc.expr, op2.expr ) );
     }
 
     template <typename FLOAT, class ARCH> static
     void Sub( FLOAT& acc, FLOAT const& op2, ARCH& arch, SmartValue<uint32_t> const& fpscr_val )
     {
-      acc = FLOAT( make_operation( Op::FSub, acc.expr, op2.expr ) );
+      acc = FLOAT( make_operation( Op::Sub, acc.expr, op2.expr ) );
     }
 
     template <typename FLOAT, class ARCH> static
     void Div( FLOAT& acc, FLOAT const& op2, ARCH& arch, SmartValue<uint32_t> const& fpscr_val )
     {
-      acc = FLOAT( make_operation( Op::FDiv, acc.expr, op2.expr ) );
+      acc = FLOAT( make_operation( Op::Div, acc.expr, op2.expr ) );
     }
 
     template <typename FLOAT, class ARCH> static
     void Mul( FLOAT& acc, FLOAT const& op2, ARCH& arch, SmartValue<uint32_t> const& fpscr_val )
     {
-      acc = FLOAT( make_operation( Op::FMul, acc.expr, op2.expr ) );
+      acc = FLOAT( make_operation( Op::Mul, acc.expr, op2.expr ) );
     }
 
     struct MulAddNode : public ExprNode

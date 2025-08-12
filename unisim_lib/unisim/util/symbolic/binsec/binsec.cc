@@ -160,8 +160,9 @@ namespace binsec {
     }
 
     std::string const&
-    mktemp(Expr const& expr, unsigned size)
+    mktemp(Expr const& expr, ValueType vtp)
     {
+      unsigned size = vtp.bitsize;
       auto itr = vars.lower_bound(expr);
       if (itr != vars.end() and itr->first == expr)
         throw std::logic_error( "multiple temporary definitions" );
@@ -173,24 +174,26 @@ namespace binsec {
         name = buf.str();
       }
 
-      itr = vars.emplace_hint(itr, std::piecewise_construct, std::forward_as_tuple(expr), std::forward_as_tuple(std::move(name), size) );
+      itr = vars.emplace_hint(itr, std::piecewise_construct, std::forward_as_tuple(expr), std::forward_as_tuple(std::move(name), vtp) );
       return itr->second.first;
     }
 
-    int GenTempCode(Expr const& expr)
+    ValueType GenTempCode(Expr const& expr)
     {
       std::string tmp_src;
-      int retsize;
+      ValueType vtp = NoValueType();
       {
         std::ostringstream buffer;
-        retsize = ASExprNode::GenerateCode( expr, buffer, *this );
-        if (vars.count(expr)) return retsize;
+        vtp = ASExprNode::GenerateCode( expr, buffer, *this );
+        // TODO: why calling GenerateCode before testing vars ?
+        if (vars.count(expr))
+          return vtp;
         tmp_src = buffer.str();
       }
       std::ostringstream buffer;
-      buffer << mktemp( expr, retsize ) << " := " << tmp_src;
+      buffer << mktemp( expr, vtp ) << " := " << tmp_src;
       head.append( make_insn<Statement>( buffer.str() ), 0 );
-      return retsize;
+      return vtp;
     }
 
     // Introducing a Finish instruction to capture branching code epilogue.
@@ -312,7 +315,7 @@ namespace binsec {
     }
 
     std::list<std::unique_ptr<Instruction>> insns;
-    std::map<Expr,std::pair<std::string,int>> vars;
+    std::map<Expr,std::pair<std::string,ValueType>> vars;
     Point head, tail;
     bool opaque;
   };
@@ -550,14 +553,14 @@ namespace binsec {
     return sink;
   }
 
-  int
+  ValueType
   ASExprNode::GenConstCode(ConstNodeBase const* node, std::ostream& sink)
   {
     auto tp = node->GetType();
     switch (tp.encoding)
       {
       default: break;
-      case ValueType::BOOL: sink << node->GetBits(0) << "<1>";  return 1;
+      case ValueType::BOOL: sink << node->GetBits(0) << "<1>";  return tp;
       case ValueType::SIGNED: case ValueType::UNSIGNED:
         {
           unsigned bitsize = tp.bitsize;
@@ -575,20 +578,20 @@ namespace binsec {
             sink.flags( f );
           }
 
-          return bitsize;
+          return tp;
         }
       case ValueType::FLOAT:
         switch (tp.bitsize) {
           case 32:
             if (node->GetFloat(0.0F) == 0.0F) {
               sink << "0x00000000";
-              return 32;
+              return tp;
             }
             break;
           case 64:
             if (node->GetFloat(0.0) == 0.0) {
               sink << "0x0000000000000000";
-              return 64;
+              return tp;
             }
             break;
           default:
@@ -597,10 +600,10 @@ namespace binsec {
         break;
       }
     throw std::logic_error("can't encode type");
-    return 0;
+    return NoValueType();
   }
 
-  int
+  ValueType
   ASExprNode::GenerateCode( Expr const& expr, std::ostream& sink, Scope& scope )
   {
     /*** Pre expression process ***/
@@ -622,78 +625,79 @@ namespace binsec {
         switch (node->SubCount())
           {
           case 2: {
-            auto infix = [&] (char const* op) -> int {
-              int lhs_size = GenerateCode( node->GetSub(0), sink << '(', scope );
-              sink << ' ' << op << ' ' << GetCode( node->GetSub(1), scope ) << ')';
-              return lhs_size;
+            auto infix = [&] (char const* op, bool has_sign) -> ValueType {
+              std::ostringstream buf;
+              auto lhs_vtp = GenerateCode( node->GetSub(0), buf << '(', scope );
+              bool opaque = false;
+              switch (lhs_vtp.encoding)
+                {
+                case ValueType::BOOL:     buf << ' ' << op << ' '; break;
+                case ValueType::SIGNED:   buf << ' ' << op << (has_sign ? "s " : " "); break;
+                case ValueType::UNSIGNED: buf << ' ' << op << (has_sign ? "u " : " "); break;
+                default:                  buf << ", "; opaque = true; break;
+                }
+              buf << GetCode( node->GetSub(1), scope ) << ')';
+              if (opaque)
+                sink << "opaque<" << lhs_vtp.bitsize << ">";
+              sink << buf.str();
+              return lhs_vtp;
             };
 
-            auto prefix = [&] (char const* op) -> int {
-              int lhs_size = GenerateCode( node->GetSub(0), sink << op << '(', scope );
-              sink << ", " << GetCode( node->GetSub(1), scope ) << ')';
-              return lhs_size;
+            auto minmax = [&] (char const* op) -> ValueType {
+              std::ostringstream buf;
+              auto lhs_vtp = GenerateCode( node->GetSub(0), buf << '(', scope );
+              buf << ", " << GetCode( node->GetSub(1), scope ) << ')';
+              if (lhs_vtp.encoding == ValueType::SIGNED)
+                sink << op;
+              else
+                sink << "opaque<" << lhs_vtp.bitsize << ">";
+              sink << buf.str();
+              return lhs_vtp;
             };
 
-            auto test = [&] (char const* op) -> int {
-              sink << '(' << GetCode( node->GetSub(0), scope ) << ' ' << op << ' ' << GetCode( node->GetSub(1), scope ) << ')';
-              return 1;
-            };
-
-            auto shift = [&] (char const* op) -> int {
-              int lhs_size = GenerateCode( node->GetSub(0), sink << '(', scope );
+            auto shift = [&] (char const* op, bool has_sign) -> ValueType {
+              auto lhs_vtp = GenerateCode( node->GetSub(0), sink << '(', scope );
               Expr rhs = node->GetSub(1);
-              switch (lhs_size)
+              switch (lhs_vtp.bitsize)
                 {
                 case  8: rhs =  U8(USH(rhs)).expr; BitSimplify::Do(rhs); break;
                 case 16: rhs = U16(USH(rhs)).expr; BitSimplify::Do(rhs); break;
                 case 32: rhs = U32(USH(rhs)).expr; BitSimplify::Do(rhs); break;
                 case 64: rhs = U64(USH(rhs)).expr; BitSimplify::Do(rhs); break;
                 }
-              sink << ' ' << op << ' ' << GetCode( rhs, scope ) << ')';
-              return lhs_size;
+              char const* modifier = has_sign ? (lhs_vtp.encoding == ValueType::SIGNED ? "s" : "u") : "";
+              sink << ' ' << op << modifier << ' ' << GetCode( rhs, scope ) << ')';
+              return lhs_vtp;
             };
 
             switch (node->op.code)
               {
-              case Op::Add:     return infix("+");
-              case Op::Sub:     return infix("-");
-              case Op::Mul:     return infix("*");
-              case Op::Mod:     return infix("mods");
-              case Op::Modu:    return infix("modu");
-              case Op::Div:     return infix("/s");
-              case Op::Divu:    return infix("/u");
+              case Op::Add:     return infix("+", false);
+              case Op::Sub:     return infix("-", false);
+              case Op::Mul:     return infix("*", false);
+              case Op::Mod:     return infix("mod", true);
+              case Op::Div:     return infix("/", true);
 
-              case Op::Xor:     return infix("xor");
-              case Op::Or:      return infix("or");
-              case Op::And:     return infix("and");
+              case Op::Xor:     return infix("xor", false);
+              case Op::Or:      return infix("or", false);
+              case Op::And:     return infix("and", false);
 
-              case Op::Teq:     return test("=");
-              case Op::Tne:     return test("<>");
+              case Op::Teq:     return infix("=", false), ValueType(ValueType::BOOL, 1);
+              case Op::Tne:     return infix("<>", false), ValueType(ValueType::BOOL, 1);
+              case Op::Tle:     return infix("<=", true), ValueType(ValueType::BOOL, 1);
+              case Op::Tge:     return infix(">=", true), ValueType(ValueType::BOOL, 1);
+              case Op::Tlt:     return infix("<", true), ValueType(ValueType::BOOL, 1);
+              case Op::Tgt:     return infix(">", true), ValueType(ValueType::BOOL, 1);
 
-              case Op::Tle:     return test("<=s");
-              case Op::Tleu:    return test("<=u");
+              case Op::Shl:     return shift("lshift", false);
+              case Op::Shr:     return shift("rshift", true);
+              case Op::Ror:     return shift("rrotate", false);
 
-              case Op::Tge:     return test(">=s");
-              case Op::Tgeu:    return test(">=u");
-
-              case Op::Tlt:     return test("<s");
-              case Op::Tltu:    return test("<u");
-
-              case Op::Tgt:     return test(">s");
-              case Op::Tgtu:    return test(">u");
-
-              case Op::Lsl:     return shift("lshift");
-              case Op::Asr:     return shift("rshifts");
-              case Op::Lsr:     return shift("rshiftu");
-              case Op::Ror:     return shift("rrotate");
-
-              case Op::Min:     return prefix("min");
-              case Op::Max:     return prefix("max");
+              case Op::Min:     return minmax("min");
+              case Op::Max:     return minmax("max");
 
               case Op::Rol:
-              case Op::Minu: case Op::Maxu:
-              case Op::FAdd: case Op::FSub: case Op::FMul: case Op::FDiv: case Op::FMod: case Op::FPow:
-              case Op::FMax: case Op::FMin:
+              case Op::FPow:
                 return OpaqueBV( node->GetSub(0)->GetType().bitsize, {node->GetSub(0), node->GetSub(1)}).GenCode(sink, scope);
 
               case Op::CMov:
@@ -707,7 +711,7 @@ namespace binsec {
 
             std::ostringstream buf;
             buf << "[" << node->op.c_str() << "]";
-            return infix(buf.str().c_str());
+            return infix(buf.str().c_str(), false);
           }
 
           case 1: {
@@ -723,7 +727,8 @@ namespace binsec {
                 // case Op::BSwp:  break;
               case Op::BSF:
                 {
-                  unsigned bitsize = node->GetType().bitsize;
+                  auto tp = node->GetType();
+                  unsigned bitsize = tp.bitsize;
                   sink << "(";
                   for (unsigned i = 0; i < bitsize - 1; i += 1) {
                     sink << "if " << GetCode(node->GetSub(0), scope)
@@ -763,12 +768,13 @@ namespace binsec {
 
                   // sink << "bsf_out<" << bitsize << ">";
 
-                  return bitsize;
+                  return tp;
                 }
 
               case Op::BSR:
                 {
-                  unsigned bitsize = node->GetType().bitsize;
+                  auto tp = node->GetType();
+                  unsigned bitsize = tp.bitsize;
                   sink << "(";
                   for (unsigned i = bitsize - 1; i > 1; i -= 1) {
                     sink << "if " << GetCode(node->GetSub(0), scope)
@@ -810,13 +816,13 @@ namespace binsec {
 
                   // sink << "bsr_out<" << bitsize << ">";
 
-                  return bitsize;
+                  return tp;
                 }
               case Op::Tnzero:
                 {
                   Expr const& src = node->GetSub(0);
                   sink << "(" << GetCode(src, scope) << " <> " << dbx(src->GetType().bitsize/8,0) << ")";
-                  return 1;
+                  return CValueType(bool());
                 }
               case Op::Cast:
                 {
@@ -836,14 +842,14 @@ namespace binsec {
                       sink << "( " << GetCode(cnb.src, scope) << " )";
                     }
 
-                  return dst.bitsize;
+                  return dst;
                 }
               }
 
             sink << '(' << operation << ' ';
-            int retsz = GenerateCode( node->GetSub(0), sink, scope );
+            auto rtp = GenerateCode( node->GetSub(0), sink, scope );
             sink << ')';
-            return retsz;
+            return rtp;
           }
           case 3: {
             switch (node->op.code)
@@ -853,11 +859,10 @@ namespace binsec {
               case Op::CMov:
 
                 sink << "(if " << GetCode(node->GetSub(2), scope) << " then ";
-                int retsz = GenerateCode( node->GetSub(0), sink, scope );
+                auto rtp = GenerateCode( node->GetSub(0), sink, scope );
                 sink << " else " << GetCode(node->GetSub(1), scope) << ")";
 
-                return retsz;
-
+                return rtp;
               }
           }
           default:
@@ -866,13 +871,14 @@ namespace binsec {
       }
     else if (auto vt = dynamic_cast<vector::VTransBase const*>( expr.node ))
       {
-        unsigned srcsize = 8*vt->srcsize, dstsize = vt->GetType().bitsize, srcpos = 8*vt->srcpos;
+        auto dtp = vt->GetType();
+        unsigned srcsize = 8*vt->srcsize, dstsize = dtp.bitsize, srcpos = 8*vt->srcpos;
 
         if (dstsize < srcsize)
           sink << "(" << GetCode(vt->src, scope) << " {" << std::dec << srcpos << ", " << (srcpos+dstsize-1) << "})";
         else
           sink << GetCode(vt->src, scope);
-        return dstsize;
+        return dtp;
       }
     else if (auto vc = dynamic_cast<vector::VCatBase const*>( expr.node ))
       {
@@ -885,7 +891,7 @@ namespace binsec {
             sep = " :: ";
           }
         sink << ")";
-        return subsize * vc->inputs.size();
+        return vc->GetType();
       }
     else if (ASExprNode const* node = dynamic_cast<ASExprNode const*>( expr.node ))
       {
@@ -893,7 +899,7 @@ namespace binsec {
       }
 
     throw std::logic_error("No GenCode method");
-    return 0;
+    return NoValueType();
   }
 
   ConstNodeBase const*
@@ -903,9 +909,9 @@ namespace binsec {
   }
 
   Expr
-  BitFilter::mksimple( Expr const& input, unsigned source, unsigned rshift, unsigned select, unsigned extend, bool sxtend )
+  BitFilter::mksimple( Expr const& input, unsigned source, unsigned rshift, unsigned select, unsigned extend, bool sxtend, bool is_signed )
   {
-    Expr sbf( new BitFilter( input, source, rshift, select, extend, sxtend ) );
+    Expr sbf( new BitFilter( input, source, rshift, select, extend, sxtend, is_signed ) );
 
     BitSimplify::Do(sbf);
 
@@ -919,36 +925,47 @@ namespace binsec {
     if (int delta = int(rshift) - int(rhs.rshift)) return delta;
     if (int delta = int(select) - int(rhs.select)) return delta;
     if (int delta = int(extend) - int(rhs.extend)) return delta;
-    return int(sxtend) - int(rhs.sxtend);
+    if (int delta = int(sxtend) - int(rhs.sxtend)) return delta;
+    return int(styped) - int(rhs.styped);
   }
 
   ConstNodeBase const*
   BitFilter::Eval( ConstNodeBase const** cnbs ) const
   {
     Expr scratch = cnbs[0];
-    // if (rshift)
-    //   scratch = make_operation(Op::Lsr, scratch, make_const<shift_type>(rshift));
 
+    // Determine the core working type (signedness depends on internal
+    // sign extension, not on final type )
+    ValueType working_type = ValueType(extend == 1 ? ValueType::BOOL : sxtend ? ValueType::SIGNED : ValueType::UNSIGNED, extend);
+    Expr wz( new Zero(working_type) );
+    // Check relative position of selected msb with respect to final type msb
     int shift = extend - (rshift+select);
-    Expr dz( new Zero(GetType()) );
-    if (shift >= 0)
+    if (shift > 0)
       {
-        scratch = make_operation( Op::ReinterpretAs, dz, scratch );
-        if (shift)
-          scratch = make_operation( Op::Lsl, scratch, make_const<shift_type>(shift) );
+        // Selection msb is to the right of final type msb: reinterpret then shift
+        scratch = make_operation( Op::ReinterpretAs, wz, scratch );
+        scratch = make_operation( Op::Shl, scratch, make_const<shift_type>(shift) );
       }
     else
       {
-        scratch = make_operation( Op::Lsr, scratch, make_const<shift_type>(-shift) );
-        scratch = make_operation( Op::ReinterpretAs, dz, scratch );
+        // Selection msb is to the left of final type msb: shift then reinterpret
+        if (shift < 0)
+          scratch = make_operation( Op::Shr, scratch, make_const<shift_type>(-shift) );
+        scratch = make_operation( Op::ReinterpretAs, wz, scratch );
       }
+    // Adjust destination msb with correct sign/unsigned extension
+    if (int xshift = extend - select)
+      scratch = make_operation( Op::Shr, scratch, make_const<shift_type>(xshift) );
 
-    Expr xshift =  make_const<shift_type>(extend - select);
-    ConstNodeBase const* args[2] = {scratch.ConstSimplify(), xshift.ConstSimplify()};
-    return args[0]->apply(sxtend ? Op::Asr : Op::Lsr, args);
+    // Final type reinterpretation with correct signedness
+    Expr dz( new Zero(GetType()) );
+    ConstNodeBase const* args[2] = {dz.ConstSimplify(), scratch.ConstSimplify()};
+    if (not (args[0] and args[1]))
+      { struct Bad{}; throw Bad(); }
+    return args[0]->apply( Op::ReinterpretAs, args );
   }
 
-  int
+  ValueType
   BitFilter::GenCode( std::ostream& sink, Scope& scope ) const
   {
     bool selection = source > select;
@@ -963,7 +980,7 @@ namespace binsec {
           tail = false;
 
         if (tail)
-          return extend;
+          return GetType();
       }
 
     bool extension = extend > select;
@@ -972,36 +989,36 @@ namespace binsec {
     if (selection)
       sink << '(';
 
-    int chksize = ASExprNode::GenerateCode( input, sink, scope );
-    if (chksize != source) { struct TypeSizeMisMatch {}; throw TypeSizeMisMatch(); }
+    auto chktp = ASExprNode::GenerateCode( input, sink, scope );
+    if (chktp.bitsize != source) { struct TypeSizeMisMatch {}; throw TypeSizeMisMatch(); }
 
     if (selection)
       sink << " {" << (rshift) << "," << (rshift+select-1) << "})";
     if (extension)
       sink << ' ' << extend << ')';
 
-    return extend;
+    return GetType();
   }
 
   void
   BitFilter::Repr( std::ostream& sink ) const
   {
     sink << "BitFilter(" << input
-         << ", " << source
-         << ", " << rshift
-         << ", " << select
-         << ", " << extend
-         << ", " << (sxtend ? "signed" : "unsigned")
+         << "<" << source
+         << "> shr " << rshift
+         << " sel " << select << (sxtend ? "s" : "u")
+         << " ext " << extend << (styped ? "s" : "u")
          << ")";
   }
 
-  int
+  ValueType
   RegReadBase::GenCode( std::ostream& sink, Scope& scope ) const
   {
-    unsigned bitsize = GetType().bitsize;
+    auto tp = GetType();
+    unsigned bitsize = tp.bitsize;
     GetRegName( sink );
     sink << "<" << bitsize << ">";
-    return bitsize;
+    return tp;
   }
 
   void
@@ -1012,7 +1029,7 @@ namespace binsec {
     sink << " )";
   }
 
-  int
+  ValueType
   Assignment::GenInputCode( Expr const& input, Scope& scope, std::ostream& sink )
   {
     Expr constant = input;
@@ -1037,7 +1054,7 @@ namespace binsec {
   RegWriteBase::source_read( RegReadBase* reg_read ) const
   {
     if (slice_size != reg_size)
-      return BitFilter::mksimple(reg_read, reg_size, slice_base, slice_size, slice_size, false);
+      return BitFilter::mksimple(reg_read, reg_size, slice_base, slice_size, slice_size, false, false);
     return reg_read;
   }
 
@@ -1052,9 +1069,9 @@ namespace binsec {
 
     sink << " := ";
 
-    int value_size = GenInputCode( value, scope, sink );
+    auto value_type = GenInputCode( value, scope, sink );
 
-    if (slice_size != value_size)
+    if (slice_size != value_type.bitsize)
       throw std::logic_error( "error: size disagreement in register assignment." );
   }
 
@@ -1128,9 +1145,9 @@ namespace binsec {
     GenInputCode( addr, scope, sink );
     sink << ',' << (bigendian?"->":"<-") << ',' << bytecount() << "] := ";
 
-    int value_size = GenInputCode( value, scope, sink );
+    auto value_type = GenInputCode( value, scope, sink );
 
-    if (value_size != 8*bytecount())
+    if (value_type.bitsize != 8*bytecount())
       throw std::logic_error( "error: size disagreement in memory store." );
   }
 
@@ -1140,12 +1157,12 @@ namespace binsec {
     sink << "[" << addr << ',' << bytecount() << ",^" << alignment << ',' << (bigendian ? "be" : "le") << "]";
   }
 
-  int
+  ValueType
   Load::GenCode( std::ostream& sink, Scope& scope ) const
   {
     /* TODO: exploit alignment info */
     sink << "@[" << GetCode(addr, scope) << ',' << (bigendian?"->":"<-") << ',' << bytecount() << "]";
-    return 8*bytecount();
+    return CValueType(ValueType::UNSIGNED, 8*bytecount());
   }
 
   void
@@ -1156,16 +1173,16 @@ namespace binsec {
     sink << ">()";
   }
 
-  int
+  ValueType
   UndefinedValueBase::GenCode(std::ostream& sink, Scope& scope) const
   {
-    int retsize = GetType().bitsize;
+    auto tp = GetType();
     std::ostringstream buffer;
-    std::string const& tmp = scope.mktemp( Expr(this), retsize );
+    std::string const& tmp = scope.mktemp( Expr(this), tp );
     buffer << tmp << " := \\undef";
     scope.head.append( scope.make_insn<Statement>( buffer.str() ), 0 );
     sink << tmp;
-    return retsize;
+    return tp;
   }
 
   void OpaqueBase::Repr( std::ostream& sink ) const
@@ -1181,24 +1198,24 @@ namespace binsec {
     sink << ")";
   }
 
-  int OpaqueBase::GenCode( std::ostream& sink, Scope& scope ) const
+  ValueType OpaqueBase::GenCode( std::ostream& sink, Scope& scope ) const
   {
     scope.opaque = true;
-    int retsize = GetType().bitsize;
-    sink << "opaque<" << std::dec << retsize << ">(";
+    auto tp = GetType();
+    sink << "opaque<" << std::dec << tp.bitsize << ">(";
     for (unsigned idx = 0, end = this->SubCount(); idx < end; ++idx)
       {
         ASExprNode::GenerateCode( this->GetSub(idx), sink << (idx ? ", " : ""), scope );
       }
     sink << ")";
-    return retsize;
+    return tp;
   }
 
-  int
+  ValueType
   BitInsertNode::GenCode(std::ostream& sink, Scope&) const
   {
     throw 0;
-    return 0;
+    return NoValueType();
   }
 
   void
@@ -1298,7 +1315,8 @@ namespace binsec {
                             { expr = dmask; return expr->AsConstNode(); }
 
                           /* Make it a BitFilter */
-                          unsigned bitsize = src->GetType().bitsize, select = 0;
+                          auto stp = src->GetType();
+                          unsigned bitsize = stp.bitsize, select = 0;
                           {
                             ConstNodeBase const* cst = dmask.ConstSimplify();
 
@@ -1312,7 +1330,7 @@ namespace binsec {
                           if (select >= bitsize)
                             expr = src;
                           else
-                            expr = BitFilter::mksimple( src, bitsize, 0, select, bitsize, false );
+                            expr = BitFilter::mksimple( src, bitsize, 0, select, bitsize, false, stp.encoding == stp.SIGNED );
                           continue;
                         }
                       if (make_operation( Op::Teq, umask, dmask ).Eval<bool>())
@@ -1339,28 +1357,28 @@ namespace binsec {
                 continue;
                 break;
 
-              case Op::Asr:
-              case Op::Lsr:
-              case Op::Lsl:
+              case Op::Shl:
+              case Op::Shr:
                 if (subcount == 2)
                   {
                     if (ConstNodeBase const* cst = expr->GetSub(1)->AsConstNode())
                       {
-                        if (op != Op::Lsl)
+                        if (op != Op::Shl)
                           {
                             // Priority is given to BitFilter replacement
                             unsigned shift = dynamic_cast<ConstNode<shift_type> const&>(*cst).value;
                             Expr const& src = expr->GetSub(0);
-                            unsigned bitsize = src->GetType().bitsize;
+                            auto stp = src->GetType();
+                            unsigned bitsize = stp.bitsize;
                             if (shift >= bitsize) { struct Bad {}; throw Bad(); }
-
-                            expr = BitFilter::mksimple( src, bitsize, shift, bitsize - shift, bitsize, op == Op::Asr );
+                            bool is_signed = stp.encoding == stp.SIGNED;
+                            expr = BitFilter::mksimple( src, bitsize, shift, bitsize - shift, bitsize, op == Op::Shr and is_signed, is_signed );
                             continue;
                           }
 
                         auto tp = expr->GetType();
                         Expr dmask = mask.good() ? mask : make_operation(Op::Not, make_zero(tp));
-                        auto unsh = op == Op::Lsl ? Op::Lsr : Op::Lsl;
+                        auto unsh = op == Op::Shl ? Op::Shr : Op::Shl;
                         dmask = make_operation(unsh, dmask, cst);
                         if (auto cst = expr.Simplify(FiltBitSimplify(dmask.ConstSimplify(), 1)))
                           return cst;
@@ -1368,12 +1386,12 @@ namespace binsec {
                       }
                     else if (mask.good())
                       {
-                        if (op == Op::Lsl)
+                        if (op == Op::Shl)
                           {
                             Expr dmask = make_operation(Op::BSR, mask);
                             unsigned shift = dmask.ConstSimplify()->GetBits(0);
                             dmask = make_operation(Op::Not, make_operation(Op::Inc, make_zero(expr->GetType())));
-                            dmask = make_operation(Op::Not, make_operation(Op::Lsl, dmask, make_const<shift_type>(shift)));
+                            dmask = make_operation(Op::Not, make_operation(Op::Shl, dmask, make_const<shift_type>(shift)));
                             if (auto cst = expr.Simplify(FiltBitSimplify(dmask.ConstSimplify(), 1)))
                               return cst;
                           }
@@ -1393,16 +1411,16 @@ namespace binsec {
                   {
                     CastNodeBase const& cnb = dynamic_cast<CastNodeBase const&>( *expr.node );
                     auto src = cnb.GetSrcType(), dst = cnb.GetType();
-                    if (dst.cmp(src) == 0) {
-                      expr = cnb.src;
-                      continue;
-                    }
+                    if (dst.cmp(src) == 0)
+                      {
+                        expr = cnb.src;
+                        continue;
+                      }
                     if (src.encoding != src.UNSIGNED and src.encoding != src.SIGNED and src.encoding != src.BOOL)
                       {
                         // Complex source
                         break;
                       }
-
                     if (dst.encoding == dst.BOOL)
                       {
                         if (src.encoding == src.BOOL)
@@ -1414,26 +1432,10 @@ namespace binsec {
                     if (dst.encoding != dst.UNSIGNED and dst.encoding != dst.SIGNED)
                       break; // Complex casts
 
-                    unsigned src_bit_size = src.bitsize, dst_bit_size = dst.bitsize;
-
-                    if (src_bit_size == dst_bit_size)
-                      expr = cnb.src;
-                    else
-                      {
-                        unsigned select = std::min(src_bit_size, dst_bit_size);
-                        bool sextend = dst_bit_size > src_bit_size and src.encoding == src.SIGNED;
-                        expr = BitFilter::mksimple( cnb.src, src_bit_size, 0, select, dst_bit_size, sextend );
-                      }
-
-                    if (auto const* node = Process(mask, expr))
-                      {
-                        if (src.encoding != dst.encoding)
-                          {
-                            expr = make_operation(Op::ReinterpretAs, new Zero(dst.encoding, dst.bitsize), expr);
-                            return expr.ConstSimplify();
-                          }
-                        return node;
-                      }
+                    unsigned select = std::min(src.bitsize, dst.bitsize);
+                    bool sextend = dst.bitsize > src.bitsize and src.encoding == src.SIGNED;
+                    bool is_signed = dst.encoding == dst.SIGNED;
+                    expr = BitFilter::mksimple( cnb.src, src.bitsize, 0, select, dst.bitsize, sextend, is_signed );
                     continue;
                   }
                 break;
@@ -1463,8 +1465,8 @@ namespace binsec {
     auto tp = GetType();
     Expr xmask[2];
     xmask[1] = make_operation(Op::Not, BitSimplify::make_zero(tp));
-    xmask[1] = make_operation(Op::Not, make_operation(Op::Lsl, xmask[1], make_const<shift_type>(size)));
-    Expr fgmask = make_operation(Op::Lsl, xmask[1].ConstSimplify(), make_const<shift_type>(pos));
+    xmask[1] = make_operation(Op::Not, make_operation(Op::Shl, xmask[1], make_const<shift_type>(size)));
+    Expr fgmask = make_operation(Op::Shl, xmask[1].ConstSimplify(), make_const<shift_type>(pos));
     bool notinfg = mask.good() ? make_operation(Op::Tzero, make_operation(Op::And, fgmask, mask)).Eval<bool>() : true;
     xmask[0] = make_operation(Op::Not, fgmask);
     bool notinbg = mask.good() ? make_operation(Op::Tzero, make_operation(Op::And, xmask[0], mask)).Eval<bool>() : true;
@@ -1478,7 +1480,7 @@ namespace binsec {
       {
         // Significant bits only found in foreground
         if (pos)
-          expr = make_operation(Op::Lsl,src,make_const<shift_type>(pos));
+          expr = make_operation(Op::Shl,src,make_const<shift_type>(pos));
         else
           expr = src;
         return 0;
@@ -1497,23 +1499,26 @@ namespace binsec {
   BitFilter::Simplify( Expr const& mask, Expr& expr ) const
   {
     Expr keep(this);
-    // First check for local simplification, trivial and pipe hole
-    if (rshift == 0 and source == select and select == extend)
-      { expr = input; return 0; }
-
     auto tp = GetType();
+
+    // First check for local simplification, trivial and pipe hole
+    if (rshift == 0 and source == select and select == extend and tp.cmp(input->GetType()) == 0)
+      {
+        expr = input;
+        return 0;
+      }
 
     if (OpNodeBase const* onb = input->AsOpNode())
       {
         auto op = onb->op.code;
-        if (op == Op::Lsl)
+        if (op == Op::Shl)
           {
             try
               {
                 unsigned lshift = onb->GetSub(1).Eval<shift_type>();
 
                 if (lshift <= rshift)
-                  { expr = new BitFilter(onb->GetSub(0), this->source, this->rshift - lshift, this->select, this->extend, this->sxtend); return 0; }
+                  { expr = new BitFilter(onb->GetSub(0), this->source, this->rshift - lshift, this->select, this->extend, this->sxtend, this->styped); return 0; }
 
                 if (lshift >= unsigned(rshift + select))
                   { expr = BitSimplify::make_zero(tp); return 0; }
@@ -1528,13 +1533,13 @@ namespace binsec {
             if (2 <= subcount and subcount <= 3)
               {
                 for (unsigned idx = 0; idx < subcount; ++idx)
-                  args[idx] = new BitFilter(onb->GetSub(idx), source, rshift, select, select, false);
+                  args[idx] = new BitFilter(onb->GetSub(idx), source, rshift, select, select, false, false);
                 if      (subcount == 2)
                   expr = make_operation(op, args[0], args[1] );
                 else if (subcount == 3)
                   expr = make_operation(op, args[0], args[1], args[2] );
                 if (extend > select)
-                  expr = new BitFilter(expr, select, 0, select, extend, sxtend);
+                  expr = new BitFilter(expr, select, 0, select, extend, sxtend, styped);
                 return 0;
               }
           }
@@ -1553,11 +1558,11 @@ namespace binsec {
             unsigned new_rshift = bf->rshift + rshift;
 
             if (bf->select >= (rshift + select))
-              { expr = new BitFilter( bf->input, bf->source, new_rshift, select, extend, sxtend ); return 0; }
+              { expr = new BitFilter( bf->input, bf->source, new_rshift, select, extend, sxtend, styped ); return 0; }
 
             // rshift < bf->select < (rshift + select)
             if (sxtend or not bf->sxtend)
-              { expr = new BitFilter( bf->input, bf->source, new_rshift, bf->select - rshift, extend, bf->sxtend ); return 0; }
+              { expr = new BitFilter( bf->input, bf->source, new_rshift, bf->select - rshift, extend, bf->sxtend, styped ); return 0; }
           }
       }
 
@@ -1565,13 +1570,13 @@ namespace binsec {
 
     Expr dmask = make_operation(Op::Not, BitSimplify::make_zero(tp));
     if (select < extend)
-      dmask = make_operation(Op::Not, make_operation(Op::Lsl, dmask, make_const<shift_type>(select)));
+      dmask = make_operation(Op::Not, make_operation(Op::Shl, dmask, make_const<shift_type>(select)));
     if (mask.good())
       dmask = make_operation(Op::And, dmask, mask);
     auto childtype = input->GetType();
     dmask = make_operation(Op::ReinterpretAs, BitSimplify::make_zero(childtype)->AsConstNode(), dmask);
     if (rshift)
-      dmask = make_operation(Op::Lsl, dmask, make_const<shift_type>(rshift));
+      dmask = make_operation(Op::Shl, dmask, make_const<shift_type>(rshift));
 
     return expr.Simplify(FiltBitSimplify(dmask.ConstSimplify(), 1));
   }

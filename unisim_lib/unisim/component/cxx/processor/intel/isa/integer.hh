@@ -2646,7 +2646,6 @@ struct Bextr : public Operation<ARCH>
 
   void execute( ARCH& arch ) const {
     typedef typename TypeFor<ARCH,OP::SIZE>::u val_t;
-    typedef typename TypeFor<ARCH,OP::SIZE>::s sval_t;
     typedef typename ARCH::u8_t u8_t;
     typedef typename ARCH::bit_t bit_t;
     val_t arg = arch.rmread( OP(), rmop );

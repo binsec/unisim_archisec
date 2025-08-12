@@ -53,28 +53,32 @@ template <class I64>
 void eval_div_128( P64& arch, I64& hi, I64& lo, I64 const& divisor )
 {
   typedef unisim::util::symbolic::Expr Expr;
+  typedef unisim::util::symbolic::Op Op;
   typedef unisim::util::symbolic::binsec::BitFilter BitFilter;
   if (arch.Test(divisor == I64(0))) arch._DE();
 
   bool const sext = hi.is_signed;
   Expr dividend = new unisim::util::symbolic::vector::VCat<P64::u128_t>( std::vector<Expr>{lo.expr, hi.expr}, 8 );
-  Expr divisor128 = BitFilter::mksimple( divisor.expr, 64, 0, 64, 128, sext );
-  Expr divres = unisim::util::symbolic::make_operation(divisor.is_signed ? "Div" : "Divu", dividend, divisor128);
-  Expr modres = unisim::util::symbolic::make_operation(divisor.is_signed ? "Mod" : "Modu", dividend, divisor128);
-  lo.expr = BitFilter::mksimple( divres, 128,  0, 64, 64, false );
-  hi.expr = BitFilter::mksimple( modres, 128,  0, 64, 64, false );
+  Expr divisor128 = BitFilter::mksimple( divisor.expr, 64, 0, 64, 128, sext, sext );
+  Expr divres = unisim::util::symbolic::make_operation(Op::Div, dividend, divisor128);
+  Expr modres = unisim::util::symbolic::make_operation(Op::Mod, dividend, divisor128);
+  lo.expr = BitFilter::mksimple( divres, 128,  0, 64, 64, false, sext );
+  hi.expr = BitFilter::mksimple( modres, 128,  0, 64, 64, false, sext );
 }
 
 template <class I64>
 void eval_mul_128( P64& arch, I64& hi, I64& lo, I64 const& multiplier )
 {
   typedef unisim::util::symbolic::Expr Expr;
+  typedef unisim::util::symbolic::Op Op;
   typedef unisim::util::symbolic::binsec::BitFilter BitFilter;
   bool const sext = hi.is_signed;
-  Expr result = unisim::util::symbolic::make_operation("Mul", BitFilter::mksimple( lo.expr, 64, 0, 64, 128, sext ), BitFilter::mksimple( multiplier.expr, 64, 0, 64, 128, sext ));
-  hi.expr = BitFilter::mksimple( result, 128, 64, 64, 64, false );
-  lo.expr = BitFilter::mksimple( result, 128,  0, 64, 64, false );
-  P64::bit_t ovf( unisim::util::symbolic::make_operation("Tne", BitFilter::mksimple( result, 128, 0, 64, 128, sext ), result) );
+  Expr result = unisim::util::symbolic::make_operation(Op::Mul,
+                                                       BitFilter::mksimple( lo.expr, 64, 0, 64, 128, sext, sext ),
+                                                       BitFilter::mksimple( multiplier.expr, 64, 0, 64, 128, sext, sext ));
+  hi.expr = BitFilter::mksimple( result, 128, 64, 64, 64, false, sext );
+  lo.expr = BitFilter::mksimple( result, 128,  0, 64, 64, false, sext );
+  P64::bit_t ovf( unisim::util::symbolic::make_operation(Op::Tne, BitFilter::mksimple( result, 128, 0, 64, 128, sext, sext ), result) );
   arch.flagwrite( P64::FLAG::OF, ovf );
   arch.flagwrite( P64::FLAG::CF, ovf );
 }

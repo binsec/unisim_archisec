@@ -79,18 +79,18 @@ namespace binsec {
   struct ASExprNode : public ExprNode
   {
     virtual ConstNodeBase const* Simplify( Expr const& mask, Expr& expr ) const;
-    virtual int GenCode( std::ostream& sink, Scope& scope ) const = 0;
-    static  int GenerateCode( Expr const& expr, std::ostream& sink, Scope& scope );
-    static  int GenConstCode( ConstNodeBase const* node, std::ostream& sink );
+    virtual ValueType GenCode( std::ostream& sink, Scope& scope ) const = 0;
+    static  ValueType GenerateCode( Expr const& expr, std::ostream& sink, Scope& scope );
+    static  ValueType GenConstCode( ConstNodeBase const* node, std::ostream& sink );
   };
 
   struct BitFilter : public ASExprNode
   {
-    static Expr mksimple( Expr const& _input, unsigned _source, unsigned _rshift, unsigned _select, unsigned _extend, bool _sxtend );
+    static Expr mksimple( Expr const& _input, unsigned _source, unsigned _rshift, unsigned _select, unsigned _extend, bool _sxtend, bool is_signed );
 
     virtual BitFilter* Mutate() const override { return new BitFilter( *this ); }
-    virtual ValueType GetType() const { return ValueType(extend == 1 ? ValueType::BOOL : ValueType::UNSIGNED, extend); }
-    virtual int GenCode( std::ostream& sink, Scope& scope ) const override;
+    virtual ValueType GetType() const { return ValueType(extend == 1 ? ValueType::BOOL : styped ? ValueType::SIGNED : ValueType::UNSIGNED, extend); }
+    virtual ValueType GenCode( std::ostream& sink, Scope& scope ) const override;
     virtual void Repr( std::ostream& sink ) const;
     virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<BitFilter const&>( rhs ) ); }
     int compare( BitFilter const& rhs ) const;
@@ -104,8 +104,8 @@ namespace binsec {
 
   private:
     BitFilter(BitFilter const&) = default;
-    BitFilter( Expr const& _input, unsigned _source, unsigned _rshift, unsigned _select, unsigned _extend, bool _sxtend )
-      : input(_input), source(_source), pad0(), rshift(_rshift), pad1(), select(_select), pad2(), extend(_extend), sxtend(_sxtend)
+    BitFilter( Expr const& _input, unsigned _source, unsigned _rshift, unsigned _select, unsigned _extend, bool _sxtend, bool _is_signed )
+      : input(_input), source(_source), pad0(), rshift(_rshift), pad1(), select(_select), styped(_is_signed), extend(_extend), sxtend(_sxtend)
     {}
 
     Expr     input;
@@ -114,9 +114,26 @@ namespace binsec {
     uint64_t rshift   : 15; // Source less significant bit selected
     uint64_t pad1     :  1;
     uint64_t select   : 15; // Source selected bit size
-    uint64_t pad2     :  1;
+    uint64_t styped   :  1; // Destination is signed type
     uint64_t extend   : 15; // Destination bit size
     uint64_t sxtend   :  1; // Destination is signed extended from `select` to `extend`
+  };
+
+  struct Comparison : public ASExprNode
+  {
+    enum { EQ, NE, LE, GT, GE, LT };
+    virtual Comparison* Mutate() const override { return new Comparison( *this ); }
+    virtual ValueType GetType() const override { return ValueType(ValueType::BOOL, 1); }
+    virtual ValueType GenCode( std::ostream& sink, Scope& scope ) const override;
+    virtual void Repr( std::ostream& sink ) const override;
+    virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<BitFilter const&>( rhs ) ); }
+    int compare( BitFilter const& rhs ) const;
+    virtual unsigned SubCount() const { return 2; }
+    virtual Expr const& GetSub(unsigned idx) const { if (idx >= 2) return ExprNode::GetSub(idx); return inputs[idx]; }
+    virtual ConstNodeBase const* Eval( ConstNodeBase const** cnbs ) const override;
+    virtual ConstNodeBase const* Simplify( Expr const&, Expr& ) const override;
+
+    Expr inputs[2];
   };
 
   struct BitInsertNode : public ASExprNode
@@ -129,7 +146,7 @@ namespace binsec {
     int compare(BitInsertNode const& rhs) const { if (int delta = int(size) - int(rhs.size)) return delta; return int(pos) - int(rhs.pos); }
     ExprNode* Mutate() const { return new BitInsertNode(*this); }
     ValueType GetType() const override { return dst->GetType(); }
-    int GenCode(std::ostream&, Scope&) const override;
+    ValueType GenCode(std::ostream&, Scope&) const override;
     ConstNodeBase const* Simplify( Expr const&, Expr& ) const override;
 
     friend class BitSimplify;
@@ -149,14 +166,14 @@ namespace binsec {
 
   struct GetCode
   {
-    GetCode(Expr const& _expr, Scope& _scope, int _expected=-1)
+    GetCode(Expr const& _expr, Scope& _scope, int _expected = -1)
       : expr(_expr), scope(_scope), expected(_expected)
     {}
 
     friend std::ostream& operator << ( std::ostream& sink, GetCode const& gc )
     {
-      int size = ASExprNode::GenerateCode( gc.expr, sink, gc.scope );
-      if (gc.expected >= 0 and gc.expected != size) { struct TypeSizeMisMatch {}; throw TypeSizeMisMatch(); }
+      auto vtp = ASExprNode::GenerateCode( gc.expr, sink, gc.scope );
+      if (gc.expected >= 0 and gc.expected != vtp.bitsize) { struct TypeSizeMisMatch {}; throw TypeSizeMisMatch(); }
       return sink;
     }
 
@@ -166,7 +183,7 @@ namespace binsec {
   struct RegReadBase : public ASExprNode
   {
     virtual void GetRegName( std::ostream& ) const = 0;
-    virtual int GenCode( std::ostream& sink, Scope& scope ) const;
+    virtual ValueType GenCode( std::ostream& sink, Scope& scope ) const;
     virtual void Repr( std::ostream& sink ) const;
     virtual unsigned SubCount() const { return 0; }
     virtual int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<RegReadBase const&>( rhs ) ); }
@@ -201,7 +218,7 @@ namespace binsec {
     virtual unsigned SubCount() const override { return 1; }
     virtual Expr const& GetSub(unsigned idx) const override { if (idx != 0) return ExprNode::GetSub(idx); return value; }
     virtual Expr SourceRead() const = 0;
-    static int GenInputCode( Expr const& input, Scope& scope, std::ostream& sink );
+    static ValueType GenInputCode( Expr const& input, Scope& scope, std::ostream& sink );
 
     Expr value;
   };
@@ -326,7 +343,7 @@ namespace binsec {
     int cmp( ExprNode const& rhs ) const override { return compare( dynamic_cast<MemAccess const&>( rhs ) ); }
     virtual Load* Mutate() const override { return new Load(*this); }
     virtual ValueType GetType() const override { return CValueType(ValueType::UNSIGNED, 8*bytecount()); }
-    virtual int GenCode( std::ostream& sink, Scope& scope ) const override;
+    virtual ValueType GenCode( std::ostream& sink, Scope& scope ) const override;
     virtual void Repr( std::ostream& sink ) const override { MemAccess::Repr(sink); }
     virtual unsigned SubCount() const override { return 1; }
     virtual Expr const& GetSub(unsigned idx) const override { if (idx != 0) return ExprNode::GetSub(idx); return addr; }
@@ -352,7 +369,7 @@ namespace binsec {
     virtual unsigned SubCount() const override { return 0; };
     virtual void Repr( std::ostream& sink ) const override;
     virtual int cmp( ExprNode const& rhs ) const override { return this > &rhs ? +1 : this < &rhs ? -1 : 0; }
-    virtual int GenCode( std::ostream& sink, Scope& scope ) const override;
+    virtual ValueType GenCode( std::ostream& sink, Scope& scope ) const override;
   };
 
   template <typename T>
@@ -375,7 +392,7 @@ namespace binsec {
     virtual Expr const& GetSub(unsigned idx) const { if (idx < sources.size()) return sources[idx]; return ExprNode::GetSub(idx); }
     virtual void Repr( std::ostream& sink ) const override;
     virtual int cmp( ExprNode const& rhs ) const override { return this > &rhs ? +1 : this < &rhs ? -1 : 0; }
-    virtual int GenCode( std::ostream& sink, Scope& scope ) const override;
+    virtual ValueType GenCode( std::ostream& sink, Scope& scope ) const override;
 
     std::vector<Expr> sources;
   };

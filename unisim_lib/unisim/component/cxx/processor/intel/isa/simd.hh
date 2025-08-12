@@ -4679,6 +4679,152 @@ Operation<ARCH>* newInsr( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase,
 };
 
 template <class ARCH>
+struct Sha1rnds4 : public Operation<ARCH>
+{
+  Sha1rnds4( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn, uint8_t _imm8 ) :
+    Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ), imm8( _imm8 ) {}
+  RMOp<ARCH> rm; uint8_t gn; uint8_t imm8; const uint8_t xmm0 = 0;
+
+  void disasm( std::ostream& sink ) const { sink << "sha1rnds4 " << DisasmV( XMM(), xmm0 ) << ',' << DisasmW( XMM(), rm ) << ',' << DisasmV( XMM(), gn );}
+
+  typedef typename ARCH::u32_t u32_t;
+
+  static u32_t choice(u32_t b, u32_t c, u32_t d) { return (b & c) | (~b & d); }
+  static u32_t parity(u32_t b, u32_t c, u32_t d) { return b ^ c ^ d; }
+  static u32_t majority(u32_t b, u32_t c, u32_t d) { return (b & c) | (b & d) | (c & d); }
+  u32_t f(u32_t b, u32_t c, u32_t d) const {
+    switch (imm8 & 0b11) {
+    case 0: return choice(b, c, d);
+    case 1:
+    case 3: return parity(b, c, d);
+    case 2: return majority(b, c, d);
+    default: __builtin_unreachable();
+    }
+  }
+
+  u32_t k() const {
+    switch (imm8 & 0b11) {
+    case 0: return u32_t(0x5A827999);
+    case 1: return u32_t(0x6ED9EBA1);
+    case 2: return u32_t(0x8F1BBCDC);
+    case 3: return u32_t(0xCA62C1D6);
+    default: __builtin_unreachable();
+    }
+  }
+
+  static u32_t
+  rol32(u32_t x, uint8_t n) { return (x << u32_t(n)) | (x >> u32_t(32-n)); }
+
+  void execute( ARCH& arch ) const
+  {
+    u32_t a[5], b[5], c[5], d[5], e[5], w[4];
+    a[0] = arch.vmm_read( XMM(), gn, 3, u32_t() );
+    b[0] = arch.vmm_read( XMM(), gn, 2, u32_t() );
+    c[0] = arch.vmm_read( XMM(), gn, 1, u32_t() );
+    d[0] = arch.vmm_read( XMM(), gn, 0, u32_t() );
+    e[0] = u32_t(0); // merged in w[0]
+    w[0] = arch.vmm_read( XMM(), rm, 3, u32_t() );
+    w[1] = arch.vmm_read( XMM(), rm, 2, u32_t() );
+    w[2] = arch.vmm_read( XMM(), rm, 1, u32_t() );
+    w[3] = arch.vmm_read( XMM(), rm, 0, u32_t() );
+
+    for (int i = 0; i < 4; i += 1) {
+      a[i + 1] = f( b[i], c[i], d[i] ) + rol32( a[i], 5 ) + w[i] + e[i] + k();
+      b[i + 1] = a[i];
+      c[i + 1] = rol32( b[i], 30 );
+      d[i + 1] = c[i];
+      e[i + 1] = d[i];
+    }
+
+    arch.vmm_write( XMM(), gn, 3, a[4] );
+    arch.vmm_write( XMM(), gn, 2, b[4] );
+    arch.vmm_write( XMM(), gn, 1, c[4] );
+    arch.vmm_write( XMM(), gn, 0, d[4] );
+  }
+};
+
+template <class ARCH>
+struct Sha1nexte : public Operation<ARCH>
+{
+  Sha1nexte( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) :
+    Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ) {}
+  RMOp<ARCH> rm; uint8_t gn;
+
+  void disasm( std::ostream& sink ) const { sink << "sha1nexte " << DisasmW( XMM(), rm ) << ',' << DisasmV( XMM(), gn );}
+
+  typedef typename ARCH::u32_t u32_t;
+
+  static u32_t rol30(u32_t x) { return (x << u32_t(30)) | (x >> u32_t(2)); }
+
+  void execute( ARCH& arch ) const
+  {
+    u32_t tmp = rol30( arch.vmm_read( XMM(), gn, 3, u32_t() ) );
+    arch.vmm_write( XMM(), gn, 3, arch.vmm_read( XMM(), rm, 3, u32_t() ) + tmp );
+    arch.vmm_write( XMM(), gn, 2, arch.vmm_read( XMM(), rm, 2, u32_t() ) );
+    arch.vmm_write( XMM(), gn, 1, arch.vmm_read( XMM(), rm, 1, u32_t() ) );
+    arch.vmm_write( XMM(), gn, 0, arch.vmm_read( XMM(), rm, 0, u32_t() ) );
+  }
+};
+
+template <class ARCH>
+struct Sha1msg1 : public Operation<ARCH>
+{
+  Sha1msg1( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) :
+    Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ) {}
+  RMOp<ARCH> rm; uint8_t gn;
+
+  void disasm( std::ostream& sink ) const { sink << "sha1msg1 " << DisasmW( XMM(), rm ) << ',' << DisasmV( XMM(), gn );}
+
+  typedef typename ARCH::u32_t u32_t;
+
+  void execute( ARCH& arch ) const
+  {
+    u32_t w0 = arch.vmm_read( XMM(), gn, 3, u32_t() );
+    u32_t w1 = arch.vmm_read( XMM(), gn, 2, u32_t() );
+    u32_t w2 = arch.vmm_read( XMM(), gn, 1, u32_t() );
+    u32_t w3 = arch.vmm_read( XMM(), gn, 0, u32_t() );
+    u32_t w4 = arch.vmm_read( XMM(), rm, 3, u32_t() );
+    u32_t w5 = arch.vmm_read( XMM(), rm, 2, u32_t() );
+
+    arch.vmm_write( XMM(), gn, 3, w2 ^ w0 );
+    arch.vmm_write( XMM(), gn, 2, w3 ^ w1 );
+    arch.vmm_write( XMM(), gn, 1, w4 ^ w2 );
+    arch.vmm_write( XMM(), gn, 0, w5 ^ w3 );
+  }
+};
+
+template <class ARCH>
+struct Sha1msg2 : public Operation<ARCH>
+{
+  Sha1msg2( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) :
+    Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ) {}
+  RMOp<ARCH> rm; uint8_t gn;
+
+  void disasm( std::ostream& sink ) const { sink << "sha1msg2 " << DisasmW( XMM(), rm ) << ',' << DisasmV( XMM(), gn );}
+
+  typedef typename ARCH::u32_t u32_t;
+
+  static u32_t rol1(u32_t x) { return (x << u32_t(1)) | (x >> u32_t(31)); }
+
+  void execute( ARCH& arch ) const
+  {
+    u32_t w13 = arch.vmm_read( XMM(), rm, 2, u32_t() );
+    u32_t w14 = arch.vmm_read( XMM(), rm, 1, u32_t() );
+    u32_t w15 = arch.vmm_read( XMM(), rm, 0, u32_t() );
+    u32_t w16 = rol1( arch.vmm_read( XMM(), gn, 3, u32_t() ) ^ w13 );
+    u32_t w17 = rol1( arch.vmm_read( XMM(), gn, 2, u32_t() ) ^ w14 );
+    u32_t w18 = rol1( arch.vmm_read( XMM(), gn, 1, u32_t() ) ^ w15 );
+    u32_t w19 = rol1( arch.vmm_read( XMM(), gn, 0, u32_t() ) ^ w16 );
+
+    arch.vmm_write( XMM(), gn, 3, w16 );
+    arch.vmm_write( XMM(), gn, 2, w17 );
+    arch.vmm_write( XMM(), gn, 1, w18 );
+    arch.vmm_write( XMM(), gn, 0, w19 );
+  }
+};
+
+
+template <class ARCH>
 struct Sha256rnds2 : public Operation<ARCH>
 {
   Sha256rnds2( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) :
@@ -4798,8 +4944,20 @@ struct Sha256msg2 : public Operation<ARCH>
 };
 
 
-template <class ARCH> struct DC<ARCH,SHA256> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
+template <class ARCH> struct DC<ARCH,SHANI> { Operation<ARCH>* get( InputCode<ARCH> const& ic )
 {
+  if (auto _ = match( ic, opcode( "\x0f\x3a\xcc" ) & RM() & Imm<8>() ))
+    return new Sha1rnds4<ARCH>( _.opbase(), _.rmop(), _.greg(), _.i( uint8_t() ) );
+
+  if (auto _ = match( ic, opcode( "\x0f\x38\xc8" ) & RM() ))
+    return new Sha1nexte<ARCH>( _.opbase(), _.rmop(), _.greg() );
+
+  if (auto _ = match( ic, opcode( "\x0f\x38\xc9" ) & RM() ))
+    return new Sha1msg1<ARCH>( _.opbase(), _.rmop(), _.greg() );
+
+  if (auto _ = match( ic, opcode( "\x0f\x38\xca" ) & RM() ))
+    return new Sha1msg2<ARCH>( _.opbase(), _.rmop(), _.greg() );
+
   if (auto _ = match( ic, opcode( "\x0f\x38\xcb" ) & RM() ))
     return new Sha256rnds2<ARCH>( _.opbase(), _.rmop(), _.greg() );
 
