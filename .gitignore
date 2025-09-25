@@ -341,3 +341,8 @@ tags
 [._]*.un~
 
 # End of https://www.toptal.com/developers/gitignore/api/ocaml,c,c++,python,vim,emacs,macos
+
+# Unisim temporary files
+genisslib/
+*.isa
+*.isadeps

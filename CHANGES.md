@@ -1,9 +1,35 @@
-## 0.0.8 (2023-03-08)
+## 0.0.12 (2025-08-12)
+
+- add a few AMD64 instructions
+- bug fixes and code refactoring
+  (DBA instructions order should now be stable across platforms)
+
+## 0.0.11 (2025-07-05)
+
+- add several AMD64 instructions
+- bug fixes and code refactoring
+  (plugin mode should no longer crash)
+
+## 0.0.10 (2025-02-17)
+
+- add SPARCv8 decoder
+- better handling for some AVX2 instructions (x86)
+- bug fixes and code refactoring
+
+## 0.0.9 (2024-09-13)
+
+- support for NEON instructions in AARCH64
+- handling some new VEX encoded instructions (x86)
+- more systematic branchless semantics
+  (e.g. [#37](https://github.com/binsec/binsec/issues/37))
+- various bug fixes and code improvements
+
+## 0.0.8 (2024-03-08)
 
 - support for `adcx`, `adox` and `mulx` (x86)
 - some bug fixes and code improvements
 
-## 0.0.7 (2023-10-32)
+## 0.0.7 (2023-10-23)
 
 - various bug fixes and code improvements
 
