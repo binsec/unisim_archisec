@@ -1137,8 +1137,9 @@ struct LoadFPS : public LSFPS<ARCH,VR,OPSIZE>, public LSMnemo<VR,OPSIZE>
   void execute( ARCH& arch ) const
   {
     arch.vmm_write( VR(), gn, 0, arch.vmm_read( VR(), rm, 0, typename TypeFor<ARCH,OPSIZE>::f() ) );
-    for (unsigned idx = 1, end = VR::size()/OPSIZE; idx < end; ++idx)
-      arch.vmm_write( VR(), gn, idx, typename TypeFor<ARCH,OPSIZE>::f(0) );
+    if (rm.ismem())
+      for (unsigned idx = 1, end = VR::size()/OPSIZE; idx < end; ++idx)
+        arch.vmm_write( VR(), gn, idx, typename TypeFor<ARCH,OPSIZE>::f(0) );
   }
 };
 
@@ -1186,26 +1187,28 @@ Operation<ARCH>* newMovs( InputCode<ARCH> const& ic, bool store, OpBase<ARCH> co
 {
   bool is_mem = rm.ismem();
 
-  if (is_mem ? store : not ic.vex())
+  if (not is_mem and ic.vex())
+    {
+      // Merger (AVX only, all registers)
+      unsigned dst = gn, src1 = ic.vreg(), src2 = rm.ereg();
+      if (store) std::swap(dst,src2);
+      return new MergeFPS<ARCH,OPSIZE>( opbase, dst, src1, src2 );
+    }
+
+  if (store)
     {
       // Store
       if      (not ic.vex())  return new StoreFPS<ARCH,SSE,OPSIZE>( opbase, std::move(rm), gn );
       else if (not ic.vreg()) return new StoreFPS<ARCH,XMM,OPSIZE>( opbase, std::move(rm), gn );
       else                    return 0;
     }
-
-  if (is_mem)
+  else
     {
       // Load
       if      (not ic.vex())  return new LoadFPS<ARCH,SSE,OPSIZE>( opbase, std::move(rm), gn );
       else if (not ic.vreg()) return new LoadFPS<ARCH,XMM,OPSIZE>( opbase, std::move(rm), gn );
       else                    return 0;
     }
-
-  // Merger (AVX only)
-  unsigned dst = gn, src1 = ic.vreg(), src2 = rm.ereg();
-  if (store) std::swap(dst,src2);
-  return new MergeFPS<ARCH,OPSIZE>( opbase, dst, src1, src2 );
 }
 };
 

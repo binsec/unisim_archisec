@@ -1790,7 +1790,14 @@ struct IMulGE : public Operation<ARCH>
 
   void disasm( std::ostream& sink ) const { sink << "imul " << DisasmE( OP(), rmop )  << ',' << DisasmG( OP(), gn ); }
 
-  void execute( ARCH& arch ) const { arch.regwrite( OP(), gn, arch.regread( OP(), gn ) * arch.rmread( OP(), rmop ) ); }
+  void execute( ARCH& arch ) const {
+    typedef typename TypeFor<ARCH,OP::SIZE>::s s_type;
+    typedef typename TypeFor<ARCH,OP::SIZE>::u u_type;
+
+    s_type acc( arch.regread( OP(), gn ) ), src( arch.rmread( OP(), rmop ) ), hi(0);
+    eval_mul( arch, hi, acc, src );
+    arch.regwrite( OP(), gn, u_type( acc ) );
+    }
 };
 
 template <class ARCH, class OP>

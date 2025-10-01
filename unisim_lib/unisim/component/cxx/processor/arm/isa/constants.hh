@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2013-2023,
+ *  Copyright (c) 2007,
  *  Commissariat a l'Energie Atomique (CEA)
  *  All rights reserved.
  *
@@ -29,7 +29,8 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Authors: Yves Lhuillier (yves.lhuillier@cea.fr), Daniel Gracia Perez (daniel.gracia-perez@cea.fr), Gilles Mouchard (gilles.mouchard@cea.fr)
+ * Authors: Yves Lhuillier (yves.lhuillier@cea.fr)
+ *          Gilles Mouchard (gilles.mouchard@cea.fr)
  */
 
 #ifndef __UNISIM_COMPONENT_CXX_PROCESSOR_ARM_ISA_CONSTANTS_HH__
@@ -103,11 +104,11 @@ namespace arm {
   RegisterField< 2,1> const OFC;    /* Overflow cumulative exception bit */
   RegisterField< 1,1> const DZC;    /* Division by Zero cumulative exception bit */
   RegisterField< 0,1> const IOC;    /* Invalid Operation cumulative exception bit */
-  
+
   RegisterField<19,1> const FZ16;   /* Flushing denormalized numbers to zero control bit on half-precision data-processing instructions */
   RegisterField< 1,1> const AH;     /* Alternate Handling */
   RegisterField< 0,1> const FIZ;    /* Flush Inputs to Zero */
-  
+
   /* Common bitfields */
   RegisterField<0,32> const ALL32;  /* Raw 32 bits of the any status/control register*/
   RegisterField<0,64> const ALL64;  /* Raw 64 bits of the any status/control register*/

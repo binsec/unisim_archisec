@@ -1,3 +1,7 @@
+## 0.0.13 (2025-10-01)
+
+- bug fixes
+
 ## 0.0.12 (2025-08-12)
 
 - add a few AMD64 instructions

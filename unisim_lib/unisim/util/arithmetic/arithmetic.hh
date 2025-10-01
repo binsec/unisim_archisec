@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2007-2023,
+ *  Copyright (c) 2007,
  *  Commissariat a l'Energie Atomique (CEA),
  *  University of Perpignan (UPVD)
  *  All rights reserved.
@@ -32,10 +32,11 @@
  *
  * Authors: Gilles Mouchard (gilles.mouchard@cea.fr)
  *          Yves Lhuillier (yves.lhuillier@cea.fr)
+ *          Daniel Gracia Perez (daniel.gracia-perez@cea.fr)
  *          Reda Nouacer (reda.nouacer@cea.fr)
  *          Sylvain Collange (sylvain.collange@univ-perp.fr)
  */
- 
+
 #ifndef __UNISIM_UTIL_ARITHMETIC_ARITHMETIC_HH__
 #define __UNISIM_UTIL_ARITHMETIC_ARITHMETIC_HH__
 
@@ -83,7 +84,7 @@ inline void SignedSatSub32(uint32_t& result, uint8_t& does_sat, uint32_t x, uint
 inline void UnsignedSatSub8(uint8_t& result, uint8_t& borrow_out, uint8_t& overflow, uint8_t& sign, uint8_t x, uint8_t y, uint8_t borrow_in) ALWAYS_INLINE;
 inline void UnsignedSatSub16(uint16_t& result, uint8_t& borrow_out, uint8_t& overflow, uint8_t& sign, uint16_t x, uint16_t y, uint8_t borrow_in) ALWAYS_INLINE;
 inline void UnsignedSatSub32(uint32_t& result, uint8_t& borrow_out, uint8_t& overflow, uint8_t& sign, uint32_t x, uint32_t y, uint8_t borrow_in) ALWAYS_INLINE;
-inline void UnsignedSatSub8(uint8_t& result, uint8_t& overflow, uint8_t x, uint8_t y) ALWAYS_INLINE; 
+inline void UnsignedSatSub8(uint8_t& result, uint8_t& overflow, uint8_t x, uint8_t y) ALWAYS_INLINE;
 inline void UnsignedSatSub16(uint16_t& result, uint8_t& overflow, uint16_t x, uint16_t y) ALWAYS_INLINE;
 inline void UnsignedSatSub32(uint32_t& result, uint8_t& overflow, uint32_t x, uint32_t y) ALWAYS_INLINE;
 
@@ -128,12 +129,14 @@ inline bool BitScanForward(unsigned int& n, uint64_t v) ALWAYS_INLINE;
 inline bool BitScanReverse(unsigned int& n, uint32_t v) ALWAYS_INLINE;
 inline bool BitScanReverse(unsigned int& n, uint64_t v) ALWAYS_INLINE;
 
+inline int BitScanForward(bool n) ALWAYS_INLINE;
 inline int BitScanForward(unsigned char n) ALWAYS_INLINE;
 inline int BitScanForward(unsigned short n) ALWAYS_INLINE;
 inline int BitScanForward(unsigned n) ALWAYS_INLINE;
 inline int BitScanForward(unsigned long n) ALWAYS_INLINE;
 inline int BitScanForward(unsigned long long n) ALWAYS_INLINE;
 
+inline int BitScanReverse(bool n) ALWAYS_INLINE;
 inline int BitScanReverse(unsigned char n) ALWAYS_INLINE;
 inline int BitScanReverse(unsigned short n) ALWAYS_INLINE;
 inline int BitScanReverse(unsigned n) ALWAYS_INLINE;
@@ -675,7 +678,7 @@ inline void SignedSatAdd32(uint32_t& result, uint8_t& carry_out, uint8_t& overfl
 // outputs:
 //   - result   : 16-bit result of substraction x - y with saturation
 //   - overflow : overflow flag (0 or 1)
-inline void SignedSatAdd16(uint16_t& result, uint8_t& overflow, uint16_t x, uint16_t y) 
+inline void SignedSatAdd16(uint16_t& result, uint8_t& overflow, uint16_t x, uint16_t y)
 {
 	uint8_t carry_out;
 	uint8_t sign;
@@ -689,7 +692,7 @@ inline void SignedSatAdd16(uint16_t& result, uint8_t& overflow, uint16_t x, uint
 // outputs:
 //   - result   : 32-bit result of substraction x - y with saturation
 //   - overflow : overflow flag (0 or 1)
-inline void SignedSatAdd32(uint32_t& result, uint8_t& overflow, uint32_t x, uint32_t y) 
+inline void SignedSatAdd32(uint32_t& result, uint8_t& overflow, uint32_t x, uint32_t y)
 {
 	uint8_t carry_out;
 	uint8_t sign;
@@ -825,7 +828,7 @@ inline void SignedSatSub32(uint32_t& result, uint8_t& borrow_out, uint8_t& overf
 // outputs:
 //   - result   : 16-bit result of addition x - y with saturation
 //   - overflow : overflow flag (0 or 1)
-inline void SignedSatSub16(uint16_t& result, uint8_t& overflow, uint16_t x, uint16_t y) 
+inline void SignedSatSub16(uint16_t& result, uint8_t& overflow, uint16_t x, uint16_t y)
 {
 	uint8_t borrow_out;
 	uint8_t sign;
@@ -839,7 +842,7 @@ inline void SignedSatSub16(uint16_t& result, uint8_t& overflow, uint16_t x, uint
 // outputs:
 //   - result   : 32-bit result of addition x - y with saturation
 //   - overflow : overflow flag (0 or 1)
-inline void SignedSatSub32(uint32_t& result, uint8_t& overflow, uint32_t x, uint32_t y) 
+inline void SignedSatSub32(uint32_t& result, uint8_t& overflow, uint32_t x, uint32_t y)
 {
 	uint8_t borrow_out;
 	uint8_t sign;
@@ -914,7 +917,7 @@ inline void UnsignedSatSub32(uint32_t& result, uint8_t& borrow_out, uint8_t& ove
 // outputs:
 //   - result   : 8-bit result of addition x - y with saturation
 //   - overflow : overflow flag (0 or 1)
-inline void UnsignedSatSub8(uint8_t& result, uint8_t& overflow, uint8_t x, uint8_t y) 
+inline void UnsignedSatSub8(uint8_t& result, uint8_t& overflow, uint8_t x, uint8_t y)
 {
 	uint8_t borrow_out;
 	uint8_t sign;
@@ -928,7 +931,7 @@ inline void UnsignedSatSub8(uint8_t& result, uint8_t& overflow, uint8_t x, uint8
 // outputs:
 //   - result   : 16-bit result of addition x - y with saturation
 //   - overflow : overflow flag (0 or 1)
-inline void UnsignedSatSub16(uint16_t& result, uint8_t& overflow, uint16_t x, uint16_t y) 
+inline void UnsignedSatSub16(uint16_t& result, uint8_t& overflow, uint16_t x, uint16_t y)
 {
 	uint8_t borrow_out;
 	uint8_t sign;
@@ -942,7 +945,7 @@ inline void UnsignedSatSub16(uint16_t& result, uint8_t& overflow, uint16_t x, ui
 // outputs:
 //   - result   : 32-bit result of addition x - y with saturation
 //   - overflow : overflow flag (0 or 1)
-inline void UnsignedSatSub32(uint32_t& result, uint8_t& overflow, uint32_t x, uint32_t y) 
+inline void UnsignedSatSub32(uint32_t& result, uint8_t& overflow, uint32_t x, uint32_t y)
 {
 	uint8_t borrow_out;
 	uint8_t sign;
@@ -1426,6 +1429,9 @@ inline bool BitScanReverse(unsigned int& n, uint64_t v)
 	return false;
 }
 
+inline int BitScanForward(bool n) { return n ? 0  : -1; }
+inline int BitScanReverse(bool n) { return n ? 0  : -1; }
+
 #ifdef __GNUC__
 
 inline int BitScanForward(unsigned char n) { return __builtin_ctz(n); }
@@ -1450,7 +1456,7 @@ BitScanForward_C(INT value)
     for (int bit = 0; ; ++bit, value >>= 1)
       if (value & 1)
         return bit;
-  
+
   return -1;
 }
 
@@ -1459,11 +1465,11 @@ int
 BitScanReverse_C(INT value)
 {
   int bsr = -1;
-  
+
   for (int bit = 0; value; ++bit, value >>= 1)
     if (value & 1)
       bsr = bit;
-  
+
   return bsr;
 }
 
@@ -1499,7 +1505,7 @@ int PopCount(uint64_t v)
   v = (v & 0xff00ff00ff00ff00ull) >>  8 + (v & 0x00ff00ff00ff00ffull);
   v = (v & 0xffff0000ffff0000ull) >> 16 + (v & 0x0000ffff0000ffffull);
   v = (v & 0xffffffff00000000ull) >> 32 + (v & 0x00000000ffffffffull);
-  
+
   return int(v);
 }
 #endif
@@ -1552,28 +1558,28 @@ inline int8_t SignExtend(uint8_t v, unsigned int n)
 {
 	unsigned int m = (8 * sizeof(v)) - n;
 	// FIXME: this operation is undefined
-	return (int8_t) (v << m) >> m; 
+	return (int8_t) (v << m) >> m;
 }
 
 inline int16_t SignExtend(uint16_t v, unsigned int n)
 {
 	unsigned int m = (8 * sizeof(v)) - n;
 	// FIXME: this operation is undefined
-	return (int16_t) (v << m) >> m; 
+	return (int16_t) (v << m) >> m;
 }
 
 inline int32_t SignExtend(uint32_t v, unsigned int n)
 {
 	unsigned int m = (8 * sizeof(v)) - n;
 	// FIXME: this operation is undefined
-	return (int32_t) (v << m) >> m; 
+	return (int32_t) (v << m) >> m;
 }
 
 inline int64_t SignExtend(uint64_t v, unsigned int n)
 {
 	unsigned int m = (8 * sizeof(v)) - n;
 	// FIXME: this operation is undefined
-	return (int64_t) (v << m) >> m; 
+	return (int64_t) (v << m) >> m;
 }
 
 inline int8_t SignExtend(int8_t v, unsigned int n)
