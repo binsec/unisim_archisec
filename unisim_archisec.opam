@@ -14,7 +14,7 @@ license: "BSD-3-Clause"
 homepage: "https://binsec.github.io"
 bug-reports: "mailto:binsec@saxifrage.saclay.cea.fr"
 depends: [
-  "dune" {>= "3.0"}
+  "dune" {>= "3.18"}
   "conf-gcc" {build}
   "conf-g++" {build}
   "odoc" {with-doc}
@@ -37,4 +37,5 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/binsec/unisim_archisec.git"
+x-maintenance-intent: ["(latest)"]
 available: [ os = "linux" & (os-distribution != "ol" & os-distribution != "centos" | os-version >= 8) | os = "macos" & os-distribution = "homebrew" ]

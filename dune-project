@@ -1,4 +1,4 @@
-(lang dune 3.0)
+(lang dune 3.18)
 (generate_opam_files true)
 
 (name unisim_archisec)
@@ -21,8 +21,9 @@ UNISIM ARCHISEC is a companion package of the binary analysis platform
 BINSEC. It exposes disassembly metadata and DBA (Dynamic Bitvector Automata)
 semantics of several instruction set architectures, including ARM, x86_64,
 ppc64 and Sparcv8.")
-(depends
+ (depends
   (conf-gcc :build)
   (conf-g++ :build))
  (conflicts
-  (binsec (< 0.10.0))))
+  (binsec (< 0.10.0)))
+ (maintenance_intent "(latest)"))
