@@ -3381,7 +3381,7 @@ struct Vperm2i128 : public Operation<ARCH>
   {
     typedef typename ARCH::u128_t u128_t;
 
-    u128_t tmp[4];
+    u128_t tmp[4], zero128 = u128_t(unisim::util::arithmetic::Integer<4,false>(0));
 
     tmp[0] = arch.vmm_read( VR(), vn, 0, u128_t() );
     tmp[1] = arch.vmm_read( VR(), vn, 1, u128_t() );
@@ -3389,11 +3389,11 @@ struct Vperm2i128 : public Operation<ARCH>
     tmp[3] = arch.vmm_read( VR(), rm, 1, u128_t() );
 
     if (oo & 0b00001000)
-      arch.vmm_write( VR(), gn, 0, u128_t(0) );
+      arch.vmm_write( VR(), gn, 0, zero128 );
     else
       arch.vmm_write( VR(), gn, 0, tmp[oo & 0b00000011] );
     if (oo & 0b10000000)
-      arch.vmm_write( VR(), gn, 1, u128_t(0) );
+      arch.vmm_write( VR(), gn, 1, zero128 );
     else
       arch.vmm_write( VR(), gn, 1, tmp[(oo & 0b00110000) >> 4] );
   }

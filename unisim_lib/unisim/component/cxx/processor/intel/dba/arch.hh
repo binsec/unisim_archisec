@@ -900,7 +900,7 @@ Processor<MODE>::eregwrite( unsigned reg, unsigned size, unsigned pos, Expr cons
 
   for (unsigned rem = 1; rem < size; ++rem)
     {
-      regvalues[reg][pos+rem] = 0;
+      regvalues[reg][pos+rem] = Expr(); // invalidate overlapping bytes
     }
 }
 
