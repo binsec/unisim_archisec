@@ -690,7 +690,7 @@ namespace symbolic {
 
     Expr expr;
 
-    SmartValue() : expr(0) {}
+    SmartValue() : expr(make_const(value_type(0))) {}
 
     SmartValue( Expr const& _expr )
       : expr( _expr )

@@ -96,15 +96,18 @@ namespace vector {
               TypeInfo<ELEM>::Allocate( res[idx] );
               if (src < src_end)
                 TypeInfo<ELEM>::FromBytes( res[idx], src );
-              else if (pos < final_size)
-                res[idx] = ELEM(0);
+              else if (pos < final_size) {
+                  Byte zero[TypeInfo<ELEM>::bytecount] = {};
+                  TypeInfo<ELEM>::FromBytes(res[idx], zero);
+              }
             }
           transfer = current;
         }
       else if (size < final_size)
         {
+          Byte zero[TypeInfo<ELEM>::bytecount] = {};
           for (unsigned idx = size / elem_size, end = final_size / elem_size; idx < end; ++idx)
-            res[idx] = ELEM(0);
+              TypeInfo<ELEM>::FromBytes(res[idx], zero);
         }
       size = final_size;
       return res;
