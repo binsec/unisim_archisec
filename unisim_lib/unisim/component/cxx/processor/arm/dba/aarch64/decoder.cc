@@ -557,17 +557,14 @@ struct Processor
   bool             unpredictable;
 };
 
-struct Translator
+struct Translator : public unisim::util::symbolic::binsec::Translator
 {
   typedef unisim::component::cxx::processor::arm::dba::arm64::Decoder<Processor> Decoder;
   typedef unisim::component::cxx::processor::arm::dba::arm64::Operation<Processor> Operation;
 
-  typedef unisim::util::symbolic::binsec::ActionNode ActionNode;
-
   Translator( uint64_t _addr, uint32_t _code )
-    : coderoot(new ActionNode), addr(_addr), code(_code)
+    : addr(_addr), code(_code)
   {}
-  ~Translator() { delete coderoot; }
 
   void
   translate( std::ostream& sink )
@@ -621,7 +618,7 @@ struct Translator
         for (bool end = false; not end;)
           {
             Processor state;
-            state.path = coderoot;
+            state.path = coderoot.get();
             state.step(*instruction);
             end = state.close( reference );
           }
@@ -635,10 +632,9 @@ struct Translator
       }
 
     // Translate to DBA
-    coderoot->generate(sink, 8, addr);
+    generate(sink, 8, addr);
   }
 
-  ActionNode*               coderoot;
   uint64_t                  addr;
   uint32_t                  code;
 };

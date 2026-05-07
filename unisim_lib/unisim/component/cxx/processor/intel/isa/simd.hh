@@ -215,75 +215,94 @@ newVFPCmp( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, unsigned gn, u
 /* SIMD CVT Functions*/
 /*********************/
 
-template <class ARCH, unsigned DOPSZ, unsigned SOPSZ>
+template <class ARCH, class VR, unsigned DOPSZ, unsigned SOPSZ>
 struct CvtI2F : public Operation<ARCH>
 {
-  CvtI2F( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ) {}
+  CvtI2F( OpBase<ARCH> const& opbase, RMOp<ARCH>&& _rm, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( std::move(_rm) ), gn( _gn ) {}
   RMOp<ARCH> rm; uint8_t gn;
   char const* mnemonic() const { switch (DOPSZ) { case 32: return "cvtdq2ps"; case 64: return "cvtdq2pd"; } return "cvt<bad>"; }
-  void disasm( std::ostream& sink ) const { sink << mnemonic() << ' ' << DisasmW( SSE(), rm ) << ',' << DisasmV( SSE(), gn ); }
+  void disasm( std::ostream& sink ) const { sink << (VR::vex()?"v":"") << mnemonic() << ' ' << DisasmW( VR(), rm ) << ',' << DisasmV( VR(), gn ); }
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,DOPSZ>::f fdst_type;
-    typedef typename TypeFor<ARCH,SOPSZ>::u usrc_type;
-    for (unsigned idx = 0, end = 128/DOPSZ; idx < end; ++idx)
+    typedef typename TypeFor<ARCH,SOPSZ>::s ssrc_type;
+    for (unsigned idx = 0, end = VR::size()/DOPSZ; idx < end; ++idx)
       {
-        usrc_type src = arch.vmm_read( SSE(), rm, idx, usrc_type() );
+        ssrc_type src = arch.vmm_read( VR(), rm, idx, ssrc_type() );
         fdst_type dst = fdst_type(src);
-        arch.vmm_write( SSE(), gn, idx, dst );
+        arch.vmm_write( VR(), gn, idx, dst );
       }
   }
 };
 
-template <class ARCH, unsigned DOPSZ, class SOP>
+template <class ARCH, class VR, unsigned DOPSZ, class SOP>
 struct CvtsI2F : public Operation<ARCH>
 {
-  CvtsI2F( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ) {}
-  RMOp<ARCH> rm; uint8_t gn;
+  CvtsI2F( OpBase<ARCH> const& opbase, RMOp<ARCH>&& _rm, uint8_t _vn, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( std::move(_rm) ), vn( _vn ), gn( _gn ) {}
+  RMOp<ARCH> rm; uint8_t vn, gn;
   char const* mnemonic() const { switch (DOPSZ) { case 32: return "cvtsi2ss"; case 64: return "cvtsi2sd"; } return "cvt<bad>"; }
-  void disasm( std::ostream& sink ) const { sink << mnemonic() << ' ' << DisasmE( SOP(), rm ) << ',' << DisasmV( SSE(), gn ); }
+  void disasm( std::ostream& sink ) const
+  {
+    sink << (VR::vex()?"v":"") << mnemonic() << ' ' << DisasmE( SOP(), rm );
+    if (VR::vex()) sink << ',' << DisasmV( VR(), vn );
+    sink << ',' << DisasmV( VR(), gn );
+  }
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,DOPSZ>::f fdst_type;
     typename TypeFor<ARCH,SOP::SIZE>::u src = arch.rmread( SOP(), rm );
     fdst_type dst = fdst_type(src);
-    arch.vmm_write( SSE(), gn, 0, dst );
+    arch.vmm_write( VR(), gn, 0, dst );
+
+    if (VR::vex())
+      {
+        for (unsigned idx = 1, end = VR::size() / DOPSZ; idx < end; ++idx)
+          arch.vmm_write( VR(), gn, idx, arch.vmm_read( VR(), vn, idx, fdst_type() ) );
+      }
   }
 };
 
-template <class ARCH, unsigned DOPSZ, unsigned SOPSZ>
+template <class ARCH, class VR, unsigned DOPSZ, unsigned SOPSZ>
 struct CvtsF2F : public Operation<ARCH>
 {
-  CvtsF2F( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ) {} RMOp<ARCH> rm; uint8_t gn;
+  CvtsF2F( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _vn, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( _rm ), vn( _vn ), gn( _gn ) {} RMOp<ARCH> rm; uint8_t vn, gn;
   void disasm( std::ostream& sink ) const
   {
-    sink << "cvts" << SizeID<SOPSZ>::fid() << "2s" << SizeID<DOPSZ>::fid() << " " << DisasmW( SSE(), rm ) << ',' << DisasmV( SSE(), gn );
+    sink << (VR::vex()?"v":"") << "cvts" << SizeID<SOPSZ>::fid() << "2s" << SizeID<DOPSZ>::fid() << " " << DisasmW( VR(), rm );
+    if (VR::vex()) sink << ',' << DisasmV( VR(), vn );
+    sink << ',' << DisasmV( VR(), gn );
   }
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,SOPSZ>::f fsrc_type;
     typedef typename TypeFor<ARCH,DOPSZ>::f fdst_type;
 
-    fsrc_type src = arch.vmm_read( SSE(), rm, 0, fsrc_type() );
+    fsrc_type src = arch.vmm_read( VR(), rm, 0, fsrc_type() );
     //FPToFP( res, op, cpu, cpu.FPSCR );
     fdst_type dst = fdst_type(src);
 
-    arch.vmm_write( SSE(), gn, 0, dst );
+    arch.vmm_write( VR(), gn, 0, dst );
+
+    if (VR::vex())
+      {
+        for (unsigned idx = 1, end = VR::size() / DOPSZ; idx < end; ++idx)
+          arch.vmm_write( VR(), gn, idx, arch.vmm_read( VR(), vn, idx, fdst_type() ) );
+      }
   }
 };
 
-template <class ARCH, unsigned SOPSZ, class DOP>
+template <class ARCH, class VR, unsigned SOPSZ, class DOP>
 struct CvttF2I : public Operation<ARCH>
 {
-  CvttF2I( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rm, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( _rm ), gn( _gn ) {}
+  CvttF2I( OpBase<ARCH> const& opbase, RMOp<ARCH>&& _rm, uint8_t _gn ) : Operation<ARCH>( opbase ), rm( std::move(_rm) ), gn( _gn ) {}
   RMOp<ARCH> rm; uint8_t gn;
   char const* mnemonic() const { switch (SOPSZ) { case 32: return "cvttss2si"; case 64: return "cvttsd2si"; } return "cvt<bad>"; }
-  void disasm( std::ostream& sink ) const { sink << mnemonic() << ' ' << DisasmW( SSE(), rm ) << ',' << DisasmG( DOP(), gn ); }
+  void disasm( std::ostream& sink ) const { sink << (VR::vex()?"v":"") << mnemonic() << ' ' << DisasmW( VR(), rm ) << ',' << DisasmG( DOP(), gn ); }
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,DOP::SIZE>::u udst_type;
     typedef typename TypeFor<ARCH,SOPSZ>::f fsrc_type;
-    fsrc_type src = arch.vmm_read( SSE(), rm, 0, fsrc_type() );
+    fsrc_type src = arch.vmm_read( VR(), rm, 0, fsrc_type() );
     udst_type dst = udst_type(src);
     arch.regwrite( DOP(), gn, dst );
   }
@@ -293,54 +312,84 @@ template <class ARCH> struct DC<ARCH,CVT> { Operation<ARCH>* get( InputCode<ARCH
 {
   if (ic.f0()) return 0;
 
-  if (auto _ = match( ic, simdF2() & opcode( "\x0f\x5a" ) & RM() ))
+  if (auto _ = match( ic, vex( "\xf2\x0f\x5a" ) & RM() ))
 
-    return new CvtsF2F<ARCH,32,64>( _.opbase(), _.rmop(), _.greg() );
+    return newCvtsF2F<32,64>( ic, _.opbase(), _.rmop(), _.greg() );
 
-  if (auto _ = match( ic, simdF3() & opcode( "\x0f\x5a" ) & RM() ))
+  if (auto _ = match( ic, vex("\xf3\x0f\x5a" ) & RM() ))
 
-    return new CvtsF2F<ARCH,64,32>( _.opbase(), _.rmop(), _.greg() );
+    return newCvtsF2F<64,32>( ic, _.opbase(), _.rmop(), _.greg() );
 
-  if (auto _ = match( ic, simdF3() & opcode( "\x0f\xe6" ) & RM() ))
+  if (auto _ = match( ic, vex( "\xf3\x0f\xe6" ) & RM() ))
 
-    return new CvtI2F<ARCH,64,32>( _.opbase(), _.rmop(), _.greg() );
+    return newCvtI2F<64,32>( ic, _.opbase(), _.rmop(), _.greg() );
 
-  if (auto _ = match( ic, simd__() & opcode( "\x0f\x5b" ) & RM() ))
+  if (auto _ = match( ic, vex( "\x0f\x5b" ) & RM() ))
 
-    return new CvtI2F<ARCH,32,32>( _.opbase(), _.rmop(), _.greg() );
+    return newCvtI2F<32,32>( ic, _.opbase(), _.rmop(), _.greg() );
 
-  if (auto _ = match( ic, opcode( "\x0f\x2a" ) & RM() ))
-    {
-      if (ic.f3())
-        {
-          if (ic.w()) return new CvtsI2F<ARCH,32,GOq>( _.opbase(), _.rmop(), _.greg() );
-          /*else*/    return new CvtsI2F<ARCH,32,GOd>( _.opbase(), _.rmop(), _.greg() );
-        }
-      if (ic.f2())
-        {
-          if (ic.w()) return new CvtsI2F<ARCH,64,GOq>( _.opbase(), _.rmop(), _.greg() );
-          /*else*/    return new CvtsI2F<ARCH,64,GOd>( _.opbase(), _.rmop(), _.greg() );
-        }
-      return 0;
-    }
+  if (auto _ = match( ic, vex( "\xf3\x0f\x2a" ) & RM() ))
 
-  if (auto _ = match( ic, opcode( "\x0f\x2c" ) & RM() ))
-    {
-      if (ic.f3())
-        {
-          if (ic.w()) return new CvttF2I<ARCH,32,GOq>( _.opbase(), _.rmop(), _.greg() );
-          /*else*/    return new CvttF2I<ARCH,32,GOd>( _.opbase(), _.rmop(), _.greg() );
-        }
-      if (ic.f2())
-        {
-          if (ic.w()) return new CvttF2I<ARCH,64,GOq>( _.opbase(), _.rmop(), _.greg() );
-          /*else*/    return new CvttF2I<ARCH,64,GOd>( _.opbase(), _.rmop(), _.greg() );
-        }
-      return 0;
-    }
+    return newCvtsI2F<32>( ic, _.opbase(), _.rmop(), _.greg() );
+
+  if (auto _ = match( ic, vex( "\xf2\x0f\x2a" ) & RM() ))
+
+    return newCvtsI2F<64>( ic, _.opbase(), _.rmop(), _.greg() );
+
+  if (auto _ = match( ic, vex( "\xf3\x0f\x2c" ) & RM() ))
+
+    return newCvttF2I<32>( ic, _.opbase(), _.rmop(), _.greg() );
+
+  if (auto _ = match( ic, vex( "\xf2\x0f\x2c" ) & RM() ))
+
+    return newCvttF2I<64>( ic, _.opbase(), _.rmop(), _.greg() );
 
   return 0;
-}};
+}
+template <unsigned DOPSZ, unsigned SOPSZ>
+Operation<ARCH>* newCvtsF2F( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, MOp<ARCH> const* rm, unsigned gn )
+{
+  if (not ic.vex())     return new CvtsF2F<ARCH,SSE,DOPSZ,SOPSZ>( opbase, rm, gn, gn );
+  return new CvtsF2F<ARCH,XMM,DOPSZ,SOPSZ>( opbase, rm, ic.vreg(), gn );
+}
+template <unsigned DOPSZ, unsigned SOPSZ>
+Operation<ARCH>* newCvtI2F( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, unsigned gn )
+{
+  if (not ic.vex())     return new CvtI2F<ARCH,SSE,DOPSZ,SOPSZ>( opbase, std::move(rm), gn );
+  if (ic.vreg()) return 0;
+  if (ic.vlen() == 128) return new CvtI2F<ARCH,XMM,DOPSZ,SOPSZ>( opbase, std::move(rm), gn );
+  if (ic.vlen() == 256) return new CvtI2F<ARCH,YMM,DOPSZ,SOPSZ>( opbase, std::move(rm), gn );
+  return 0;
+}
+template <unsigned DOPSZ>
+Operation<ARCH>* newCvtsI2F( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, unsigned gn )
+{
+  bool wide = ic.w();
+  if (not ic.vex())     return newCvtsI2F<SSE,DOPSZ>( wide, opbase, std::move(rm), gn, gn);
+  if (ic.vlen() == 128) return newCvtsI2F<XMM,DOPSZ>( wide, opbase, std::move(rm), ic.vreg(), gn);
+  return 0;
+}
+template <class VR, unsigned DOPSZ>
+Operation<ARCH>* newCvtsI2F( bool wide, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, unsigned vn, unsigned gn )
+{
+  if (wide) return new CvtsI2F<ARCH,VR,DOPSZ,GOq>(opbase, std::move(rm), vn, gn);
+  return           new CvtsI2F<ARCH,VR,DOPSZ,GOd>(opbase, std::move(rm), vn, gn);
+}
+template <unsigned SOPSZ>
+Operation<ARCH>* newCvttF2I( InputCode<ARCH> const& ic, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, unsigned gn )
+{
+  bool wide = ic.w();
+  if (not ic.vex())     return newCvttF2I<SSE,SOPSZ>( wide, opbase, std::move(rm), gn);
+  if (ic.vlen() == 128) return newCvttF2I<XMM,SOPSZ>( wide, opbase, std::move(rm), gn);
+  return 0;
+}
+template <class VR, unsigned SOPSZ>
+Operation<ARCH>* newCvttF2I( bool wide, OpBase<ARCH> const& opbase, RMOp<ARCH>&& rm, unsigned gn )
+{
+  if (wide) return new CvttF2I<ARCH,VR,SOPSZ,GOq>(opbase, std::move(rm), gn);
+  return           new CvttF2I<ARCH,VR,SOPSZ,GOd>(opbase, std::move(rm), gn);
+}
+};
 
 template <class ARCH>
 struct LSMxcsr : public Operation<ARCH>
@@ -736,9 +785,11 @@ struct BroadcastI128 : public Operation<ARCH>
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,GOq::SIZE>::u src_type;
-    src_type value = arch.vmm_read( YMM(), rm, 0, src_type());
+    src_type value[2];
+    value[0] = arch.vmm_read( YMM(), rm, 0, src_type());
+    value[1] = arch.vmm_read( YMM(), rm, 1, src_type());
     for (unsigned idx = 0, end = YMM::size() / GOq::SIZE; idx < end; ++idx)
-      arch.vmm_write( YMM(), gn, idx, value );
+      arch.vmm_write( YMM(), gn, idx, value[idx&1] );
   }
 };
 
@@ -1588,7 +1639,7 @@ struct VHBinaryVVW : public Op3V<ARCH,VR>
       for (unsigned idx = 0, end = 128/opsz/2; idx < end; ++idx) {
         unsigned pos = 2*end*row;
         tmp[pos+idx] = OPERATION::eval( arch.vmm_read( VR(), vn, pos+2*idx, valtype() ), arch.vmm_read( VR(), vn, pos+2*idx+1, valtype() ) );
-        tmp[pos+end+idx] = OPERATION::eval( arch.vmm_read( VR(), rm, pos+2*idx, valtype() ), arch.vmm_read( VR(), rm, pos+2*idx+1, valtype() ) ); 
+        tmp[pos+end+idx] = OPERATION::eval( arch.vmm_read( VR(), rm, pos+2*idx, valtype() ), arch.vmm_read( VR(), rm, pos+2*idx+1, valtype() ) );
       }
     for (unsigned idx = 0, end = VR::size()/opsz; idx < end; ++idx)
       arch.vmm_write( VR(), gn, idx, tmp[idx] );
@@ -1940,7 +1991,7 @@ struct Pabs : public Operation<ARCH>
 
   Pabs( OpBase<ARCH> const& opbase, RMOp<ARCH>&& _rm, unsigned _gn ) : Operation<ARCH>( opbase ), rm( std::move(_rm) ), gn( _gn ) {}
   RMOp<ARCH> rm; uint8_t gn;
-  
+
   void disasm( std::ostream& sink ) const { sink << (VR::vex()?"v":"") << "pabs" << DisasmSize(OPSZ,'i') << ' ' << DisasmW( VR(), rm ) << ',' << DisasmV( VR(), gn ); }
 
   uvaltype abs ( svaltype x ) const
@@ -3473,25 +3524,27 @@ struct Pshuf_w : public Operation<ARCH>
     typedef typename ARCH::u16_t u16_t;
 
 
+    const size_t row_size = 128 / 16;
+    const size_t half_size = row_size / 2;
     for (unsigned chunk = 0, cend = VR::size() / 128; chunk < cend; ++ chunk)
       {
-	u16_t res[64 / 16];
+	      u16_t res[half_size];
 
-        for (unsigned idx = 0, end = 64 / 16; idx < end; ++idx)
+        for (unsigned idx = 0, end = half_size; idx < end; ++idx)
           {
             unsigned part = (oo >> 2*idx) % 4;
-            res[idx] = arch.vmm_read( VR(), rm, part + chunk*end + (64 / 16) * HIGH, u16_t() );
+            res[idx] = arch.vmm_read( VR(), rm, part + chunk*row_size + half_size * HIGH, u16_t() );
           }
 
-	for (unsigned idx = 0, end = 64 / 16; idx < end; ++idx)
+	      for (unsigned idx = 0, end = half_size; idx < end; ++idx)
           {
-            arch.vmm_write( VR(), gn, idx + chunk*end + (64 / 16) * HIGH, res[idx] );
+            arch.vmm_write( VR(), gn, idx + chunk*row_size + half_size * HIGH, res[idx] );
           }
 
-	for (unsigned idx = 64 / 16, end = 128 / 16; idx < end; ++idx)
+	      for (unsigned idx = half_size, end = row_size; idx < end; ++idx)
           {
-	    arch.vmm_write( VR(), gn, idx + chunk*end - (64 / 16) * HIGH,
-			    arch.vmm_read( VR(), rm, idx + chunk*end - (64 / 16) * HIGH, u16_t() ));
+	          arch.vmm_write( VR(), gn, idx + chunk*row_size - half_size * HIGH,
+			        arch.vmm_read( VR(), rm, idx + chunk*row_size - half_size * HIGH, u16_t() ));
           }
 
       }
@@ -4618,14 +4671,14 @@ struct Insr : public Op3V<ARCH,VR>
   }
 };
 
-template <class ARCH>
-struct VInsertI128 : public Op3V<ARCH,YMM>
+template <class ARCH, char KIND>
+struct VInsert_128 : public Op3V<ARCH,YMM>
 {
-  VInsertI128( OpBase<ARCH> const& opbase, uint8_t _imm, MOp<ARCH> const* rm, uint8_t vn, uint8_t gn ) : Op3V<ARCH,YMM>( opbase, rm, vn, gn ), imm( _imm ) {} uint8_t imm;
+  VInsert_128( OpBase<ARCH> const& opbase, uint8_t _imm, MOp<ARCH> const* rm, uint8_t vn, uint8_t gn ) : Op3V<ARCH,YMM>( opbase, rm, vn, gn ), imm( _imm ) {} uint8_t imm;
 
   using Op3V<ARCH,YMM>::rm; using Op3V<ARCH,YMM>::vn; using Op3V<ARCH,YMM>::gn; using Op3V<ARCH,YMM>::disasmVV;
 
-  void disasm( std::ostream& sink ) const { sink << "vinserti128 " << DisasmI( imm ) << ',' << DisasmW( XMM(), rm ); disasmVV(sink); }
+  void disasm( std::ostream& sink ) const { sink << "vinsert" << KIND << "128 " << DisasmI( imm ) << ',' << DisasmW( XMM(), rm ); disasmVV(sink); }
 
   void execute( ARCH& arch ) const
   {
@@ -4664,7 +4717,13 @@ template <class ARCH> struct DC<ARCH,INSERT> { Operation<ARCH>* get( InputCode<A
   if (auto _ = match( ic, vex( "\x66\x0f\x3a\x38" ) & RM() & Imm<8>() )) {
     if (ic.w() || ic.vlen() != 256) return 0;
 
-    return new VInsertI128<ARCH>( _.opbase(), _.i( uint8_t() ), _.rmop(), _.vreg(), _.greg() );
+    return new VInsert_128<ARCH,'i'>( _.opbase(), _.i( uint8_t() ), _.rmop(), _.vreg(), _.greg() );
+  }
+
+  if (auto _ = match( ic, vex( "\x66\x0f\x3a\x18" ) & RM() & Imm<8>() )) {
+    if (ic.w() || ic.vlen() != 256) return 0;
+
+    return new VInsert_128<ARCH,'f'>( _.opbase(), _.i( uint8_t() ), _.rmop(), _.vreg(), _.greg() );
   }
 
   return 0;

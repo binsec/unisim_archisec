@@ -1,3 +1,10 @@
+## 0.0.14 (2026-05-08)
+
+- fix some instruction decoding resulting in segfaults
+  (including fix from [admkopec](https://github.com/binsec/unisim_archisec/pull/4))
+- fix decode or semantics of several x86 instructions
+  (including reports from [#64](https://github.com/binsec/binsec/issues/61))
+
 ## 0.0.13 (2025-10-01)
 
 - bug fixes

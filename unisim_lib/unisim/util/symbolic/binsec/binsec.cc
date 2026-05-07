@@ -451,15 +451,21 @@ namespace binsec {
     } sec(this,0);
   }
 
+  Translator::Translator()
+    : coderoot(std::make_unique<ActionNode>())
+    , with_opaque_code(false)
+    , with_opaque_stat(true)
+  {}
+
   void
-  ActionNode::generate(std::ostream& sink, unsigned addrsize, uint64_t address, bool with_opaque) const
+  Translator::generate(std::ostream& sink, unsigned addrsize, uint64_t address) const
   {
     Nop entrypoint;
     Scope root( entrypoint );
 
-    root.GenCode( this );
+    root.GenCode( coderoot.get() );
 
-    if (not root.opaque or with_opaque)
+    if (not root.opaque or with_opaque_code)
       {
         Instruction::Sequence prologue, epilogue;
         entrypoint.compute_indices(prologue, epilogue);
@@ -477,10 +483,11 @@ namespace binsec {
         for (auto line : epilogue)
           line.second->print(printer);
       }
-    if (root.opaque or with_opaque)
+    else
+      sink << "(unsupported)\n";
+
+    if (root.opaque and with_opaque_stat)
       {
-        if (not with_opaque)
-          sink << "(unsupported)\n";
         struct
         {
           void source(Expr const& from)
@@ -524,7 +531,7 @@ namespace binsec {
           std::set<Expr> reads, writes, branches;
         } effects;
 
-        effects.process( this );
+        effects.process( coderoot.get() );
 
         sink << "(read";
         for (auto const& read : effects.reads)

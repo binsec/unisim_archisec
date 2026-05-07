@@ -48,17 +48,14 @@ namespace arch64 {
 
 struct TBD {};
 
-struct Translator
+struct Translator : unisim::util::symbolic::binsec::Translator
 {
   typedef ppc64::Decoder Decoder;
   typedef ppc64::Operation Operation;
 
-  typedef unisim::util::symbolic::binsec::ActionNode ActionNode;
-
   Translator( uint64_t _addr, uint32_t _code )
-    : coderoot(new ActionNode), addr(_addr), code(_code)
+    : addr(_addr), code(_code)
   {}
-  ~Translator() { delete coderoot; }
 
   void
   translate( std::ostream& sink )
@@ -111,7 +108,7 @@ struct Translator
         for (bool end = false; not end;)
           {
             Arch state( reference );
-	    path.reset(coderoot);
+	    path.reset(coderoot.get());
             instruction->execute( &state );
             end = state.close( reference, addr + 4 );
           }
@@ -125,10 +122,9 @@ struct Translator
       }
 
     // Translate to DBA
-    coderoot->generate(sink, 8, addr);
+    generate(sink, 8, addr);
   }
 
-  ActionNode*          coderoot;
   uint64_t             addr;
   uint32_t             code;
 };

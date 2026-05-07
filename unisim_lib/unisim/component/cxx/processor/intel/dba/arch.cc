@@ -51,6 +51,7 @@ ProcessorBase::ProcessorBase()
     flagvalues[reg.idx()] = newRegRead( reg );
   for (FRegID reg; reg.next();)
     fregs[reg.idx()] = newRegRead( reg );
+  ftop = newRegRead( FTopID() );
 }
 
 // void

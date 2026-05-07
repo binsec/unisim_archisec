@@ -2254,11 +2254,12 @@ struct Popcnt : public Operation<ARCH>
 {
   Popcnt( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn )  : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
 
-  void disasm( std::ostream& sink ) const { sink << "popcnt " << DisasmE( OP(), rmop ) << DisasmG( OP(), gn ); }
+  void disasm( std::ostream& sink ) const { sink << "popcnt " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
 
   void execute( ARCH& arch ) const
   {
     typedef typename TypeFor<ARCH,OP::SIZE>::u op_type;
+    typedef typename ARCH::bit_t bit_t;
     //    op_type const zero = op_type( 0 );
     op_type const lsb = op_type( 1 );
     op_type src = arch.rmread( OP(), rmop ), cnt = op_type( 0 );
@@ -2267,6 +2268,11 @@ struct Popcnt : public Operation<ARCH>
       cnt += ((src >> idx) & lsb);
 
     arch.regwrite( OP(), gn, cnt );
+
+    arch.flagwrite( ARCH::FLAG::ZF, bit_t(src == op_type( 0 )));
+
+    for (typename ARCH::FLAG::Code flag : {ARCH::FLAG::PF, ARCH::FLAG::SF, ARCH::FLAG::AF, ARCH::FLAG::OF, ARCH::FLAG::CF})
+      arch.flagwrite( flag, bit_t(false) );
   }
 };
 
@@ -2274,12 +2280,14 @@ template <class ARCH> struct DC<ARCH,POPCNT> { Operation<ARCH>* get( InputCode<A
 {
   if (ic.f0()) return 0;
 
-  if (auto _ = match( ic, simdF3() & opcode( "\x0f\xb8" ) & RM() ))
+  if (auto _ = match( ic, opcode( "\x0f\xb8" ) & RM() ))
 
     {
-      if      (ic.opsize() == 16) return new Popcnt<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
-      else if (ic.opsize() == 32) return new Popcnt<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
-      else if (ic.opsize() == 64) return new Popcnt<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
+      if (ic.f3()) {
+        if      (ic.opsize() == 16) return new Popcnt<ARCH,GOw>( _.opbase(), _.rmop(), _.greg() );
+        else if (ic.opsize() == 32) return new Popcnt<ARCH,GOd>( _.opbase(), _.rmop(), _.greg() );
+        else if (ic.opsize() == 64) return new Popcnt<ARCH,GOq>( _.opbase(), _.rmop(), _.greg() );
+      }
       return 0;
     }
 
@@ -2531,9 +2539,9 @@ template <class ARCH> struct DC<ARCH,BOUND> { Operation<ARCH>* get( InputCode<AR
 }};
 
 template <class ARCH, class OP, bool CF>
-struct Adcx : public Operation<ARCH>
+struct Adfx : public Operation<ARCH>
 {
-  Adcx( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
+  Adfx( OpBase<ARCH> const& opbase, MOp<ARCH> const* _rmop, uint8_t _gn ) : Operation<ARCH>( opbase ), rmop( _rmop ), gn( _gn ) {} RMOp<ARCH> rmop; uint8_t gn;
   void disasm( std::ostream& sink ) const { sink << "ad" << (CF ? 'c' : 'o') << "x " << DisasmE( OP(), rmop ) << ',' << DisasmG( OP(), gn ); }
 
   typedef typename TypeFor<ARCH,OP::SIZE>::u val_t;
@@ -2564,15 +2572,15 @@ template <class ARCH> struct DC<ARCH,ADF> { Operation<ARCH>* get( InputCode<ARCH
   if (auto _ = match( ic, simd66() & opcode( "\x0f\x38\xf6" ) & RM() ))
 
     {
-      if (ic.opsize() == 64) return new Adcx<ARCH,GOq,true>( _.opbase(), _.rmop(), _.greg() );
-      else                   return new Adcx<ARCH,GOd,true>( _.opbase(), _.rmop(), _.greg() );
+      if (ic.opsize() == 64) return new Adfx<ARCH,GOq,true>( _.opbase(), _.rmop(), _.greg() );
+      else                   return new Adfx<ARCH,GOd,true>( _.opbase(), _.rmop(), _.greg() );
     }
 
   if (auto _ = match( ic, simdF3() & opcode( "\x0f\x38\xf6" ) & RM() ))
 
     {
-      if (ic.opsize() == 64) return new Adcx<ARCH,GOq,false>( _.opbase(), _.rmop(), _.greg() );
-      else                   return new Adcx<ARCH,GOd,false>( _.opbase(), _.rmop(), _.greg() );
+      if (ic.opsize() == 64) return new Adfx<ARCH,GOq,false>( _.opbase(), _.rmop(), _.greg() );
+      else                   return new Adfx<ARCH,GOd,false>( _.opbase(), _.rmop(), _.greg() );
     }
 
   return 0;

@@ -196,6 +196,7 @@ namespace symbolic {
     virtual ~ExprNode() {}
     void Retain() const { ++refs; }
     void Release() const { if (--refs == 0) delete this; }
+    uintptr_t GetRefs() const { return refs; }
     virtual ExprNode* Mutate() const = 0;
     /* Expression-Tree accessors */
     virtual unsigned SubCount() const = 0;
@@ -678,6 +679,19 @@ namespace symbolic {
     res->subs[2] = arg2;
     return res;
   }
+
+  struct Empty : public ExprNode
+  {
+    Empty() { Retain(); }
+    ~Empty() override { if (GetRefs() != 1) std::terminate(); }
+    struct Error {};
+    Empty* Mutate() const override { throw Error(); }
+    unsigned SubCount() const override { throw Error(); }
+    int cmp( ExprNode const& ) const override { throw Error(); }
+    ValueType GetType() const override { throw Error(); }
+    void Repr( std::ostream& sink ) const override { throw Error(); }
+    static Empty singleton;
+  };
 
   template <typename VALUE_TYPE>
   struct SmartValue

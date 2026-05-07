@@ -1208,14 +1208,11 @@ struct InstructionAddress : public unisim::util::symbolic::binsec::ASExprNode
 
 namespace
 {
-  struct Translator
+  struct Translator : unisim::util::symbolic::binsec::Translator
   {
-    typedef unisim::util::symbolic::binsec::ActionNode ActionNode;
-
     Translator( StatusRegister const& _status, uint32_t _addr, uint32_t _code )
-      : status(_status), addr(_addr), code(_code), coderoot(new ActionNode)
+      : status(_status), addr(_addr), code(_code)
     {}
-    ~Translator() { delete coderoot; }
 
     template <class ISA>
     void
@@ -1267,7 +1264,7 @@ namespace
       for (bool end = false; not end;)
         {
           Processor state( status );
-          state.path = coderoot;
+          state.path = coderoot.get();
           // Fetch
           uint32_t insn_addr = instruction->GetAddr(), nia = insn_addr + instruction.bytecount;
           state.SetNIA( Processor::U32(nia), Processor::B_JMP );
@@ -1313,12 +1310,11 @@ namespace
         }
 
       // Translate to DBA
-      coderoot->generate(sink, 4, addr);
+      generate(sink, 4, addr);
     }
 
     StatusRegister const& status;
     uint32_t              addr, code;
-    ActionNode*           coderoot;
   };
 }
 

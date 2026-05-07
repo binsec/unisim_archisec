@@ -397,17 +397,14 @@ struct Processor : public unisim::component::cxx::processor::sparc::isa::sv8::Ar
   std::set<Expr>   stores;
 };
 
-struct Translator
+struct Translator : public unisim::util::symbolic::binsec::Translator
 {
   typedef unisim::component::cxx::processor::sparc::dba::sv8::Decoder<Processor> Decoder;
   typedef unisim::component::cxx::processor::sparc::dba::sv8::Operation<Processor> Operation;
 
-  typedef unisim::util::symbolic::binsec::ActionNode ActionNode;
-
   Translator( uint32_t _addr, uint32_t _code0, uint32_t _code1 )
-    : coderoot(new ActionNode), addr(_addr), code0(_code0), code1(_code1)
+    : addr(_addr), code0(_code0), code1(_code1)
   {}
-  ~Translator() { delete coderoot; }
 
   void
   translate( std::ostream& sink )
@@ -479,7 +476,7 @@ struct Translator
             for (bool end = false; not end;)
               {
                 Processor state( reference );
-                state.path = coderoot;
+                state.path = coderoot.get();
                 instruction0->execute( state );
                 ds_state |= 1 << state.delay_slot;
                 if (state.delay_slot)
@@ -530,10 +527,9 @@ struct Translator
     headers.write(sink);
 
     // Translate to DBA
-    coderoot->generate(sink, 8, addr);
+    generate(sink, 8, addr);
   }
 
-  ActionNode*               coderoot;
   uint32_t                  addr;
   uint32_t                  code0, code1;
 };

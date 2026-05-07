@@ -40,6 +40,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <memory>
 
 namespace unisim {
 namespace util {
@@ -68,10 +69,21 @@ namespace binsec {
     void                    commit_stats();
     std::map<Expr,unsigned> const& get_sestats() const { return sestats; }
     std::set<Expr> const&   get_sinks() const { return updates; }
-    void                    generate(std::ostream& sink, unsigned bytes, uint64_t address, bool with_opaque=false) const;
 
   private:
     std::map<Expr,unsigned> sestats;
+  };
+
+  struct Translator
+  {
+    Translator();
+    void generate(std::ostream& sink, unsigned bytes, uint64_t address) const;
+    void show_opaque_code(bool show) { with_opaque_code = show; }
+    void show_opaque_stat(bool show) { with_opaque_stat = show; }
+
+    std::unique_ptr<ActionNode> coderoot;
+    bool with_opaque_code;
+    bool with_opaque_stat;
   };
 
   struct Scope;

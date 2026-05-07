@@ -260,7 +260,7 @@ struct ProcessorBase
   void                        finit();
   typedef u8_t rc_t;
   rc_t                        fcwreadRC() const { return u8_t(fcw >> 10) & u8_t(3); }
-  u16_t                       fcwread() const { return fcw; }
+  u16_t                       fcwread() const { throw Unimplemented(); return fcw; }
   void                        fcwwrite( u16_t value ) { fcw = value; }
   u8_t                        ftopread() { return ftop; }
   void                        ftopdec();
@@ -304,6 +304,16 @@ struct ProcessorBase
     FRegID() : code(end) {}
     FRegID( Code _code ) : code(_code) {}
     FRegID( char const* _code ) : code(end) { init( _code ); }
+  };
+
+  struct FTopID : public unisim::util::identifier::Identifier<FTopID>
+  {
+    typedef uint8_t value_type;
+    static unisim::util::symbolic::ValueType GetType() { return unisim::util::symbolic::CValueType(uint8_t()); }
+    enum Code { ftop } code;
+    char const* c_str() const { return "ftop"; }
+    void Repr(std::ostream& sink) const { sink << c_str(); }
+    FTopID() : code(ftop) {}
   };
 
   struct aes

@@ -508,7 +508,7 @@ template <class ARCH> struct DC<ARCH,MOVZX> { Operation<ARCH>* get( InputCode<AR
 
     {
       if (ic.opsize()==32) return new Movzx<ARCH,GOw,GOd>( _.opbase(), _.rmop(), _.greg() );
-      if (ic.opsize()==64) return new Movzx<ARCH,GOd,GOq>( _.opbase(), _.rmop(), _.greg() );
+      if (ic.opsize()==64) return new Movzx<ARCH,GOw,GOq>( _.opbase(), _.rmop(), _.greg() );
       return 0;
     }
 

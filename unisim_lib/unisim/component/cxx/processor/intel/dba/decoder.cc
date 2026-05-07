@@ -54,15 +54,13 @@ struct InstructionAddress : public unisim::util::symbolic::binsec::ASExprNode
   int compare( InstructionAddress const& rhs ) const { return 0; }
 };
 
-struct Translator
+struct Translator : public unisim::util::symbolic::binsec::Translator
 {
-  typedef unisim::util::symbolic::binsec::ActionNode ActionNode;
   typedef unisim::util::symbolic::binsec::dbx print_dbx;
 
   Translator(uint64_t _addr, std::vector<uint8_t>&& _code)
-    : code(std::move(_code)), addr(_addr), coderoot(new ActionNode)
+    : code(std::move(_code)), addr(_addr)
   {}
-  ~Translator() { delete coderoot; }
 
   template <class MODE>
   void
@@ -112,7 +110,7 @@ struct Translator
     for (bool end = false; not end;)
       {
         Proc state;
-        state.path = coderoot;
+        state.path = coderoot.get();
         state.step(*instruction);
         end = state.close(reference);
       }
@@ -130,7 +128,7 @@ struct Translator
           extract( Compat32(), sink );
 
         // Translate to DBA
-        coderoot->generate(sink, mode64 ? 8 : 4, addr);
+        generate(sink, mode64 ? 8 : 4, addr);
       }
     catch (ProcessorBase::Undefined const&)
       {
@@ -146,13 +144,15 @@ struct Translator
 
   std::vector<uint8_t> code;
   uint64_t addr;
-  ActionNode* coderoot;
 };
 
 void
 Decoder::process( std::ostream& sink, uint64_t addr, std::vector<uint8_t>&& code )
 {
   Translator actset( addr, std::move(code) );
+
+  actset.show_opaque_code( false );
+  actset.show_opaque_stat( true );
 
   actset.translate( mode64, sink );
 }

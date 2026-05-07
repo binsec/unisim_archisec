@@ -46,6 +46,8 @@ namespace unisim {
 namespace util {
 namespace symbolic {
 
+  Empty Empty::singleton;
+
   char const*
   Expr::dbgrepr() const
   {
@@ -92,6 +94,7 @@ namespace symbolic {
         case 16: return CValueType(uint16_t());
         case 32: return CValueType(uint32_t());
         case 64: return CValueType(uint64_t());
+        case 128: return CValueType(unisim::util::arithmetic::Integer<4,false>());
         } break;
       case ValueType::SIGNED:
         switch (bitsize) {
@@ -100,6 +103,7 @@ namespace symbolic {
         case 16: return CValueType(int16_t());
         case 32: return CValueType(int32_t());
         case 64: return CValueType(int64_t());
+        case 128: return CValueType(unisim::util::arithmetic::Integer<4,true>());
         } break;
       case ValueType::BOOL:
         if (bitsize != 1) break;
