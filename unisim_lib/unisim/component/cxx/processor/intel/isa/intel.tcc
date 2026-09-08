@@ -69,6 +69,7 @@ namespace intel {
                      PMOVMSKB, VMOVSD, VMOVZX, MXCSR, UCOMIS, PREFETCH, VFPCVT, PABS, PMUL, PCLMULQDQ, VPGATHER,
                      VSHIMM, MOVQ, BROADCAST, EXTRACT, INSERT, PACK_S, VPERMQ, VPERM2I128, PSHUFD, PSHUF_W, PSHUFB, PSHIFT,
                      PSHDQ, PTEST, PINSR, PCMPSTR, VFPCMP, SHUFP, MOVDDUP, VZEROUPPER, XSAVE, PBLEND, PMOV_X, SHANI, PMADDWD, PMADDUBSW,
+                     GFNI,
                      operation_count };
 
   template <class ARCH>
